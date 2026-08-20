@@ -68,6 +68,43 @@ class TestLLMExtractorParsing(unittest.TestCase):
         self.assertEqual(rec["source_anchor"]["file_path"], "x.md")
         self.assertEqual(rec["topic_slug"], "editor-config")
 
+    def test_batch_custom_ids_stay_short_and_map_back(self):
+        """The Batches API caps custom_id at 64 chars; long mirrored-file
+        session ids must never leak into custom_id, and results must map back
+        to their sessions."""
+        long_session = "sess_-Users-mitch-hudson-Documents-dashboard-mdb-tam__MEMORY-and-then-some"
+        self.assertGreater(len(long_session), 64)
+
+        captured = {}
+
+        class FakeBatches:
+            def create(self, requests):
+                captured["requests"] = requests
+                return types.SimpleNamespace(id="b1", processing_status="ended")
+
+            def retrieve(self, bid):
+                return types.SimpleNamespace(id=bid, processing_status="ended")
+
+            def results(self, bid):
+                for req in captured["requests"]:
+                    yield types.SimpleNamespace(
+                        custom_id=req["custom_id"],
+                        result=types.SimpleNamespace(
+                            type="succeeded",
+                            message=types.SimpleNamespace(
+                                content=[types.SimpleNamespace(type="text", text="[]")],
+                                usage=types.SimpleNamespace(input_tokens=1, output_tokens=1),
+                            ),
+                        ),
+                    )
+
+        client = types.SimpleNamespace(
+            messages=types.SimpleNamespace(batches=FakeBatches()))
+        outputs = llm_extractor.extract_batch(client, {long_session: "prompt"}, "m")
+        for req in captured["requests"]:
+            self.assertLessEqual(len(req["custom_id"]), 64)
+        self.assertEqual(set(outputs), {long_session})
+
     def test_extracted_records_flow_through_reingest(self):
         """LLM-extracted records must honor the same stable-ID re-ingest
         semantics as heuristic ones."""

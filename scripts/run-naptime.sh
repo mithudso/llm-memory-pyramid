@@ -36,12 +36,12 @@ setopt null_glob
 for src in $HOME/.claude/projects/*/memory/*.md; do
   proj="${src:h:h:t}"          # project dir slug (e.g. -Users-mitch-hudson-dev-foo)
   link="$WATCH_DIR/${proj}__${src:t}"
-  [[ -L "$link" && "$(readlink "$link")" == "$src" ]] || ln -sf "$src" "$link"
+  [[ -L "$link" && "$(readlink -- "$link")" == "$src" ]] || ln -sf -- "$src" "$link"
 done
 
 # Prune symlinks whose target vanished (deleted project or memory file).
 for link in "$WATCH_DIR"/*(N@); do
-  [[ -e "$link" ]] || rm -f "$link"
+  [[ -e "$link" ]] || rm -f -- "$link"
 done
 
 # --- One consolidation sweep ----------------------------------------------

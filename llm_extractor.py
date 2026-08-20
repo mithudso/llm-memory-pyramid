@@ -162,10 +162,15 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
     polls until the batch ends. Returns {session_id: raw_response_text} for
     succeeded requests; failed requests are logged and omitted.
     """
+    # custom_id is capped at 64 chars by the API and session ids derived from
+    # mirrored file names routinely exceed that — use short index ids and map
+    # them back to sessions on the way out.
+    id_to_session = {f"req_{i:05d}": session_id
+                     for i, session_id in enumerate(prompts_by_session)}
     requests = [
-        {"custom_id": session_id,
-         "params": _build_request_params(prompt, model)}
-        for session_id, prompt in prompts_by_session.items()
+        {"custom_id": custom_id,
+         "params": _build_request_params(prompts_by_session[session_id], model)}
+        for custom_id, session_id in id_to_session.items()
     ]
     batch = client.messages.batches.create(requests=requests)
     logger.info("Submitted batch %s with %d request(s)", batch.id, len(requests))
@@ -179,15 +184,16 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
 
     outputs: dict[str, str] = {}
     for result in client.messages.batches.results(batch.id):
+        session_id = id_to_session.get(result.custom_id, result.custom_id)
         if result.result.type == "succeeded":
             message = result.result.message
-            outputs[result.custom_id] = "".join(
+            outputs[session_id] = "".join(
                 block.text for block in message.content if block.type == "text"
             )
-            logger.info("Batch item %s: input=%s output=%s tokens", result.custom_id,
+            logger.info("Batch item %s: input=%s output=%s tokens", session_id,
                         message.usage.input_tokens, message.usage.output_tokens)
         else:
-            logger.error("Batch item %s failed: %s", result.custom_id, result.result.type)
+            logger.error("Batch item %s failed: %s", session_id, result.result.type)
     return outputs
 
 
