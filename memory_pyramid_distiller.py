@@ -167,26 +167,48 @@ class MemoryPyramidDistiller:
 
         index = self._get_semantic_index()
 
+        def fold(rec, canonical_rec):
+            if rec["id"] != canonical_rec["id"] and rec["id"] not in canonical_rec["duplicates"]:
+                canonical_rec["duplicates"].append(rec["id"])
+                anchor = dict(rec["source_anchor"])
+                if rec["text"] != canonical_rec["text"]:
+                    anchor["paraphrase_text"] = rec["text"]
+                canonical_rec.setdefault("duplicate_anchors", {})[rec["id"]] = anchor
+
+        # Pass 1: exact-text folds; collect the misses for a single batched
+        # semantic pass (one embed round-trip per merge, not per record).
+        exact_misses: list[dict[str, Any]] = []
         for rec in new_records:
-            clean_text = rec["text"].lower().strip()
-            canonical_rec = existing_texts.get(clean_text)
-            if canonical_rec is None and index is not None:
-                # Exact match missed: try a semantic near-duplicate fold. The
-                # promotion machinery requires identical text between canonical
-                # and duplicates, so semantic folds keep the CANONICAL's text
-                # and record the paraphrase in the duplicate anchor.
-                near_id = index.nearest_record_id(
-                    rec["text"], self.data["memory_records"], self.semantic_threshold
-                )
-                if near_id is not None:
-                    canonical_rec = next(r for r in self.data["memory_records"] if r["id"] == near_id)
+            canonical_rec = existing_texts.get(rec["text"].lower().strip())
             if canonical_rec is not None:
-                if rec["id"] != canonical_rec["id"] and rec["id"] not in canonical_rec["duplicates"]:
-                    canonical_rec["duplicates"].append(rec["id"])
-                    anchor = dict(rec["source_anchor"])
-                    if rec["text"] != canonical_rec["text"]:
-                        anchor["paraphrase_text"] = rec["text"]
-                    canonical_rec.setdefault("duplicate_anchors", {})[rec["id"]] = anchor
+                fold(rec, canonical_rec)
+            else:
+                exact_misses.append(rec)
+
+        # Pass 2: semantic near-duplicate folds against the EXISTING store.
+        # The promotion machinery requires identical text between canonical
+        # and duplicates, so semantic folds keep the CANONICAL's text and
+        # record the paraphrase in the duplicate anchor. Best-effort: any
+        # index failure (backend outage, cache-write race) degrades to
+        # exact-only dedup for this merge instead of aborting the ingest.
+        near_ids: list[str | None] = [None] * len(exact_misses)
+        if index is not None and exact_misses:
+            try:
+                near_ids = index.nearest_many(
+                    [r["text"] for r in exact_misses],
+                    self.data["memory_records"], self.semantic_threshold,
+                )
+            except (RuntimeError, OSError) as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Semantic dedup unavailable (%s); exact-only for this merge", exc)
+
+        by_id = {r["id"]: r for r in self.data["memory_records"]}
+        for rec, near_id in zip(exact_misses, near_ids):
+            clean_text = rec["text"].lower().strip()
+            canonical_rec = existing_texts.get(clean_text) or by_id.get(near_id or "")
+            if canonical_rec is not None:
+                fold(rec, canonical_rec)
             else:
                 self.data["memory_records"].append(rec)
                 existing_texts[clean_text] = rec

@@ -35,16 +35,39 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Probe order: remote embedding server first, local Ollama as backup. A single
-# NAPMEM_OLLAMA_URL overrides the whole list; NAPMEM_OLLAMA_URLS is the
-# comma-separated failover chain.
-DEFAULT_OLLAMA_URLS = "http://192.168.4.75:11434,http://localhost:11434"
-OLLAMA_URLS = [
-    u.strip().rstrip("/")
-    for u in (os.environ.get("NAPMEM_OLLAMA_URL")
-              or os.environ.get("NAPMEM_OLLAMA_URLS", DEFAULT_OLLAMA_URLS)).split(",")
-    if u.strip()
-]
+# Capacity-weighted Ollama pool. Comma-separated `url=weight` entries (weight
+# optional, default 1); embedding batches are split across the LIVE hosts in
+# proportion to weight, and a host failing mid-batch has its chunk retried on
+# the remaining hosts. Fleet: the RTX 5080 Linux box (heaviest), the M5 Max
+# MacBook Pro, and this box's local daemon. A single NAPMEM_OLLAMA_URL
+# overrides the whole list.
+DEFAULT_OLLAMA_URLS = (
+    "http://192.168.4.75:11434=4,"    # linux / RTX 5080
+    "http://192.168.4.1:11434=2,"     # M5 Max MBP 64GB
+    "http://localhost:11434=1"        # this box
+)
+
+
+def _parse_weighted_urls(raw: str) -> list[tuple[str, int]]:
+    hosts: list[tuple[str, int]] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        url, _, weight = part.partition("=")
+        try:
+            w = max(1, int(weight)) if weight else 1
+        except ValueError:
+            w = 1
+        hosts.append((url.strip().rstrip("/"), w))
+    return hosts
+
+
+OLLAMA_HOSTS = _parse_weighted_urls(
+    os.environ.get("NAPMEM_OLLAMA_URL")
+    or os.environ.get("NAPMEM_OLLAMA_URLS", DEFAULT_OLLAMA_URLS)
+)
+OLLAMA_URLS = [u for u, _ in OLLAMA_HOSTS]  # back-compat (probe order)
 # mxbai-embed-large: strongest embedding model served by both hosts; keeping
 # remote and local on the SAME model preserves the vector cache across
 # failover (a model switch invalidates every cached vector).
@@ -91,44 +114,68 @@ class HashedTfBackend:
 
 
 class OllamaBackend:
-    """Embeddings from a local Ollama server via its /api/embed endpoint."""
+    """
+    Capacity-weighted embedding pool over one or more Ollama hosts.
 
-    name = "ollama"
+    Every live host must serve the SAME model (cache validity). Batches are
+    split across live hosts proportionally to their weights and dispatched in
+    parallel; a host failing mid-batch has its chunk retried on the remaining
+    hosts and is dropped from the pool for this process's lifetime. All hosts
+    failing raises RuntimeError (callers degrade to hashed/substring paths).
+    """
 
-    def __init__(self, base_url: str, model: str = OLLAMA_MODEL):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None, model: str = OLLAMA_MODEL,
+                 hosts: list[tuple[str, int]] | None = None):
+        if hosts is None:
+            hosts = [(base_url.rstrip("/"), 1)] if base_url else []
+        self.hosts: list[tuple[str, int]] = [(u.rstrip("/"), w) for u, w in hosts]
         self.model = model
+
+    @property
+    def base_url(self) -> str:
+        return self.hosts[0][0] if self.hosts else ""
+
+    @property
+    def name(self) -> str:
+        return "ollama" if len(self.hosts) <= 1 else f"ollama-pool[{len(self.hosts)}]"
+
+    @staticmethod
+    def _host_alive(url: str) -> bool:
+        try:
+            req = urllib.request.Request(f"{url}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                return resp.status == 200
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            logger.debug("Ollama probe failed for %s: %s", url, exc)
+            return False
 
     @classmethod
     def probe(cls, urls: list[str] | None = None) -> "OllamaBackend | None":
-        """Returns a backend for the first responding host in the failover
-        chain (remote embedding server before local backup), else None."""
-        for url in urls or OLLAMA_URLS:
-            backend = cls(url)
-            try:
-                req = urllib.request.Request(f"{backend.base_url}/api/tags", method="GET")
-                with urllib.request.urlopen(req, timeout=1.5) as resp:
-                    if resp.status == 200:
-                        logger.info("Ollama backend: %s (%s)", backend.base_url, backend.model)
-                        return backend
-            except (urllib.error.URLError, OSError, TimeoutError) as exc:
-                logger.debug("Ollama probe failed for %s: %s", url, exc)
-        return None
+        """Probes every configured host; returns a pool of the live ones
+        (weighted per NAPMEM_OLLAMA_URLS), or None when none respond."""
+        configured = ([(u, 1) for u in urls] if urls is not None else OLLAMA_HOSTS)
+        live = [(u.rstrip("/"), w) for u, w in configured if cls._host_alive(u)]
+        if not live:
+            return None
+        backend = cls(hosts=live)
+        logger.info("Ollama backend: %s -> %s (%s)", backend.name,
+                    [f"{u}(w={w})" for u, w in live], backend.model)
+        return backend
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def _embed_on(self, url: str, texts: list[str]) -> list[list[float]]:
         payload = json.dumps({"model": self.model, "input": texts}).encode("utf-8")
         req = urllib.request.Request(
-            f"{self.base_url}/api/embed", data=payload,
+            f"{url}/api/embed", data=payload,
             headers={"Content-Type": "application/json"}, method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=300) as resp:
                 body = json.load(resp)
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            raise RuntimeError(f"Ollama embedding request failed: {exc}") from exc
+            raise RuntimeError(f"Ollama embedding request failed ({url}): {exc}") from exc
         embeddings = body.get("embeddings")
         if not isinstance(embeddings, list) or len(embeddings) != len(texts):
-            raise RuntimeError("Ollama returned a malformed embeddings response")
+            raise RuntimeError(f"Ollama returned a malformed embeddings response ({url})")
         # The response travels plain HTTP from a LAN host and lands in the
         # persistent vector cache — validate shape strictly (numeric-only
         # vectors of one consistent dimension) so a compromised or spoofed
@@ -137,12 +184,76 @@ class OllamaBackend:
         for vec in embeddings:
             if (not isinstance(vec, list) or not vec
                     or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vec)):
-                raise RuntimeError("Ollama returned a non-numeric embedding vector")
+                raise RuntimeError(f"Ollama returned a non-numeric embedding vector ({url})")
             if dim is None:
                 dim = len(vec)
             elif len(vec) != dim:
-                raise RuntimeError("Ollama returned inconsistent embedding dimensions")
+                raise RuntimeError(f"Ollama returned inconsistent embedding dimensions ({url})")
         return embeddings
+
+    def _split_by_weight(self, texts: list[str]) -> list[tuple[str, int, int]]:
+        """Contiguous (url, start, end) chunks proportional to host weight."""
+        total_w = sum(w for _, w in self.hosts)
+        chunks = []
+        start = 0
+        for i, (url, w) in enumerate(self.hosts):
+            if i == len(self.hosts) - 1:
+                end = len(texts)
+            else:
+                end = start + max(1, round(len(texts) * w / total_w))
+                end = min(end, len(texts))
+            if start < end:
+                chunks.append((url, start, end))
+            start = end
+        return chunks
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        if not self.hosts:
+            raise RuntimeError("Ollama pool has no live hosts")
+        # Small batches: single request to the highest-weight host, walking
+        # down the pool on failure.
+        if len(self.hosts) == 1 or len(texts) < 4:
+            last_exc: Exception | None = None
+            for url, _ in self.hosts:
+                try:
+                    return self._embed_on(url, texts)
+                except RuntimeError as exc:
+                    last_exc = exc
+                    logger.warning("Embed failed on %s; trying next host", url)
+            raise RuntimeError(f"All Ollama hosts failed: {last_exc}")
+
+        # Large batches: weighted parallel dispatch with per-chunk failover.
+        from concurrent.futures import ThreadPoolExecutor
+        results: list[list[list[float]] | None] = [None] * len(self.hosts)
+        chunks = self._split_by_weight(texts)
+        with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+            futures = {pool.submit(self._embed_on, url, texts[s:e]): (i, url, s, e)
+                       for i, (url, s, e) in enumerate(chunks)}
+            failed: list[tuple[int, str, int, int]] = []
+            for fut, (i, url, s, e) in futures.items():
+                try:
+                    results[i] = fut.result()
+                except RuntimeError as exc:
+                    logger.warning("Embed chunk failed on %s (%s); will retry elsewhere", url, exc)
+                    failed.append((i, url, s, e))
+        for i, dead_url, s, e in failed:
+            self.hosts = [(u, w) for u, w in self.hosts if u != dead_url] or self.hosts
+            retried = False
+            for url, _ in self.hosts:
+                if url == dead_url:
+                    continue
+                try:
+                    results[i] = self._embed_on(url, texts[s:e])
+                    retried = True
+                    break
+                except RuntimeError:
+                    continue
+            if not retried:
+                raise RuntimeError("All Ollama hosts failed while retrying a chunk")
+        out: list[list[float]] = []
+        for i, (_, s, e) in enumerate(chunks):
+            out.extend(results[i])
+        return out
 
 
 def select_backend():
@@ -178,7 +289,11 @@ class SemanticIndex:
         return {"model": self.backend.model, "vectors": {}}
 
     def save(self):
-        tmp_path = f"{self.index_path}.tmp"
+        # Per-PID tmp name: the index is written by both the consolidator and
+        # any concurrent retrieval query; a shared tmp path lets one process's
+        # os.replace consume the other's file (observed crash). Last writer
+        # wins on the index itself — it is a rebuildable cache.
+        tmp_path = f"{self.index_path}.{os.getpid()}.tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(self._cache, f)
         os.replace(tmp_path, self.index_path)
@@ -225,6 +340,29 @@ class SemanticIndex:
         if results and results[0]["score"] >= threshold:
             return results[0]["record"]["id"]
         return None
+
+    def nearest_many(self, texts: list[str], records: list[dict[str, Any]],
+                     threshold: float) -> list[str | None]:
+        """
+        Batched nearest_record_id: ONE embed round-trip for all query texts
+        (plus cache misses among records) instead of one per query — the
+        difference between minutes and hours on a large merge.
+        """
+        if not texts:
+            return []
+        if not records:
+            return [None] * len(texts)
+        vectors = self._vectors_for(records)
+        query_vecs = self.backend.embed(texts)
+        out: list[str | None] = []
+        for qv in query_vecs:
+            best_id, best_score = None, 0.0
+            for r in records:
+                score = cosine(qv, vectors[r["id"]])
+                if score > best_score:
+                    best_id, best_score = r["id"], score
+            out.append(best_id if best_score >= threshold else None)
+        return out
 
 
 def main():

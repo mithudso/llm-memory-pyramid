@@ -400,6 +400,34 @@ class TestOllamaFailover(unittest.TestCase):
                 with self.assertRaises(RuntimeError, msg=f"accepted {bad}"):
                     backend.embed(texts)
 
+    def test_weighted_url_parsing_and_split(self):
+        from semantic_index import _parse_weighted_urls
+        hosts = _parse_weighted_urls(
+            "http://a:1/=4, http://b:2=2 ,http://c:3,bad=weight=x")
+        self.assertEqual(hosts[:3], [("http://a:1", 4), ("http://b:2", 2), ("http://c:3", 1)])
+        pool = OllamaBackend(hosts=[("http://a:1", 3), ("http://b:2", 1)])
+        chunks = pool._split_by_weight(list(range(8)))
+        self.assertEqual(chunks, [("http://a:1", 0, 6), ("http://b:2", 6, 8)])
+        self.assertEqual(pool.name, "ollama-pool[2]")
+
+    def test_nearest_many_matches_singles(self):
+        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
+        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        tmp = tempfile.mkdtemp(prefix="napmem_nm_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        index = SemanticIndex(os.path.join(tmp, "p.json"))
+        records = [
+            {"id": "r1", "text": "user prefers tabs over spaces always"},
+            {"id": "r2", "text": "deployment pipeline uses github actions"},
+        ]
+        queries = ["User Prefers TABS over spaces always!",
+                   "something entirely unrelated to anything"]
+        batched = index.nearest_many(queries, records, threshold=0.8)
+        singles = [index.nearest_record_id(q, records, 0.8) for q in queries]
+        self.assertEqual(batched, singles)
+        self.assertEqual(batched[0], "r1")
+        self.assertIsNone(batched[1])
+
     def test_probe_order_prefers_first_responding_host(self):
         alive = "http://127.0.0.1:9999"
 

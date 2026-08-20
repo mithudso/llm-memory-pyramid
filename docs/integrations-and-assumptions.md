@@ -8,19 +8,22 @@ inventory with error/retry/logging status: `docs/external-calls.md`.
 - **Anthropic API** (`llm_extractor.py`): Messages + Message Batches for LLM
   extraction. Credential via the SDK's standard resolution; `anthropic`
   package lazy-imported.
-- **Ollama** (`semantic_index.py`): `/api/embed` for real embeddings with a
-  host failover chain — the remote server `http://192.168.4.75:11434` is
-  probed first, local `http://localhost:11434` is the backup; both serve
-  `mxbai-embed-large` (same model on both keeps the vector cache valid across
-  failover). If neither responds, silent fallback to the stdlib hashed-TF
-  backend.
+- **Ollama** (`semantic_index.py`): `/api/embed` via a capacity-weighted pool.
+  Default fleet: `192.168.4.75:11434` (RTX 5080 Linux box, weight 4),
+  `192.168.4.1:11434` (M5 Max MBP 64GB, weight 2), `localhost:11434` (this
+  box, weight 1). Live hosts share batches proportionally to weight; a host
+  failing mid-batch has its chunk retried elsewhere and is dropped for the
+  process lifetime. Every host must serve `mxbai-embed-large` — same model
+  everywhere keeps the vector cache valid across failover. No host responding
+  → silent fallback to the stdlib hashed-TF backend. Note: a host is only
+  poolable if its Ollama listens on the LAN (`OLLAMA_HOST=0.0.0.0`).
 
 ## Environment variables
 
 | Var | Used by | Meaning |
 |---|---|---|
 | `NAPMEM_EMBED_BACKEND` | `semantic_index.py` | Force `ollama` or `hashed` (default: auto-probe) |
-| `NAPMEM_OLLAMA_URLS` | `semantic_index.py` | Comma-separated failover chain (default `http://192.168.4.75:11434,http://localhost:11434`) |
+| `NAPMEM_OLLAMA_URLS` | `semantic_index.py` | Comma-separated `url=weight` pool (default `http://192.168.4.75:11434=4,http://192.168.4.1:11434=2,http://localhost:11434=1`) |
 | `NAPMEM_OLLAMA_URL` / `NAPMEM_OLLAMA_MODEL` | `semantic_index.py` | Single-host override of the chain / embedding model (default `mxbai-embed-large`) |
 | `NAPMEM_PYRAMID` | `napmem_mcp_server.py` | Default pyramid store path |
 | `ANTHROPIC_API_KEY` (et al.) | `anthropic` SDK | Standard SDK credential resolution; never read directly by repo code |
