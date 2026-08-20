@@ -2,17 +2,19 @@
 
 ## Strategy
 
-Plain `unittest`, single suite in `test_napmem_pipeline.py`, no test
-dependencies. Tests assert observable behavior on real pyramid stores written
-to temp paths — extraction output, dedup folds, ID stability across
-re-ingestion, duplicate promotion, provenance resolution, prompt-guard
-neutralization.
+Plain `unittest`, two suites (`test_napmem_pipeline.py`,
+`test_napmem_extensions.py`), 19 tests, no test dependencies, network-free:
+extractor tests exercise parsing/validation offline, semantic tests force
+`NAPMEM_EMBED_BACKEND=hashed`, and the MCP test drives the real server binary
+over a subprocess pipe. Tests assert observable behavior on real pyramid
+stores written to temp paths.
 
 ## Running
 
 ```bash
-python3 test_napmem_pipeline.py        # direct
-python3 -m unittest -v                 # discovery, verbose
+python3 -m unittest discover -s . -p "test_*.py"   # everything (CI command)
+python3 test_napmem_pipeline.py                    # core suite only
+python3 test_napmem_extensions.py                  # extensions suite only
 ```
 
 ## Coverage target
@@ -27,6 +29,11 @@ in this codebase, all covered and to stay covered:
 - Dedup (`deduplicate_and_merge`): fold + `duplicate_anchors` preservation.
 - Provenance (`inspect_provenance`): canonical and duplicate-ID resolution.
 - Prompt guards (`_neutralize_sentinel`): nested-sentinel reconstitution.
+- Extractor gate (`validate_unit`/`units_to_records`): invalid units rejected;
+  LLM-extracted records honor stable-ID re-ingest semantics.
+- Semantic dedup: fold with `paraphrase_text` anchor; off by default.
+- MCP protocol: handshake, tool list, in-band tool errors, -32601 on unknown
+  methods.
 
 ## CI gate
 

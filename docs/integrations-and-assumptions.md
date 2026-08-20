@@ -2,13 +2,23 @@
 
 ## External services
 
-None. No network calls, no SDKs, no subprocesses, no env vars.
+All optional — the core pipeline runs with zero external calls. Full
+inventory with error/retry/logging status: `docs/external-calls.md`.
 
-The one *intended* integration point is an LLM extraction backend for
-`llm_extraction_prompts.py` — not yet wired; the distiller uses its heuristic
-extractor. When wired, that call becomes the repo's first external call and
-must be added to `docs/external-calls.md` with logging, retry policy, and a
-test.
+- **Anthropic API** (`llm_extractor.py`): Messages + Message Batches for LLM
+  extraction. Credential via the SDK's standard resolution; `anthropic`
+  package lazy-imported.
+- **Ollama** (`semantic_index.py`): localhost `/api/embed` for real
+  embeddings; auto-probed, silent fallback to the stdlib hashed-TF backend.
+
+## Environment variables
+
+| Var | Used by | Meaning |
+|---|---|---|
+| `NAPMEM_EMBED_BACKEND` | `semantic_index.py` | Force `ollama` or `hashed` (default: auto-probe) |
+| `NAPMEM_OLLAMA_URL` / `NAPMEM_OLLAMA_MODEL` | `semantic_index.py` | Ollama endpoint (default `http://localhost:11434`) and model (`nomic-embed-text`) |
+| `NAPMEM_PYRAMID` | `napmem_mcp_server.py` | Default pyramid store path |
+| `ANTHROPIC_API_KEY` (et al.) | `anthropic` SDK | Standard SDK credential resolution; never read directly by repo code |
 
 ## Hardcoded assumptions
 

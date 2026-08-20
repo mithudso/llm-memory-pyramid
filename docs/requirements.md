@@ -29,5 +29,7 @@
 
 ## Dependencies
 
-None at runtime. CI-only: `ruff` (advisory lint), GitHub Actions
+Core: none. Optional: `anthropic` package (LLM extraction path,
+lazy-imported) and a local Ollama server (real embeddings; stdlib hashed-TF
+fallback otherwise). CI-only: `ruff` (advisory lint), GitHub Actions
 `setup-python`/`checkout`.

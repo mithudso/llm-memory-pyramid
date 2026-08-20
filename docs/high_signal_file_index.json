@@ -23,9 +23,29 @@
       "summary": "Zero-fabrication LLM extraction prompt: untrusted-content + zero-fabrication guards, sentinel delimiter with loop neutralization (_neutralize_sentinel), newline-stripped metadata interpolation (_neutralize_metadata), get_extraction_prompt."
     },
     {
+      "path": "llm_extractor.py",
+      "signal": "high",
+      "summary": "Production LLM extraction: get_extraction_prompt -> Anthropic Message Batches API (claude-haiku-4-5 default) or direct call, parse_extraction_output (fence-tolerant), validate_unit schema gate, units_to_records, ingest via distiller.ingest_session_records. Optional anthropic dependency, lazy import."
+    },
+    {
+      "path": "semantic_index.py",
+      "signal": "high",
+      "summary": "SemanticIndex: per-record embedding cache (<pyramid>.embindex.json, keyed id+text hash), cosine search, nearest_record_id for semantic dedup. Backends: OllamaBackend (localhost /api/embed, auto-probe) and HashedTfBackend (stdlib hashed TF). NAPMEM_EMBED_BACKEND forces choice."
+    },
+    {
+      "path": "napmem_mcp_server.py",
+      "signal": "high",
+      "summary": "Pure-stdlib MCP stdio server (newline JSON-RPC 2.0, protocol 2025-06-18): initialize/tools list/tools call; tools search_memory (substring+semantic), inspect_provenance, get_topic_track, memory_stats. Store re-read per call; in-band isError for tool failures."
+    },
+    {
       "path": "test_napmem_pipeline.py",
       "signal": "high",
       "summary": "9 unittest tests: extraction typing/salience, dedup + duplicate anchors, re-ingestion ID stability, duplicate promotion, layer rebuild, provenance, sentinel neutralization."
+    },
+    {
+      "path": "test_napmem_extensions.py",
+      "signal": "high",
+      "summary": "10 unittest tests, network-free: extractor parse/validate/convert + LLM-record re-ingest stability, hashed-backend cosine, semantic search ranking, semantic dedup fold and off-by-default, MCP handshake/tools/errors via subprocess."
     },
     {
       "path": "memory_pyramid_schema.json",

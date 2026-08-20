@@ -5,14 +5,22 @@ green (9/9).
 
 ## Limitations (by design, candidates for enhancement)
 
-- **Exact-text dedup only.** Paraphrases of the same fact create separate
-  records; semantic/embedding dedup is the planned complement (ADR-3).
-- **Heuristic extractor in the loop.** `extract_atomic_units()` is a
-  deterministic keyword-rule stand-in; the production LLM extraction path
-  (`llm_extraction_prompts.py`) is defined but not wired.
+- **Semantic dedup is opt-in and threshold-based.** Default pipeline remains
+  exact-text (deterministic). The hashed-TF fallback backend detects
+  token-overlap near-duplicates, not true paraphrase — real paraphrase folding
+  needs the Ollama backend.
+- **Semantic folds keep the canonical's text.** The paraphrase is preserved in
+  the duplicate anchor (`paraphrase_text`); a promoted duplicate therefore
+  carries the old canonical's wording with its own anchor disclosing the
+  original phrasing.
+- **Heuristic extractor is still the default.** `llm_extractor.py` is the
+  production path but requires the `anthropic` package and an API key; the
+  consolidator daemon still uses the heuristic extractor.
 - **Heuristic profile categories are a subset.** The stand-in emits only
   `preference`/`constraint`/`workflow`; `identity` and `goal` from the schema
-  enum are reserved for the LLM extractor.
+  enum arrive via the LLM extraction path.
+- **Batch extraction polls synchronously.** `extract_batch` blocks up to 1h;
+  a submit-now/collect-later mode would suit cron-driven naptime better.
 - **Single writer.** No lock file; running two consolidators against one store
   can lose updates (last atomic write wins).
 - **In-memory mtime cache.** The consolidator re-ingests every file on

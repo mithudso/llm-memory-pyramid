@@ -19,7 +19,9 @@ jobs:
       - name: Compile check
         run: python -m compileall -q .
       - name: Run tests
-        run: python test_napmem_pipeline.py
+        run: python -m unittest discover -v -s . -p "test_*.py"
+        env:
+          NAPMEM_EMBED_BACKEND: hashed
 
   lint:
     runs-on: ubuntu-latest

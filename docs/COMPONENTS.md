@@ -56,16 +56,58 @@ are logged and skipped — one bad file never kills the loop.
 **Purpose:** zero-fabrication LLM extraction prompt templates with injection
 guards. `get_extraction_prompt(raw_text, session_id, file_name)` wraps
 untrusted text in a loop-neutralized sentinel delimiter and strips
-newlines/sentinels from metadata. Not yet wired into the distiller (heuristic
-stand-in in use).
+newlines/sentinels from metadata. Consumed by `llm_extractor.py`.
+
+## `llm_extractor.py` — LLM extraction pipeline
+
+**Purpose:** production extraction path replacing the heuristic extractor.
+
+**API:** `parse_extraction_output(raw)` (tolerates one JSON code fence),
+`validate_unit(unit)`, `units_to_records(units, session_id, file_path)`,
+`extract_direct(client, prompt, model)`, `extract_batch(client, prompts, model)`
+(Message Batches API — 50% cost, polls to completion),
+`ingest_extractions(distiller, outputs, file_paths)`. Invalid units are
+rejected and logged, never repaired.
+
+**CLI:** `--input <files>`, `--model` (default `claude-haiku-4-5`),
+`--no-batch`, `--semantic-dedup`, `--dry-run`, `--pyramid`.
+
+**Depends on:** `anthropic` (lazy import; clear error if missing).
+
+## `semantic_index.py` — embedding index
+
+**Purpose:** cosine retrieval + near-duplicate detection over Layer 1.
+
+**API (`SemanticIndex`):** `search(query, records, top_k)`,
+`nearest_record_id(text, records, threshold)`, `rebuild(records)`. Vectors
+cached in `<pyramid>.embindex.json` keyed by record id + text hash; a
+backend/model switch invalidates the cache. Backends: `OllamaBackend`
+(localhost `/api/embed`, auto-probed) and `HashedTfBackend` (stdlib hashed
+term-frequency, deterministic fallback). Force with
+`NAPMEM_EMBED_BACKEND=ollama|hashed`.
+
+**CLI:** `--rebuild`, `--query`, `--top-k`, `--pyramid`.
+
+## `napmem_mcp_server.py` — MCP stdio server
+
+**Purpose:** exposes retrieval tools to MCP clients (registered in
+`.mcp.json`). Pure-stdlib newline-delimited JSON-RPC 2.0; protocol
+`2025-06-18`. Tools: `search_memory` (substring or semantic),
+`inspect_provenance`, `get_topic_track`, `memory_stats`. Store re-read per
+call so consolidator updates are visible; tool failures return in-band
+`isError` results.
 
 ## `memory_pyramid_schema.json` — store schema
 
 JSON Schema describing the pyramid store shape (layers 0–3, record fields,
 profile category enum).
 
-## `test_napmem_pipeline.py` — test suite
+## `test_napmem_pipeline.py` / `test_napmem_extensions.py` — test suites
 
-9 `unittest` tests covering extraction, dedup/duplicate anchors, re-ingestion
-ID stability, duplicate promotion, layer rebuild, provenance resolution, and
-prompt-guard neutralization.
+19 `unittest` tests total. Pipeline suite (9): extraction, dedup/duplicate
+anchors, re-ingestion ID stability, duplicate promotion, layer rebuild,
+provenance resolution, prompt-guard neutralization. Extensions suite (10):
+extractor parsing/validation/record conversion, LLM-record re-ingest
+stability, hashed-backend cosine properties, semantic search ranking,
+semantic dedup fold (and off-by-default), MCP handshake/tools/errors via
+subprocess. Network-free by design.

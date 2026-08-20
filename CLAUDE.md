@@ -6,16 +6,21 @@ Guidance for Claude Code when working in this repository.
 
 NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
 tracks → profiles) with incremental re-ingestion, dedup with provenance, and
-active retrieval tools. Pure Python 3.10+ standard library; no dependencies, no
-network calls, no build step.
+active retrieval tools. Core is Python 3.10+ standard library with no network
+calls; optional extras: `anthropic` SDK (LLM extraction) and local Ollama
+(embeddings), both with graceful degradation.
 
 ## Commands
 
 ```bash
-python3 test_napmem_pipeline.py                                  # run tests (must stay green)
-python3 memory_pyramid_distiller.py --input <file.md>            # distill a memory file
+python3 -m unittest discover -s . -p "test_*.py"                 # run all tests (must stay green)
+python3 memory_pyramid_distiller.py --input <file.md>            # distill a memory file (heuristic)
+python3 llm_extractor.py --input <file.md> [--no-batch|--dry-run]# LLM extraction (Batches API)
 python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one consolidation sweep
-python3 napmem_retrieval_agent.py --query <q> --layer all        # query the pyramid
+python3 napmem_retrieval_agent.py --query <q> --layer all        # substring query
+python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
+python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
+python3 napmem_mcp_server.py --pyramid <p.json>                  # MCP stdio server
 ```
 
 ## Architecture in one paragraph
@@ -25,9 +30,13 @@ writes via tmp+`os.replace`). `ingest_session()` is the single write path:
 extract → reconcile prior generation of the session → dedup/merge → rebuild
 Layers 2–3 → save. `naptime_consolidator.py` maps each watched `.md` file to a
 stable `sess_<basename>` session id and re-ingests on any mtime change.
-`napmem_retrieval_agent.py` is read-only. `llm_extraction_prompts.py` holds the
-production LLM extraction prompt (the distiller's heuristic extractor is its
-deterministic stand-in).
+`napmem_retrieval_agent.py` is read-only. `llm_extractor.py` is the production
+extraction path (Anthropic Batches API + schema validation feeding
+`ingest_session_records`); the distiller's heuristic extractor is its
+deterministic stand-in. `semantic_index.py` caches embeddings per record
+(Ollama backend, stdlib hashed-TF fallback) for cosine search and opt-in
+semantic dedup. `napmem_mcp_server.py` wraps the retrieval tools in a stdlib
+MCP stdio server.
 
 ## Invariants — do not break
 
@@ -45,7 +54,12 @@ deterministic stand-in).
 
 ## Conventions
 
-- stdlib only; adding a dependency is an architecture decision, ask first.
+- Core stays stdlib-only; the sanctioned optional extras are `anthropic`
+  (lazy-imported in `llm_extractor.py`) and Ollama over HTTP. Any further
+  dependency is an architecture decision, ask first.
+- Semantic dedup is opt-in (`semantic_dedup=True` / `--semantic-dedup`); the
+  default pipeline must stay deterministic. Tests force
+  `NAPMEM_EMBED_BACKEND=hashed`.
 - `logging` module for runtime output in daemons; CLI tools print to stdout.
 - Tests are plain `unittest` in `test_napmem_pipeline.py`; add tests for any
   behavior change, especially reconciliation edge cases.

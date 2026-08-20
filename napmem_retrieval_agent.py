@@ -7,6 +7,7 @@ probe queries across the multi-granularity memory pyramid instead of passive con
 
 Tools provided:
   - search_memory_pyramid(query, layer): Active search across Profiles, Tracks, or Records.
+  - semantic_search(query, top_k): Embedding cosine search over Layer 1 records.
   - inspect_provenance(record_id): Bi-directional resolution back to Layer 0 raw logs.
   - get_topic_track(topic_slug): Retrieves entire aggregated thematic track.
   - compute_context_budget_savings(): Demonstrates token cost savings vs passive RAG.
@@ -69,6 +70,31 @@ class NapMemRetrievalAgent:
             results["matches"]["memory_records"] = record_matches
 
         return results
+
+    def semantic_search(self, query: str, top_k: int = 5) -> dict[str, Any]:
+        """
+        Embedding cosine search over Layer 1 records via semantic_index.py.
+        Falls back to substring search when no embedding backend is usable, and
+        discloses which path answered in the result's `mode` field.
+        """
+        records = self.data.get("memory_records", [])
+        try:
+            from semantic_index import SemanticIndex  # lazy: optional feature
+            index = SemanticIndex(self.pyramid_path)
+            hits = index.search(query, records, top_k=top_k)
+            return {
+                "query": query,
+                "mode": f"semantic:{index.backend.name}",
+                "matches": [{"score": h["score"], **h["record"]} for h in hits],
+            }
+        except (RuntimeError, OSError) as exc:
+            fallback = self.search_memory_pyramid(query, layer="records")
+            return {
+                "query": query,
+                "mode": "substring-fallback",
+                "fallback_reason": str(exc),
+                "matches": fallback["matches"]["memory_records"][:top_k],
+            }
 
     def inspect_provenance(self, record_id: str) -> dict[str, Any]:
         """
@@ -174,6 +200,9 @@ def main():
     parser.add_argument("--pyramid", type=str, default="napmem_pyramid.json", help="Path to pyramid JSON store.")
     parser.add_argument("--query", type=str, help="Query string for active navigation.")
     parser.add_argument("--layer", type=str, default="all", choices=list(VALID_LAYERS), help="Pyramid layer.")
+    parser.add_argument("--semantic", action="store_true",
+                        help="Use embedding cosine search instead of substring matching.")
+    parser.add_argument("--top-k", type=int, default=5, help="Result count for --semantic.")
     parser.add_argument("--provenance", type=str, help="Inspect provenance for a specific record ID.")
     parser.add_argument("--stats", action="store_true", help="Display token context budget savings stats.")
     args = parser.parse_args()
@@ -190,8 +219,12 @@ def main():
         print(json.dumps(stats, indent=2))
 
     if args.query:
-        print(f"\n=== Active Search Results for '{args.query}' (Layer: {args.layer}) ===")
-        results = agent.search_memory_pyramid(args.query, args.layer)
+        if args.semantic:
+            print(f"\n=== Semantic Search Results for '{args.query}' (top {args.top_k}) ===")
+            results = agent.semantic_search(args.query, top_k=args.top_k)
+        else:
+            print(f"\n=== Active Search Results for '{args.query}' (Layer: {args.layer}) ===")
+            results = agent.search_memory_pyramid(args.query, args.layer)
         print(json.dumps(results, indent=2))
 
     if args.provenance:

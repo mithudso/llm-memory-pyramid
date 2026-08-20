@@ -39,9 +39,22 @@ def _slugify(heading: str) -> str:
     return heading.lower().replace(" ", "-")
 
 class MemoryPyramidDistiller:
-    def __init__(self, pyramid_path: str = "napmem_pyramid.json"):
+    def __init__(self, pyramid_path: str = "napmem_pyramid.json",
+                 semantic_dedup: bool = False, semantic_threshold: float = 0.92):
         self.pyramid_path = pyramid_path
         self.data = self._load_pyramid()
+        # Semantic dedup is opt-in: it folds near-duplicate paraphrases into
+        # canonicals using the embedding index (see semantic_index.py). Off by
+        # default so the exact-text pipeline stays deterministic.
+        self.semantic_dedup = semantic_dedup
+        self.semantic_threshold = semantic_threshold
+        self._semantic_index = None
+
+    def _get_semantic_index(self):
+        if self._semantic_index is None and self.semantic_dedup:
+            from semantic_index import SemanticIndex  # lazy: optional feature
+            self._semantic_index = SemanticIndex(self.pyramid_path)
+        return self._semantic_index
 
     def _load_pyramid(self) -> dict[str, Any]:
         if os.path.exists(self.pyramid_path):
@@ -152,13 +165,28 @@ class MemoryPyramidDistiller:
         existing_texts = {r["text"].lower().strip(): r for r in self.data["memory_records"]}
         merged_records = []
 
+        index = self._get_semantic_index()
+
         for rec in new_records:
             clean_text = rec["text"].lower().strip()
-            if clean_text in existing_texts:
-                canonical_rec = existing_texts[clean_text]
+            canonical_rec = existing_texts.get(clean_text)
+            if canonical_rec is None and index is not None:
+                # Exact match missed: try a semantic near-duplicate fold. The
+                # promotion machinery requires identical text between canonical
+                # and duplicates, so semantic folds keep the CANONICAL's text
+                # and record the paraphrase in the duplicate anchor.
+                near_id = index.nearest_record_id(
+                    rec["text"], self.data["memory_records"], self.semantic_threshold
+                )
+                if near_id is not None:
+                    canonical_rec = next(r for r in self.data["memory_records"] if r["id"] == near_id)
+            if canonical_rec is not None:
                 if rec["id"] != canonical_rec["id"] and rec["id"] not in canonical_rec["duplicates"]:
                     canonical_rec["duplicates"].append(rec["id"])
-                    canonical_rec.setdefault("duplicate_anchors", {})[rec["id"]] = rec["source_anchor"]
+                    anchor = dict(rec["source_anchor"])
+                    if rec["text"] != canonical_rec["text"]:
+                        anchor["paraphrase_text"] = rec["text"]
+                    canonical_rec.setdefault("duplicate_anchors", {})[rec["id"]] = anchor
             else:
                 self.data["memory_records"].append(rec)
                 existing_texts[clean_text] = rec
@@ -288,7 +316,19 @@ class MemoryPyramidDistiller:
 
     def ingest_session(self, session_id: str, title: str, file_path: str, content: str):
         """
-        Ingests a raw session log into Layer 0 and triggers distillation.
+        Ingests a raw session log into Layer 0 and triggers distillation using
+        the built-in heuristic extractor.
+        """
+        new_records = self.extract_atomic_units(content, session_id, file_path)
+        return self.ingest_session_records(session_id, title, file_path, new_records)
+
+    def ingest_session_records(self, session_id: str, title: str, file_path: str,
+                               new_records: list[dict[str, Any]]) -> int:
+        """
+        Ingests pre-extracted Layer 1 records for a session (e.g. from the LLM
+        extractor in llm_extractor.py) and runs the reconcile -> dedup ->
+        rebuild -> save pipeline. Records must already carry
+        rec_<session_id>_NNN ids and complete source anchors.
         """
         # Register Layer 0 raw conversation
         raw_entry = {
@@ -305,9 +345,6 @@ class MemoryPyramidDistiller:
         # rec_<session>_NNN IDs collide with the stale generation.
         self.data["raw_conversations"] = [s for s in self.data["raw_conversations"] if s["session_id"] != session_id]
         self.data["raw_conversations"].append(raw_entry)
-
-        # Phase 1 & 2: Extract Atomic Units
-        new_records = self.extract_atomic_units(content, session_id, file_path)
 
         # Phase 3: Reconcile prior generation, then deduplicate the remainder
         remaining_records = self._reconcile_session_records(session_id, new_records)

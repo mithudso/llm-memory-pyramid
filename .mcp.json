@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "napmem": {
+      "command": "python3",
+      "args": ["napmem_mcp_server.py"],
+      "env": {
+        "NAPMEM_PYRAMID": "napmem_pyramid.json"
+      }
+    }
+  }
+}

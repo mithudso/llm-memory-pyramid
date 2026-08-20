@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""
+Tests for the production-path extensions: LLM extractor parsing/validation,
+semantic index + semantic dedup, and the MCP stdio server.
+
+Network-free by design: the extractor tests exercise parsing and record
+conversion (not the API), semantic tests force the stdlib hashed backend, and
+the MCP test drives the real server binary over a subprocess pipe.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from llm_extractor import ExtractionError, parse_extraction_output, units_to_records
+from memory_pyramid_distiller import MemoryPyramidDistiller
+from semantic_index import HashedTfBackend, SemanticIndex, cosine
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+class TestLLMExtractorParsing(unittest.TestCase):
+    def _unit(self, **overrides):
+        unit = {
+            "type": "fact",
+            "text": "User prefers tabs over spaces.",
+            "salience": "high",
+            "topic_slug": "editor-config",
+            "source_anchor": {"heading": "Preferences", "line_range": "L3"},
+        }
+        unit.update(overrides)
+        return unit
+
+    def test_parses_bare_and_fenced_json(self):
+        units = [self._unit()]
+        raw = json.dumps(units)
+        self.assertEqual(parse_extraction_output(raw), units)
+        fenced = f"```json\n{raw}\n```"
+        self.assertEqual(parse_extraction_output(fenced), units)
+
+    def test_rejects_non_json_and_non_array(self):
+        with self.assertRaises(ExtractionError):
+            parse_extraction_output("I could not extract anything, sorry!")
+        with self.assertRaises(ExtractionError):
+            parse_extraction_output(json.dumps({"type": "fact"}))
+
+    def test_units_to_records_validates_and_converts(self):
+        good = self._unit()
+        bad_type = self._unit(type="opinion")
+        bad_anchor = self._unit(source_anchor={"heading": "X"})
+        records, rejections = units_to_records(
+            [good, bad_type, bad_anchor], "sess_x", "x.md"
+        )
+        self.assertEqual(len(records), 1)
+        self.assertEqual(len(rejections), 2)
+        rec = records[0]
+        self.assertEqual(rec["id"], "rec_sess_x_001")
+        self.assertEqual(rec["canonical"], rec["id"])
+        self.assertEqual(rec["source_anchor"]["session_id"], "sess_x")
+        self.assertEqual(rec["source_anchor"]["file_path"], "x.md")
+        self.assertEqual(rec["topic_slug"], "editor-config")
+
+    def test_extracted_records_flow_through_reingest(self):
+        """LLM-extracted records must honor the same stable-ID re-ingest
+        semantics as heuristic ones."""
+        tmp = tempfile.mkdtemp(prefix="napmem_ext_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pyramid = os.path.join(tmp, "p.json")
+        distiller = MemoryPyramidDistiller(pyramid_path=pyramid)
+
+        v1, _ = units_to_records([self._unit()], "sess_llm", "m.md")
+        distiller.ingest_session_records("sess_llm", "V1", "m.md", v1)
+        kept_id = distiller.data["memory_records"][0]["id"]
+
+        v2, _ = units_to_records(
+            [self._unit(), self._unit(text="Uses MongoDB for storage.")],
+            "sess_llm", "m.md",
+        )
+        distiller.ingest_session_records("sess_llm", "V2", "m.md", v2)
+        records = distiller.data["memory_records"]
+        ids = [r["id"] for r in records]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertIn(kept_id, ids)
+        self.assertCountEqual(
+            [r["text"] for r in records],
+            ["User prefers tabs over spaces.", "Uses MongoDB for storage."],
+        )
+
+
+class TestSemanticIndex(unittest.TestCase):
+    def setUp(self):
+        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
+        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        self.tmp = tempfile.mkdtemp(prefix="napmem_sem_")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.pyramid = os.path.join(self.tmp, "p.json")
+
+    def _record(self, rid, text):
+        return {"id": rid, "type": "fact", "text": text, "salience": "high",
+                "canonical": rid, "duplicates": [], "topic_slug": "general",
+                "source_anchor": {"session_id": "s", "file_path": "f.md",
+                                  "heading": "H", "line_range": "L1"}}
+
+    def test_hashed_backend_cosine_properties(self):
+        backend = HashedTfBackend()
+        [a, b, c] = backend.embed([
+            "user prefers tabs over spaces",
+            "user prefers tabs over spaces",
+            "completely unrelated quantum entanglement",
+        ])
+        self.assertAlmostEqual(cosine(a, b), 1.0, places=6)
+        self.assertLess(cosine(a, c), 0.5)
+
+    def test_search_ranks_related_text_first(self):
+        records = [
+            self._record("r1", "User prefers tabs over spaces in the editor."),
+            self._record("r2", "The deployment pipeline uses GitHub Actions."),
+        ]
+        index = SemanticIndex(self.pyramid)
+        hits = index.search("tabs versus spaces preference", records, top_k=2)
+        self.assertEqual(hits[0]["record"]["id"], "r1")
+        self.assertGreater(hits[0]["score"], hits[1]["score"])
+        self.assertTrue(os.path.exists(index.index_path))
+
+    def test_semantic_dedup_folds_near_duplicate(self):
+        distiller = MemoryPyramidDistiller(
+            pyramid_path=self.pyramid, semantic_dedup=True, semantic_threshold=0.8
+        )
+        distiller.ingest_session(
+            "sess_a", "A", "a.md", "# N\n- User prefers tabs over spaces always.\n"
+        )
+        # Same tokens, different punctuation/case: exact dedup misses, semantic folds.
+        distiller.ingest_session(
+            "sess_b", "B", "b.md", "# N\n- user Prefers TABS over spaces always\n"
+        )
+        records = distiller.data["memory_records"]
+        self.assertEqual(len(records), 1)
+        canonical = records[0]
+        self.assertEqual(len(canonical["duplicates"]), 1)
+        dup_id = canonical["duplicates"][0]
+        anchor = canonical["duplicate_anchors"][dup_id]
+        self.assertEqual(anchor["session_id"], "sess_b")
+        self.assertIn("paraphrase_text", anchor)
+
+    def test_semantic_dedup_off_by_default(self):
+        distiller = MemoryPyramidDistiller(pyramid_path=self.pyramid)
+        distiller.ingest_session("sess_a", "A", "a.md", "# N\n- alpha beta gamma one.\n")
+        distiller.ingest_session("sess_b", "B", "b.md", "# N\n- Alpha beta gamma one!\n")
+        self.assertEqual(len(distiller.data["memory_records"]), 2)
+
+
+class TestMCPServer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="napmem_mcp_")
+        cls.pyramid = os.path.join(cls.tmp, "p.json")
+        distiller = MemoryPyramidDistiller(pyramid_path=cls.pyramid)
+        with open(os.path.join(BASE_DIR, "sample_agent_memory.md"), encoding="utf-8") as f:
+            distiller.ingest_session("sess_sample", "Sample",
+                                     os.path.join(BASE_DIR, "sample_agent_memory.md"),
+                                     f.read())
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def _rpc_session(self, messages):
+        """Runs the server binary, sends JSON-RPC lines, returns responses."""
+        env = dict(os.environ, NAPMEM_EMBED_BACKEND="hashed")
+        proc = subprocess.run(
+            [sys.executable, os.path.join(BASE_DIR, "napmem_mcp_server.py"),
+             "--pyramid", self.pyramid],
+            input="".join(json.dumps(m) + "\n" for m in messages),
+            capture_output=True, text=True, timeout=60, env=env, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+
+    def test_full_handshake_list_and_call(self):
+        responses = self._rpc_session([
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+             "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "0"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+             "params": {"name": "search_memory", "arguments": {"query": "NapMem"}}},
+            {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+             "params": {"name": "memory_stats", "arguments": {}}},
+            {"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+             "params": {"name": "search_memory",
+                        "arguments": {"query": "napmem pyramid", "semantic": True}}},
+        ])
+        by_id = {r["id"]: r for r in responses}
+        # Notification produced no response.
+        self.assertEqual(len(responses), 5)
+
+        self.assertEqual(by_id[1]["result"]["serverInfo"]["name"], "napmem")
+        tool_names = {t["name"] for t in by_id[2]["result"]["tools"]}
+        self.assertEqual(tool_names, {"search_memory", "inspect_provenance",
+                                      "get_topic_track", "memory_stats"})
+        search_payload = json.loads(by_id[3]["result"]["content"][0]["text"])
+        self.assertIn("matches", search_payload)
+        self.assertFalse(by_id[3]["result"]["isError"])
+        stats_payload = json.loads(by_id[4]["result"]["content"][0]["text"])
+        self.assertIn("token_compression_ratio", stats_payload)
+        semantic_payload = json.loads(by_id[5]["result"]["content"][0]["text"])
+        self.assertTrue(semantic_payload["mode"].startswith("semantic:")
+                        or semantic_payload["mode"] == "substring-fallback")
+
+    def test_unknown_tool_and_method(self):
+        responses = self._rpc_session([
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+             "params": {"name": "not_a_tool", "arguments": {}}},
+            {"jsonrpc": "2.0", "id": 2, "method": "resources/list"},
+        ])
+        by_id = {r["id"]: r for r in responses}
+        self.assertTrue(by_id[1]["result"]["isError"])
+        self.assertEqual(by_id[2]["error"]["code"], -32601)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=1)

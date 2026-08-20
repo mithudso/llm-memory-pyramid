@@ -29,14 +29,26 @@ python3 naptime_consolidator.py --watch-dir ./memory_logs --once
 
 # Query the pyramid
 python3 napmem_retrieval_agent.py --query "architecture" --layer all
+python3 napmem_retrieval_agent.py --query "editor prefs" --semantic --top-k 5
 python3 napmem_retrieval_agent.py --provenance rec_sess_sample_agent_memory_001
 python3 napmem_retrieval_agent.py --stats
 
+# Production extraction via the Anthropic Batches API (needs `pip install anthropic`)
+python3 llm_extractor.py --input memory_logs/notes.md --semantic-dedup
+
 # Run the test suite
-python3 test_napmem_pipeline.py
+python3 -m unittest discover -s . -p "test_*.py"
 ```
 
-No dependencies — Python 3.10+ standard library only.
+Core pipeline is Python 3.10+ standard library only. Optional extras:
+`anthropic` (LLM extraction path) and a local [Ollama](https://ollama.com)
+server (real embeddings — otherwise a stdlib hashed-TF backend is used).
+
+## MCP server
+
+`napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
+Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
+targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
 
 ## Components
 
@@ -46,6 +58,9 @@ No dependencies — Python 3.10+ standard library only.
 | `naptime_consolidator.py` | Background watcher that incrementally re-ingests changed `.md` files |
 | `napmem_retrieval_agent.py` | Active retrieval tools: search, provenance, topic tracks, token-savings stats |
 | `llm_extraction_prompts.py` | Zero-fabrication LLM extraction prompt templates with injection guards |
+| `llm_extractor.py` | Production extraction: Haiku via Anthropic Batches API, schema-validated ingest |
+| `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
+| `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
 | `napmem_pyramid.json` | Example pyramid store |
 | `test_napmem_pipeline.py` | Test suite (unittest, 9 tests) |

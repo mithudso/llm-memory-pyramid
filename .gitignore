@@ -12,6 +12,9 @@ naptime.log
 naptime.err
 memory_logs/
 
+# Embedding index cache (derived from the pyramid store)
+*.embindex.json
+
 # Session state
 .remember/
 .claude/worktrees/
