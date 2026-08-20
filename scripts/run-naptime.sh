@@ -44,7 +44,10 @@ setopt null_glob
 # keys, tokens) and this pipeline would upload the target's content. Mirror
 # only files that RESOLVE inside the vetted memory roots — anything else is
 # refused and logged.
-ALLOWED_ROOTS=()
+# The watch dir itself is a vetted root so plain files dropped directly into
+# it still ingest; a hostile symlink there RESOLVES outside every root and is
+# refused all the same.
+ALLOWED_ROOTS=("$(readlink -f -- "$WATCH_DIR")")
 for root in "$HOME/.claude" "$HOME/.gemini" /Volumes/mitch/.claude /Volumes/mitch/.gemini; do
   [[ -d "$root" ]] && ALLOWED_ROOTS+=("$(readlink -f -- "$root")")
 done
