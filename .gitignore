@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Runtime output
+naptime.log
+naptime.err
+memory_logs/
+
+# Session state
+.remember/
+.claude/worktrees/

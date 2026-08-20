@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NapMem Pyramid Schema",
+  "description": "Multi-granularity memory pyramid schema combining raw logs, distilled atomic records, topic tracks, and user profiles with bi-directional provenance linkage.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "user_profiles": {
+      "type": "array",
+      "description": "Layer 3: Top-level stable user traits, persistent constraints, and system profiles.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string", "enum": ["preference", "constraint", "identity", "workflow", "goal"] },
+          "trait": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "provenance_records": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "IDs of Layer 1 atomic records that substantiate this profile trait."
+          }
+        },
+        "required": ["id", "category", "trait", "provenance_records"]
+      }
+    },
+    "topic_tracks": {
+      "type": "array",
+      "description": "Layer 2: Aggregated thematic tracks spanning multiple sessions.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "track_id": { "type": "string" },
+          "topic_slug": { "type": "string" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "record_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Atomic record IDs belonging to this topic track."
+          },
+          "last_updated": { "type": "string" }
+        },
+        "required": ["track_id", "topic_slug", "title", "summary", "record_ids"]
+      }
+    },
+    "memory_records": {
+      "type": "array",
+      "description": "Layer 1: Distilled atomic units extracted via document-distiller taxonomy.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["concept", "fact", "actionable", "question", "problem", "statement", "quote", "idea"]
+          },
+          "text": { "type": "string" },
+          "salience": { "type": "string", "enum": ["high", "medium", "low"] },
+          "canonical": { "type": "string" },
+          "duplicates": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "duplicate_anchors": {
+            "type": "object",
+            "description": "Maps each folded duplicate's record ID to its original source_anchor, keeping duplicate IDs resolvable and removable per session.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "session_id": { "type": "string" },
+                "file_path": { "type": "string" },
+                "heading": { "type": "string" },
+                "line_range": { "type": "string" }
+              },
+              "required": ["session_id", "file_path"]
+            }
+          },
+          "topic_slug": { "type": "string" },
+          "source_anchor": {
+            "type": "object",
+            "properties": {
+              "session_id": { "type": "string" },
+              "file_path": { "type": "string" },
+              "heading": { "type": "string" },
+              "line_range": { "type": "string" }
+            },
+            "required": ["session_id", "file_path"]
+          },
+          "created_at": { "type": "string" }
+        },
+        "required": ["id", "type", "text", "salience", "canonical", "source_anchor"]
+      }
+    },
+    "raw_conversations": {
+      "type": "array",
+      "description": "Layer 0: Reference raw conversation sessions for provenance validation.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "title": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "file_path": { "type": "string" }
+        },
+        "required": ["session_id", "title", "file_path"]
+      }
+    }
+  },
+  "required": ["version", "updated_at", "user_profiles", "topic_tracks", "memory_records", "raw_conversations"]
+}

@@ -1,0 +1,303 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-08-11T11:24:28.130241",
+  "user_profiles": [
+    {
+      "id": "prof_01",
+      "category": "preference",
+      "trait": "- User prefers Python for backend data analytics scripts and TypeScript for web applications.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_001"
+      ]
+    },
+    {
+      "id": "prof_02",
+      "category": "constraint",
+      "trait": "- Always use Vanilla CSS for styling; never use TailwindCSS unless explicitly requested by the user.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_002"
+      ]
+    },
+    {
+      "id": "prof_03",
+      "category": "constraint",
+      "trait": "- The system must enforce high-efficiency context window budgeting.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_003"
+      ]
+    },
+    {
+      "id": "prof_04",
+      "category": "workflow",
+      "trait": "- Actionable: Always run document-distiller --diff on updated memory files during background naptime processing.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_009"
+      ]
+    },
+    {
+      "id": "prof_05",
+      "category": "constraint",
+      "trait": "- Fact: provenances must link Layer 1 records back to exact Layer 0 line numbers.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_010"
+      ]
+    },
+    {
+      "id": "prof_06",
+      "category": "constraint",
+      "trait": "- Idea: We could build an automated background daemon that triggers memory distillation whenever the agent goes idle for > 5 minutes.",
+      "confidence": 0.95,
+      "provenance_records": [
+        "rec_sess_001_011"
+      ]
+    }
+  ],
+  "topic_tracks": [
+    {
+      "track_id": "track_01",
+      "topic_slug": "development-framework",
+      "title": "Development Framework",
+      "summary": "- User prefers Python for backend data analytics scripts and TypeScript for web applications.; - Always use Vanilla CSS for styling; never use TailwindCSS unless explicitly requested by the user.; - The system must enforce high-efficiency context window budgeting.",
+      "record_ids": [
+        "rec_sess_001_001",
+        "rec_sess_001_002",
+        "rec_sess_001_003"
+      ],
+      "last_updated": "2026-08-11T11:24:28.130227"
+    },
+    {
+      "track_id": "track_02",
+      "topic_slug": "longterm-llm-memory-system",
+      "title": "Longterm Llm Memory System",
+      "summary": "- Concept: NapMem (Navigate over Pyramid Memory) treats long-term memory as a structured, active action space.; - Problem: Passive RAG context dumping leads to lost-in-the-middle phenomena and high token waste.; - Solution: Document Distiller extracts atomic units (concept, fact, actionable, question, problem, statement, quote, idea) with source anchors.",
+      "record_ids": [
+        "rec_sess_001_004",
+        "rec_sess_001_005",
+        "rec_sess_001_006",
+        "rec_sess_001_007",
+        "rec_sess_001_008",
+        "rec_sess_001_009"
+      ],
+      "last_updated": "2026-08-11T11:24:28.130229"
+    },
+    {
+      "track_id": "track_03",
+      "topic_slug": "verification-&-constraints",
+      "title": "Verification & Constraints",
+      "summary": "- Fact: provenances must link Layer 1 records back to exact Layer 0 line numbers.; - Idea: We could build an automated background daemon that triggers memory distillation whenever the agent goes idle for > 5 minutes.; - Question: How does NapMem handle conflicting user preferences updated across different sessions?",
+      "record_ids": [
+        "rec_sess_001_010",
+        "rec_sess_001_011",
+        "rec_sess_001_012"
+      ],
+      "last_updated": "2026-08-11T11:24:28.130232"
+    }
+  ],
+  "memory_records": [
+    {
+      "id": "rec_sess_001_001",
+      "type": "fact",
+      "text": "- User prefers Python for backend data analytics scripts and TypeScript for web applications.",
+      "salience": "high",
+      "canonical": "rec_sess_001_001",
+      "duplicates": [],
+      "topic_slug": "development-framework",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Development Framework",
+        "line_range": "L4"
+      },
+      "created_at": "2026-08-11T11:24:28.130128"
+    },
+    {
+      "id": "rec_sess_001_002",
+      "type": "fact",
+      "text": "- Always use Vanilla CSS for styling; never use TailwindCSS unless explicitly requested by the user.",
+      "salience": "high",
+      "canonical": "rec_sess_001_002",
+      "duplicates": [],
+      "topic_slug": "development-framework",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Development Framework",
+        "line_range": "L5"
+      },
+      "created_at": "2026-08-11T11:24:28.130134"
+    },
+    {
+      "id": "rec_sess_001_003",
+      "type": "actionable",
+      "text": "- The system must enforce high-efficiency context window budgeting.",
+      "salience": "high",
+      "canonical": "rec_sess_001_003",
+      "duplicates": [],
+      "topic_slug": "development-framework",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Development Framework",
+        "line_range": "L6"
+      },
+      "created_at": "2026-08-11T11:24:28.130178"
+    },
+    {
+      "id": "rec_sess_001_004",
+      "type": "concept",
+      "text": "- Concept: NapMem (Navigate over Pyramid Memory) treats long-term memory as a structured, active action space.",
+      "salience": "high",
+      "canonical": "rec_sess_001_004",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L9"
+      },
+      "created_at": "2026-08-11T11:24:28.130186"
+    },
+    {
+      "id": "rec_sess_001_005",
+      "type": "statement",
+      "text": "- NapMem organizes memory into a multi-granularity pyramid: Raw Conversations, Memory Records, Topic Tracks, and User Profiles.",
+      "salience": "medium",
+      "canonical": "rec_sess_001_005",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L10"
+      },
+      "created_at": "2026-08-11T11:24:28.130193"
+    },
+    {
+      "id": "rec_sess_001_006",
+      "type": "statement",
+      "text": "- Agents use Group Relative Policy Optimization (GRPO) reinforcement learning to navigate their own memory layers.",
+      "salience": "medium",
+      "canonical": "rec_sess_001_006",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L11"
+      },
+      "created_at": "2026-08-11T11:24:28.130199"
+    },
+    {
+      "id": "rec_sess_001_007",
+      "type": "problem",
+      "text": "- Problem: Passive RAG context dumping leads to lost-in-the-middle phenomena and high token waste.",
+      "salience": "high",
+      "canonical": "rec_sess_001_007",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L12"
+      },
+      "created_at": "2026-08-11T11:24:28.130201"
+    },
+    {
+      "id": "rec_sess_001_008",
+      "type": "problem",
+      "text": "- Solution: Document Distiller extracts atomic units (concept, fact, actionable, question, problem, statement, quote, idea) with source anchors.",
+      "salience": "high",
+      "canonical": "rec_sess_001_008",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L13"
+      },
+      "created_at": "2026-08-11T11:24:28.130203"
+    },
+    {
+      "id": "rec_sess_001_009",
+      "type": "fact",
+      "text": "- Actionable: Always run document-distiller --diff on updated memory files during background naptime processing.",
+      "salience": "high",
+      "canonical": "rec_sess_001_009",
+      "duplicates": [],
+      "topic_slug": "longterm-llm-memory-system",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Longterm LLM Memory System",
+        "line_range": "L14"
+      },
+      "created_at": "2026-08-11T11:24:28.130206"
+    },
+    {
+      "id": "rec_sess_001_010",
+      "type": "actionable",
+      "text": "- Fact: provenances must link Layer 1 records back to exact Layer 0 line numbers.",
+      "salience": "high",
+      "canonical": "rec_sess_001_010",
+      "duplicates": [],
+      "topic_slug": "verification-&-constraints",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Verification & Constraints",
+        "line_range": "L17"
+      },
+      "created_at": "2026-08-11T11:24:28.130210"
+    },
+    {
+      "id": "rec_sess_001_011",
+      "type": "fact",
+      "text": "- Idea: We could build an automated background daemon that triggers memory distillation whenever the agent goes idle for > 5 minutes.",
+      "salience": "high",
+      "canonical": "rec_sess_001_011",
+      "duplicates": [],
+      "topic_slug": "verification-&-constraints",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Verification & Constraints",
+        "line_range": "L18"
+      },
+      "created_at": "2026-08-11T11:24:28.130213"
+    },
+    {
+      "id": "rec_sess_001_012",
+      "type": "question",
+      "text": "- Question: How does NapMem handle conflicting user preferences updated across different sessions?",
+      "salience": "high",
+      "canonical": "rec_sess_001_012",
+      "duplicates": [],
+      "topic_slug": "verification-&-constraints",
+      "source_anchor": {
+        "session_id": "sess_001",
+        "file_path": "sample_agent_memory.md",
+        "heading": "Verification & Constraints",
+        "line_range": "L19"
+      },
+      "created_at": "2026-08-11T11:24:28.130215"
+    }
+  ],
+  "raw_conversations": [
+    {
+      "session_id": "sess_001",
+      "title": "User Prefs & NapMem Architecture",
+      "timestamp": "2026-08-11T11:24:28.130109",
+      "file_path": "sample_agent_memory.md"
+    }
+  ]
+}
