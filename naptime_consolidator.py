@@ -32,10 +32,13 @@ logger = logging.getLogger(__name__)
 
 EXTRACTION_MODES = ("auto", "llm", "heuristic")
 
-# Colon-separated list of directories memory files must RESOLVE into. When
-# set, every file read is verified race-free (see _read_file_guarded) so a
-# watched entry swapped into a symlink between scan and read cannot leak an
-# out-of-root file's content into the extraction/embedding egress paths.
+# Colon-separated list of directories memory files must RESOLVE into; every
+# file read is verified race-free (see _read_file_guarded) so a watched entry
+# swapped into a symlink between scan and read cannot leak an out-of-root
+# file's content into the extraction/embedding egress paths. FAIL-CLOSED:
+# when unset, the watch dir itself is the sole allowed root — plain files
+# ingest, symlinks escaping it are refused. Set to "off" to disable (only for
+# a watch dir you deliberately populate with out-of-tree symlinks and trust).
 ALLOWED_ROOTS_ENV = "NAPMEM_ALLOWED_ROOTS"
 
 
@@ -85,8 +88,12 @@ def _read_file_guarded(path: str, allowed_roots: list[str]) -> str:
             os.close(fd)
 
 
-def _allowed_roots_from_env() -> list[str]:
-    raw = os.environ.get(ALLOWED_ROOTS_ENV, "")
+def _resolve_allowed_roots(watch_dir: str) -> list[str]:
+    raw = os.environ.get(ALLOWED_ROOTS_ENV)
+    if raw is None or not raw.strip():
+        return [os.path.realpath(watch_dir)]  # fail-closed default
+    if raw.strip().lower() == "off":
+        return []
     return [os.path.realpath(p) for p in raw.split(":") if p.strip()]
 
 
@@ -108,10 +115,12 @@ class NaptimeConsolidator:
         self.use_llm = (extraction == "llm"
                         or (extraction == "auto" and _anthropic_available()))
         self._client = None
-        self.allowed_roots = _allowed_roots_from_env()
+        self.allowed_roots = _resolve_allowed_roots(watch_dir)
         logger.info("Extraction mode: %s", "llm" if self.use_llm else "heuristic")
         if self.allowed_roots:
             logger.info("Read guard active; allowed roots: %s", self.allowed_roots)
+        else:
+            logger.warning("Read guard DISABLED (%s=off)", ALLOWED_ROOTS_ENV)
 
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""

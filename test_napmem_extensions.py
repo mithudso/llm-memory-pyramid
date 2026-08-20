@@ -330,11 +330,37 @@ class TestGuardedRead(unittest.TestCase):
         self.assertNotIn("PRIVATE", texts)
         self.assertIn("good fact", texts)
 
-    def test_guard_off_without_env(self):
-        from naptime_consolidator import _allowed_roots_from_env
+    def test_guard_fails_closed_without_env(self):
+        """Unset env defaults to the watch dir as sole root (fail-closed);
+        only an explicit 'off' disables the guard."""
+        from naptime_consolidator import _resolve_allowed_roots
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NAPMEM_ALLOWED_ROOTS", None)
-            self.assertEqual(_allowed_roots_from_env(), [])
+            self.assertEqual(_resolve_allowed_roots(self.watch),
+                             [os.path.realpath(self.watch)])
+        with mock.patch.dict(os.environ, {"NAPMEM_ALLOWED_ROOTS": "off"}):
+            self.assertEqual(_resolve_allowed_roots(self.watch), [])
+
+    def test_default_guard_blocks_escaping_symlink(self):
+        """Manual invocation with no env: mirrored-style symlink escaping the
+        watch dir must be refused — the fail-open manual path is closed."""
+        secret = os.path.join(self.outside, "secret.txt")
+        with open(secret, "w", encoding="utf-8") as f:
+            f.write("PRIVATE")
+        os.symlink(secret, os.path.join(self.watch, "evil.md"))
+        with open(os.path.join(self.watch, "plain.md"), "w", encoding="utf-8") as f:
+            f.write("# N\n- plain fact stays here.\n")
+
+        pyramid = os.path.join(self.tmp, "p2.json")
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NAPMEM_ALLOWED_ROOTS", None)
+            consolidator = NaptimeConsolidator(self.watch, pyramid,
+                                               extraction="heuristic")
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        texts = " ".join(r["text"] for r in consolidator.distiller.data["memory_records"])
+        self.assertNotIn("PRIVATE", texts)
+        self.assertIn("plain fact", texts)
 
 
 class TestOllamaFailover(unittest.TestCase):
