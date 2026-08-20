@@ -281,10 +281,19 @@ class SemanticIndex:
 
     def _load(self) -> dict[str, Any]:
         if os.path.exists(self.index_path):
-            with open(self.index_path, "r", encoding="utf-8") as f:
-                cache = json.load(f)
+            # The cache is disposable: a corrupt or unreadable file (e.g. left
+            # behind by a crashed writer) must never take down a sweep — start
+            # fresh and re-embed instead.
+            try:
+                with open(self.index_path, "r", encoding="utf-8") as f:
+                    cache = json.load(f)
+            except (OSError, ValueError) as exc:
+                logger.warning("Discarding unreadable embedding cache %s: %s",
+                               self.index_path, exc)
+                cache = {}
             # A backend/model switch invalidates every cached vector.
-            if cache.get("model") == self.backend.model:
+            if (isinstance(cache, dict) and cache.get("model") == self.backend.model
+                    and isinstance(cache.get("vectors"), dict)):
                 return cache
         return {"model": self.backend.model, "vectors": {}}
 

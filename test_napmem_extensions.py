@@ -400,6 +400,17 @@ class TestOllamaFailover(unittest.TestCase):
                 with self.assertRaises(RuntimeError, msg=f"accepted {bad}"):
                     backend.embed(texts)
 
+    def test_corrupt_cache_discarded_not_fatal(self):
+        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
+        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        tmp = tempfile.mkdtemp(prefix="napmem_cc_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pyramid = os.path.join(tmp, "p.json")
+        with open(f"{pyramid}.embindex.json", "w", encoding="utf-8") as f:
+            f.write('{"model": "x", "vectors": {}}GARBAGE-TRAILER')
+        index = SemanticIndex(pyramid)  # must not raise
+        self.assertEqual(index._cache["vectors"], {})
+
     def test_weighted_url_parsing_and_split(self):
         from semantic_index import _parse_weighted_urls
         hosts = _parse_weighted_urls(

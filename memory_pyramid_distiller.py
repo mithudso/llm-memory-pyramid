@@ -198,7 +198,7 @@ class MemoryPyramidDistiller:
                     [r["text"] for r in exact_misses],
                     self.data["memory_records"], self.semantic_threshold,
                 )
-            except (RuntimeError, OSError) as exc:
+            except (RuntimeError, OSError, ValueError) as exc:
                 import logging
                 logging.getLogger(__name__).warning(
                     "Semantic dedup unavailable (%s); exact-only for this merge", exc)
