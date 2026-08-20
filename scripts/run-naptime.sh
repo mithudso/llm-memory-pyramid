@@ -1,12 +1,17 @@
 #!/bin/zsh
 # Naptime consolidator wrapper for launchd.
 #
-# Mirrors the operator's real Claude Code memory files
-# (~/.claude/projects/*/memory/*.md) into $NAPMEM_HOME/memory_logs as
-# uniquely-named symlinks, then runs one consolidation sweep into
-# $NAPMEM_HOME/napmem_pyramid.json. Symlink names are prefixed with the
-# project-dir slug so identically-named files (every project has a MEMORY.md)
-# map to distinct, stable session ids. Dead symlinks are pruned each run.
+# Mirrors the operator's real agent memory files into $NAPMEM_HOME/memory_logs
+# as uniquely-named symlinks, then runs one consolidation sweep into
+# $NAPMEM_HOME/napmem_pyramid.json. Sources:
+#   1. Claude Code:   ~/.claude/projects/*/memory/*.md  (project-slug prefix)
+#   2. Antigravity:   ~/.gemini/antigravity/brain/<task-uuid>/*.md
+#      (agbrain_<uuid> prefix — every task dir repeats walkthrough.md etc.)
+#   3. Volume twins:  /Volumes/mitch/.claude and /Volumes/mitch/.gemini —
+#      Syncthing copies of 1-2. Only files whose link name is not already
+#      mirrored locally are added, so identical twins collapse to one session
+#      while volume-only files still get swept if the copies diverge.
+# Dead symlinks are pruned each run.
 #
 # Credentials come from the operator's `ant auth login` OAuth profile
 # (~/.config/anthropic/), which the anthropic SDK resolves natively — no key
@@ -31,13 +36,37 @@ WATCH_DIR="$NAPMEM_HOME/memory_logs"
 
 mkdir -p "$WATCH_DIR"
 
-# --- Mirror Claude Code memory files as project-prefixed symlinks ----------
+# --- Mirror agent memory files as uniquely-named symlinks ------------------
 setopt null_glob
-for src in $HOME/.claude/projects/*/memory/*.md; do
-  proj="${src:h:h:t}"          # project dir slug (e.g. -Users-mitch-hudson-dev-foo)
-  link="$WATCH_DIR/${proj}__${src:t}"
+
+mirror() {  # mirror <src> <link-name> [keep-existing]
+  local src="$1" link="$WATCH_DIR/$2" keep="${3:-}"
+  [[ "$src" == *sync-conflict* ]] && return 0  # skip Syncthing conflict copies
+  if [[ -n "$keep" && ( -L "$link" || -e "$link" ) ]]; then
+    return 0  # volume twin: local mirror already owns this name
+  fi
   [[ -L "$link" && "$(readlink -- "$link")" == "$src" ]] || ln -sf -- "$src" "$link"
+}
+
+# 1. Claude Code project memory (project-dir slug prefix)
+for src in $HOME/.claude/projects/*/memory/*.md; do
+  mirror "$src" "${src:h:h:t}__${src:t}"
 done
+
+# 2. Antigravity task-brain artifacts (task-uuid prefix)
+for src in $HOME/.gemini/antigravity/brain/*/*.md; do
+  mirror "$src" "agbrain_${src:h:t}__${src:t}"
+done
+
+# 3. Volume twins — add only names the local mirror does not already carry.
+if [[ -d /Volumes/mitch ]]; then
+  for src in /Volumes/mitch/.claude/projects/*/memory/*.md; do
+    mirror "$src" "${src:h:h:t}__${src:t}" keep
+  done
+  for src in /Volumes/mitch/.gemini/antigravity/brain/*/*.md; do
+    mirror "$src" "agbrain_${src:h:t}__${src:t}" keep
+  done
+fi
 
 # Prune symlinks whose target vanished (deleted project or memory file).
 for link in "$WATCH_DIR"/*(N@); do
