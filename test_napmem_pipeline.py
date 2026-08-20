@@ -207,7 +207,11 @@ class TestNapMemPipeline(unittest.TestCase):
         with open(sample_log, "w", encoding="utf-8") as f:
             f.write("# Background Session\n- Fact: User prefers dark mode UI themes.\n")
 
-        consolidator = NaptimeConsolidator(watch_dir=watch_dir, pyramid_path=self.pyramid_file)
+        # Pin the heuristic extractor: this test covers the sweep mechanics,
+        # and auto mode would otherwise attempt a real API call on machines
+        # where `anthropic` happens to be installed.
+        consolidator = NaptimeConsolidator(watch_dir=watch_dir, pyramid_path=self.pyramid_file,
+                                           extraction="heuristic")
         count = consolidator.scan_and_consolidate()
         self.assertEqual(count, 1)
 

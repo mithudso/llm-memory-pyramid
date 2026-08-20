@@ -160,7 +160,8 @@ class TestSemanticIndex(unittest.TestCase):
 def _fake_anthropic_module():
     """Minimal stand-in for the anthropic package (never touches the network)."""
     module = types.ModuleType("anthropic")
-    module.APIError = type("APIError", (Exception,), {})
+    module.AnthropicError = type("AnthropicError", (Exception,), {})
+    module.APIError = type("APIError", (module.AnthropicError,), {})
     module.Anthropic = lambda: object()
     return module
 
@@ -207,6 +208,17 @@ class TestConsolidatorLLMWiring(unittest.TestCase):
         texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
         self.assertIn("User prefers tabs over spaces.", texts)  # heuristic extracted
 
+    def test_missing_credential_falls_back_to_heuristic(self):
+        """The SDK raises TypeError at call time when no credential resolves;
+        the sweep must degrade to the heuristic, not crash."""
+        with mock.patch.object(llm_extractor, "extract_batch",
+                               side_effect=TypeError("Could not resolve authentication method")):
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="auto")
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertIn("User prefers tabs over spaces.", texts)
+
     def test_invalid_llm_output_falls_back_per_file(self):
         with mock.patch.object(llm_extractor, "extract_batch",
                                return_value={"sess_notes": "not json at all"}):
@@ -233,6 +245,26 @@ class TestOllamaFailover(unittest.TestCase):
         # Ports 1 and 2 refuse connections immediately on loopback.
         self.assertIsNone(OllamaBackend.probe(
             urls=["http://127.0.0.1:1", "http://127.0.0.1:2"]))
+
+    def test_embed_rejects_malformed_vectors(self):
+        """Crafted responses (non-numeric or ragged vectors) must never reach
+        the persistent vector cache."""
+        backend = OllamaBackend("http://127.0.0.1:9999")
+        for bad in (
+            {"embeddings": [["a", "b"]]},                 # non-numeric
+            {"embeddings": [[0.1, 0.2], [0.3]]},          # inconsistent dims
+            {"embeddings": [[True, False]]},              # bools masquerading
+            {"embeddings": [[]]},                         # empty vector
+            {"embeddings": [{"v": 1}]},                   # wrong structure
+        ):
+            resp = mock.MagicMock()
+            resp.__enter__ = lambda s: s
+            resp.__exit__ = lambda s, *a: False
+            with mock.patch("semantic_index.urllib.request.urlopen", return_value=resp), \
+                 mock.patch("semantic_index.json.load", return_value=bad):
+                texts = ["x", "y"] if len(bad["embeddings"]) == 2 else ["x"]
+                with self.assertRaises(RuntimeError, msg=f"accepted {bad}"):
+                    backend.embed(texts)
 
     def test_probe_order_prefers_first_responding_host(self):
         alive = "http://127.0.0.1:9999"

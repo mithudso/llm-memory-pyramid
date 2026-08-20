@@ -129,6 +129,19 @@ class OllamaBackend:
         embeddings = body.get("embeddings")
         if not isinstance(embeddings, list) or len(embeddings) != len(texts):
             raise RuntimeError("Ollama returned a malformed embeddings response")
+        # The response travels plain HTTP from a LAN host and lands in the
+        # persistent vector cache — validate shape strictly (numeric-only
+        # vectors of one consistent dimension) so a compromised or spoofed
+        # server cannot poison the cache with crafted structures.
+        dim = None
+        for vec in embeddings:
+            if (not isinstance(vec, list) or not vec
+                    or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vec)):
+                raise RuntimeError("Ollama returned a non-numeric embedding vector")
+            if dim is None:
+                dim = len(vec)
+            elif len(vec) != dim:
+                raise RuntimeError("Ollama returned inconsistent embedding dimensions")
         return embeddings
 
 

@@ -112,7 +112,10 @@ class NaptimeConsolidator:
         file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
         try:
             outputs = extract_batch(self._client, prompts, DEFAULT_MODEL)
-        except (ExtractionError, anthropic.APIError, OSError) as exc:
+        # TypeError included deliberately: the SDK raises it at call time when
+        # no credential resolves (missing ANTHROPIC_API_KEY and no `ant auth`
+        # profile) — that must degrade to the heuristic, not kill the sweep.
+        except (ExtractionError, anthropic.AnthropicError, TypeError, OSError) as exc:
             logger.error("LLM batch extraction failed (%s); falling back to heuristic", exc)
             return set()
         _, ingested = ingest_extractions(self.distiller, outputs, file_paths)

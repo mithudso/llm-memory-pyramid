@@ -2,18 +2,29 @@
 
 ## Threat model
 
-No network calls, no credentials, no env vars, no subprocess execution. Attack
-surface is **untrusted file content**: memory files are arbitrary text that
-flows into (a) the heuristic parser and (b) LLM extraction prompts.
+No subprocess execution; credentials only via the `anthropic` SDK's standard
+resolution (never read directly). Two attack surfaces:
+
+1. **Untrusted file content** — memory files are arbitrary text flowing into
+   the heuristic parser and LLM extraction prompts.
+2. **Data egress** — memory text *leaves the machine* on the optional paths:
+   full file content goes to the **Anthropic API** (TLS) in LLM extraction
+   mode, and record/query text goes to the configured **Ollama host** for
+   embeddings — by default the remote LAN server `192.168.4.75:11434` over
+   **plain HTTP**. Treat the watch directory as the consent boundary: do not
+   point the consolidator at files that must never leave the machine, or run
+   `--extraction heuristic` with `NAPMEM_EMBED_BACKEND=hashed`. Cached
+   embedding vectors (`*.embindex.json`) are themselves partially invertible
+   and should be treated as sensitive as the text they encode.
 
 ## STRIDE summary
 
 | Threat | Exposure | Mitigation |
 |---|---|---|
-| Spoofing | N/A — no auth surface | — |
-| Tampering | Pyramid store is plain JSON on disk | Atomic writes (`.tmp` + `os.replace`) prevent corruption; filesystem permissions are the trust boundary |
+| Spoofing | Ollama traffic is unauthenticated plain HTTP on the LAN — a spoofed/compromised host could serve crafted embeddings | Strict response validation in `OllamaBackend.embed` (numeric-only vectors, consistent dimension) blocks structural poisoning of the vector cache; semantically crafted vectors remain possible — put the Ollama hosts on a trusted network segment, or force `NAPMEM_EMBED_BACKEND=hashed` |
+| Tampering | Pyramid store and embedding cache are plain JSON on disk | Atomic writes (`.tmp` + `os.replace`) prevent corruption; filesystem permissions are the trust boundary |
 | Repudiation | Low | Every record carries a source anchor (session, file, heading, line) |
-| Information disclosure | Memory files may hold sensitive user data | Store stays local; nothing is transmitted. Do not commit real pyramid stores/memory logs (`.gitignore` excludes `memory_logs/`) |
+| Information disclosure | Memory files may hold sensitive user data; text egresses to the Anthropic API (LLM mode) and the Ollama host (embeddings, plain HTTP); embedding vectors are partially invertible | See "Data egress" in the threat model. Do not commit real pyramid stores/memory logs or embedding caches (`.gitignore` excludes `memory_logs/` and `*.embindex.json`) |
 | Denial of service | Malformed/huge files | Consolidator skips unreadable/non-UTF-8 files per-file; no recursion on input |
 | Elevation of privilege | Prompt injection via memory-file content | See below |
 
