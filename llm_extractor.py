@@ -193,9 +193,15 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
 
 def ingest_extractions(distiller: MemoryPyramidDistiller,
                        outputs_by_session: dict[str, str],
-                       file_paths: dict[str, str]) -> int:
-    """Parses, validates, and ingests each session's extraction output."""
+                       file_paths: dict[str, str]) -> tuple[int, set[str]]:
+    """
+    Parses, validates, and ingests each session's extraction output.
+    Returns (total_units_ingested, session_ids_actually_ingested) — sessions
+    whose output failed parsing or validation are omitted from the set so
+    callers can route them to a fallback extractor.
+    """
     total = 0
+    ingested: set[str] = set()
     for session_id, raw_text in outputs_by_session.items():
         file_path = file_paths[session_id]
         try:
@@ -215,7 +221,8 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
         logger.info("Session %s: ingested %d unit(s) (%d rejected)",
                     session_id, count, len(rejections))
         total += count
-    return total
+        ingested.add(session_id)
+    return total, ingested
 
 
 def main():
@@ -266,8 +273,9 @@ def main():
 
     distiller = MemoryPyramidDistiller(pyramid_path=args.pyramid,
                                        semantic_dedup=args.semantic_dedup)
-    total = ingest_extractions(distiller, outputs, file_paths)
-    print(f"Ingested {total} LLM-extracted unit(s) into {args.pyramid}")
+    total, ingested = ingest_extractions(distiller, outputs, file_paths)
+    print(f"Ingested {total} LLM-extracted unit(s) from {len(ingested)} session(s) "
+          f"into {args.pyramid}")
 
 
 if __name__ == "__main__":

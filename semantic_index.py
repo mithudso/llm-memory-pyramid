@@ -5,9 +5,11 @@ Semantic Embedding Index for the NapMem Pyramid
 Provides cosine-similarity retrieval and near-duplicate detection over Layer 1
 memory records. Two embedding backends:
 
-  - OllamaBackend: real embeddings from a local Ollama server
-    (http://localhost:11434, model nomic-embed-text by default). Zero API
-    cost, no cloud dependency. Selected automatically when the server responds.
+  - OllamaBackend: real embeddings from an Ollama server. Probes each host in
+    NAPMEM_OLLAMA_URLS in order (default: the remote server at
+    http://192.168.4.75:11434, then http://localhost:11434 as the local
+    backup) and uses the first that responds. Zero API cost, no cloud
+    dependency.
   - HashedTfBackend: pure-stdlib fallback — hashed bag-of-words term-frequency
     vectors. Deterministic, dependency-free, adequate for near-duplicate
     detection and keyword-ish search; weaker on true paraphrase.
@@ -33,8 +35,20 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = os.environ.get("NAPMEM_OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("NAPMEM_OLLAMA_MODEL", "nomic-embed-text")
+# Probe order: remote embedding server first, local Ollama as backup. A single
+# NAPMEM_OLLAMA_URL overrides the whole list; NAPMEM_OLLAMA_URLS is the
+# comma-separated failover chain.
+DEFAULT_OLLAMA_URLS = "http://192.168.4.75:11434,http://localhost:11434"
+OLLAMA_URLS = [
+    u.strip().rstrip("/")
+    for u in (os.environ.get("NAPMEM_OLLAMA_URL")
+              or os.environ.get("NAPMEM_OLLAMA_URLS", DEFAULT_OLLAMA_URLS)).split(",")
+    if u.strip()
+]
+# mxbai-embed-large: strongest embedding model served by both hosts; keeping
+# remote and local on the SAME model preserves the vector cache across
+# failover (a model switch invalidates every cached vector).
+OLLAMA_MODEL = os.environ.get("NAPMEM_OLLAMA_MODEL", "mxbai-embed-large")
 BACKEND_ENV = "NAPMEM_EMBED_BACKEND"  # "ollama" | "hashed" | unset (auto)
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -81,21 +95,24 @@ class OllamaBackend:
 
     name = "ollama"
 
-    def __init__(self, base_url: str = OLLAMA_URL, model: str = OLLAMA_MODEL):
+    def __init__(self, base_url: str, model: str = OLLAMA_MODEL):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
     @classmethod
-    def probe(cls) -> "OllamaBackend | None":
-        """Returns a backend if the Ollama server answers quickly, else None."""
-        backend = cls()
-        try:
-            req = urllib.request.Request(f"{backend.base_url}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                if resp.status == 200:
-                    return backend
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            logger.debug("Ollama probe failed: %s", exc)
+    def probe(cls, urls: list[str] | None = None) -> "OllamaBackend | None":
+        """Returns a backend for the first responding host in the failover
+        chain (remote embedding server before local backup), else None."""
+        for url in urls or OLLAMA_URLS:
+            backend = cls(url)
+            try:
+                req = urllib.request.Request(f"{backend.base_url}/api/tags", method="GET")
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    if resp.status == 200:
+                        logger.info("Ollama backend: %s (%s)", backend.base_url, backend.model)
+                        return backend
+            except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                logger.debug("Ollama probe failed for %s: %s", url, exc)
         return None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -123,7 +140,7 @@ def select_backend():
         backend = OllamaBackend.probe()
         if backend is None:
             raise RuntimeError(
-                f"{BACKEND_ENV}=ollama but no Ollama server at {OLLAMA_URL}"
+                f"{BACKEND_ENV}=ollama but no Ollama server responded at any of {OLLAMA_URLS}"
             )
         return backend
     return OllamaBackend.probe() or HashedTfBackend()

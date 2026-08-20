@@ -28,10 +28,18 @@ files.
 `run_loop(poll_interval_sec, max_ticks)`. Per-file errors (OSError, non-UTF-8)
 are logged and skipped — one bad file never kills the loop.
 
-**CLI:** `--watch-dir` (default `./memory_logs`), `--pyramid`, `--interval`,
-`--max-ticks`, `--once`.
+**Extraction modes** (`extraction=` / `--extraction`): `auto` (default — LLM
+when `anthropic` is importable, decided at startup), `llm` (required, errors
+without the package), `heuristic`. In LLM mode each sweep's changed files go
+out as one Message Batches API batch; any session whose extraction fails
+(batch error, invalid JSON, all units rejected) falls back to the heuristic
+extractor for that file, so no update is ever silently dropped.
 
-**Depends on:** `memory_pyramid_distiller`.
+**CLI:** `--watch-dir` (default `./memory_logs`), `--pyramid`, `--interval`,
+`--max-ticks`, `--once`, `--extraction`, `--semantic-dedup`.
+
+**Depends on:** `memory_pyramid_distiller`; `llm_extractor`/`anthropic` only
+in LLM mode (lazy).
 
 ## `napmem_retrieval_agent.py` — active retrieval tools
 
@@ -81,9 +89,11 @@ rejected and logged, never repaired.
 **API (`SemanticIndex`):** `search(query, records, top_k)`,
 `nearest_record_id(text, records, threshold)`, `rebuild(records)`. Vectors
 cached in `<pyramid>.embindex.json` keyed by record id + text hash; a
-backend/model switch invalidates the cache. Backends: `OllamaBackend`
-(localhost `/api/embed`, auto-probed) and `HashedTfBackend` (stdlib hashed
-term-frequency, deterministic fallback). Force with
+backend/model switch invalidates the cache. Backends: `OllamaBackend` with a
+host failover chain (`NAPMEM_OLLAMA_URLS`, default remote
+`192.168.4.75:11434` then `localhost:11434`, both serving
+`mxbai-embed-large` so failover preserves the cache) and `HashedTfBackend`
+(stdlib hashed term-frequency, deterministic fallback). Force with
 `NAPMEM_EMBED_BACKEND=ollama|hashed`.
 
 **CLI:** `--rebuild`, `--query`, `--top-k`, `--pyramid`.

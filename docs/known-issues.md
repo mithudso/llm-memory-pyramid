@@ -13,9 +13,11 @@ green (9/9).
   the duplicate anchor (`paraphrase_text`); a promoted duplicate therefore
   carries the old canonical's wording with its own anchor disclosing the
   original phrasing.
-- **Heuristic extractor is still the default.** `llm_extractor.py` is the
-  production path but requires the `anthropic` package and an API key; the
-  consolidator daemon still uses the heuristic extractor.
+- **LLM extraction needs the optional dependency.** The consolidator's `auto`
+  mode uses LLM extraction only when `anthropic` is installed (and an API
+  credential resolves at call time); otherwise it runs the heuristic
+  extractor. Real paraphrase-quality extraction also assumes an Ollama host
+  is reachable for the semantic index.
 - **Heuristic profile categories are a subset.** The stand-in emits only
   `preference`/`constraint`/`workflow`; `identity` and `goal` from the schema
   enum arrive via the LLM extraction path.

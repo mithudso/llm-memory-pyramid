@@ -8,15 +8,20 @@ inventory with error/retry/logging status: `docs/external-calls.md`.
 - **Anthropic API** (`llm_extractor.py`): Messages + Message Batches for LLM
   extraction. Credential via the SDK's standard resolution; `anthropic`
   package lazy-imported.
-- **Ollama** (`semantic_index.py`): localhost `/api/embed` for real
-  embeddings; auto-probed, silent fallback to the stdlib hashed-TF backend.
+- **Ollama** (`semantic_index.py`): `/api/embed` for real embeddings with a
+  host failover chain — the remote server `http://192.168.4.75:11434` is
+  probed first, local `http://localhost:11434` is the backup; both serve
+  `mxbai-embed-large` (same model on both keeps the vector cache valid across
+  failover). If neither responds, silent fallback to the stdlib hashed-TF
+  backend.
 
 ## Environment variables
 
 | Var | Used by | Meaning |
 |---|---|---|
 | `NAPMEM_EMBED_BACKEND` | `semantic_index.py` | Force `ollama` or `hashed` (default: auto-probe) |
-| `NAPMEM_OLLAMA_URL` / `NAPMEM_OLLAMA_MODEL` | `semantic_index.py` | Ollama endpoint (default `http://localhost:11434`) and model (`nomic-embed-text`) |
+| `NAPMEM_OLLAMA_URLS` | `semantic_index.py` | Comma-separated failover chain (default `http://192.168.4.75:11434,http://localhost:11434`) |
+| `NAPMEM_OLLAMA_URL` / `NAPMEM_OLLAMA_MODEL` | `semantic_index.py` | Single-host override of the chain / embedding model (default `mxbai-embed-large`) |
 | `NAPMEM_PYRAMID` | `napmem_mcp_server.py` | Default pyramid store path |
 | `ANTHROPIC_API_KEY` (et al.) | `anthropic` SDK | Standard SDK credential resolution; never read directly by repo code |
 

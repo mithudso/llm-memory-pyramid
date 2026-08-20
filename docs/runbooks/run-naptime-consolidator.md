@@ -9,6 +9,13 @@ of memory files.
 python3 naptime_consolidator.py --watch-dir ./memory_logs --pyramid napmem_pyramid.json --once
 ```
 
+Extraction is `--extraction auto` by default: LLM extraction (one Batches API
+batch per sweep, `claude-haiku-4-5`) when the `anthropic` package is
+installed, heuristic otherwise. Force with `--extraction llm|heuristic`; add
+`--semantic-dedup` to fold paraphrases via the embedding index. Startup logs
+`Extraction mode: llm|heuristic`; any per-file LLM failure logs
+`Heuristic fallback for <file>` and is still ingested.
+
 ## Background loop (bounded)
 
 ```bash

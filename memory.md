@@ -2,6 +2,27 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.2.0 — 2026-08-20
+
+**Active task:** none.
+
+**Completed:**
+- Naptime consolidator wired to `llm_extractor` (`--extraction auto|llm|heuristic`;
+  one Batches API batch per sweep, per-file heuristic fallback on any failure).
+- `ingest_extractions` now returns the ingested session set so callers can
+  route failed sessions to the fallback extractor.
+- Ollama host failover: `NAPMEM_OLLAMA_URLS` chain, remote
+  `http://192.168.4.75:11434` first, `http://localhost:11434` backup; default
+  model switched to `mxbai-embed-large` (pulled locally, 669 MB) so both
+  hosts serve the same model and the vector cache survives failover.
+  Verified live: remote picked by default; simulated outage fails over to
+  local, 1024-dim embeddings on both.
+- Tests 19 → 26 (consolidator wiring with faked anthropic module, probe-order
+  failover); dependabot PR #2 (checkout v7) merged by operator.
+
+**Next steps:**
+- `pip install anthropic` + credential on the naptime host to activate LLM mode.
+
 ## v1.1.0 — 2026-08-20
 
 **Active task:** none — production path shipped.

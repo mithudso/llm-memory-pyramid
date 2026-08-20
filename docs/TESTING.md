@@ -3,7 +3,7 @@
 ## Strategy
 
 Plain `unittest`, two suites (`test_napmem_pipeline.py`,
-`test_napmem_extensions.py`), 19 tests, no test dependencies, network-free:
+`test_napmem_extensions.py`), 26 tests, no test dependencies, network-free:
 extractor tests exercise parsing/validation offline, semantic tests force
 `NAPMEM_EMBED_BACKEND=hashed`, and the MCP test drives the real server binary
 over a subprocess pipe. Tests assert observable behavior on real pyramid
@@ -34,6 +34,11 @@ in this codebase, all covered and to stay covered:
 - Semantic dedup: fold with `paraphrase_text` anchor; off by default.
 - MCP protocol: handshake, tool list, in-band tool errors, -32601 on unknown
   methods.
+- Consolidator LLM wiring: auto-mode batch use, per-file heuristic fallback on
+  batch error or invalid output, heuristic mode isolation (via a faked
+  `anthropic` module — no network).
+- Ollama failover: probe order prefers the first responding host; all-dead
+  chain returns None.
 
 ## CI gate
 

@@ -16,7 +16,7 @@ calls; optional extras: `anthropic` SDK (LLM extraction) and local Ollama
 python3 -m unittest discover -s . -p "test_*.py"                 # run all tests (must stay green)
 python3 memory_pyramid_distiller.py --input <file.md>            # distill a memory file (heuristic)
 python3 llm_extractor.py --input <file.md> [--no-batch|--dry-run]# LLM extraction (Batches API)
-python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one consolidation sweep
+python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one sweep (--extraction auto|llm|heuristic)
 python3 napmem_retrieval_agent.py --query <q> --layer all        # substring query
 python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
 python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
@@ -32,11 +32,12 @@ Layers 2–3 → save. `naptime_consolidator.py` maps each watched `.md` file to
 stable `sess_<basename>` session id and re-ingests on any mtime change.
 `napmem_retrieval_agent.py` is read-only. `llm_extractor.py` is the production
 extraction path (Anthropic Batches API + schema validation feeding
-`ingest_session_records`); the distiller's heuristic extractor is its
-deterministic stand-in. `semantic_index.py` caches embeddings per record
-(Ollama backend, stdlib hashed-TF fallback) for cosine search and opt-in
-semantic dedup. `napmem_mcp_server.py` wraps the retrieval tools in a stdlib
-MCP stdio server.
+`ingest_session_records`); the consolidator uses it automatically when
+`anthropic` is installed (`--extraction auto`, per-file heuristic fallback on
+any failure). `semantic_index.py` caches embeddings per record (Ollama with a
+remote→local host failover chain, stdlib hashed-TF fallback) for cosine
+search and opt-in semantic dedup. `napmem_mcp_server.py` wraps the retrieval
+tools in a stdlib MCP stdio server.
 
 ## Invariants — do not break
 

@@ -15,3 +15,9 @@ Versioned record of user requests, in order. Newest last.
 3. "Implement all 3" — shipped llm_extractor.py (Haiku Batches API),
    semantic_index.py (+semantic dedup, --semantic search), napmem_mcp_server.py
    (+.mcp.json); tests 9 → 19; docs + external-calls registry updated.
+4. "Wire the naptime consolidator to use llm_extractor. Also download whatever
+   ollama model would be most effective ... local backup if the remote ollama
+   server at 192.168.4.75 isn't responding" — consolidator --extraction
+   auto|llm|heuristic with per-file fallback; NAPMEM_OLLAMA_URLS failover
+   chain (remote first, localhost backup); pulled mxbai-embed-large locally
+   to match the remote's model; tests 19 → 26.

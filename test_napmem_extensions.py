@@ -14,11 +14,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
+from unittest import mock
 
+import llm_extractor
 from llm_extractor import ExtractionError, parse_extraction_output, units_to_records
 from memory_pyramid_distiller import MemoryPyramidDistiller
-from semantic_index import HashedTfBackend, SemanticIndex, cosine
+from naptime_consolidator import NaptimeConsolidator
+from semantic_index import HashedTfBackend, OllamaBackend, SemanticIndex, cosine
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -151,6 +155,101 @@ class TestSemanticIndex(unittest.TestCase):
         distiller.ingest_session("sess_a", "A", "a.md", "# N\n- alpha beta gamma one.\n")
         distiller.ingest_session("sess_b", "B", "b.md", "# N\n- Alpha beta gamma one!\n")
         self.assertEqual(len(distiller.data["memory_records"]), 2)
+
+
+def _fake_anthropic_module():
+    """Minimal stand-in for the anthropic package (never touches the network)."""
+    module = types.ModuleType("anthropic")
+    module.APIError = type("APIError", (Exception,), {})
+    module.Anthropic = lambda: object()
+    return module
+
+
+class TestConsolidatorLLMWiring(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="napmem_llm_")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.watch = os.path.join(self.tmp, "logs")
+        os.makedirs(self.watch)
+        self.pyramid = os.path.join(self.tmp, "p.json")
+        with open(os.path.join(self.watch, "notes.md"), "w", encoding="utf-8") as f:
+            f.write("# Prefs\n- User prefers tabs over spaces.\n")
+        # `anthropic` is faked in sys.modules so auto mode selects the LLM
+        # path without the real dependency or network.
+        patcher = mock.patch.dict(sys.modules, {"anthropic": _fake_anthropic_module()})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _llm_output(self):
+        return json.dumps([{
+            "type": "fact", "text": "LLM says: tabs preferred.",
+            "salience": "high", "topic_slug": "prefs",
+            "source_anchor": {"heading": "Prefs", "line_range": "L2"},
+        }])
+
+    def test_auto_mode_uses_llm_batch(self):
+        with mock.patch.object(llm_extractor, "extract_batch",
+                               return_value={"sess_notes": self._llm_output()}) as mocked:
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="auto")
+            self.assertTrue(consolidator.use_llm)
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        mocked.assert_called_once()
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertEqual(texts, ["LLM says: tabs preferred."])  # LLM path, not heuristic
+
+    def test_llm_failure_falls_back_to_heuristic(self):
+        with mock.patch.object(llm_extractor, "extract_batch",
+                               side_effect=ExtractionError("batch timed out")):
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="auto")
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertIn("User prefers tabs over spaces.", texts)  # heuristic extracted
+
+    def test_invalid_llm_output_falls_back_per_file(self):
+        with mock.patch.object(llm_extractor, "extract_batch",
+                               return_value={"sess_notes": "not json at all"}):
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="auto")
+            consolidator.scan_and_consolidate()
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertIn("User prefers tabs over spaces.", texts)
+
+    def test_heuristic_mode_never_imports_llm_path(self):
+        with mock.patch.object(llm_extractor, "extract_batch") as mocked:
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid,
+                                               extraction="heuristic")
+            self.assertFalse(consolidator.use_llm)
+            consolidator.scan_and_consolidate()
+        mocked.assert_not_called()
+
+    def test_extraction_mode_validation(self):
+        with self.assertRaises(ValueError):
+            NaptimeConsolidator(self.watch, self.pyramid, extraction="magic")
+
+
+class TestOllamaFailover(unittest.TestCase):
+    def test_probe_returns_none_when_all_hosts_dead(self):
+        # Ports 1 and 2 refuse connections immediately on loopback.
+        self.assertIsNone(OllamaBackend.probe(
+            urls=["http://127.0.0.1:1", "http://127.0.0.1:2"]))
+
+    def test_probe_order_prefers_first_responding_host(self):
+        alive = "http://127.0.0.1:9999"
+
+        def fake_urlopen(req, timeout=0):
+            if alive in req.full_url:
+                resp = mock.MagicMock()
+                resp.status = 200
+                resp.__enter__ = lambda s: resp
+                resp.__exit__ = lambda s, *a: False
+                return resp
+            raise OSError("refused")
+
+        with mock.patch("semantic_index.urllib.request.urlopen", side_effect=fake_urlopen):
+            backend = OllamaBackend.probe(urls=["http://127.0.0.1:1", alive])
+        self.assertIsNotNone(backend)
+        self.assertEqual(backend.base_url, alive)
 
 
 class TestMCPServer(unittest.TestCase):
