@@ -16,6 +16,28 @@ installed, heuristic otherwise. Force with `--extraction llm|heuristic`; add
 `Extraction mode: llm|heuristic`; any per-file LLM failure logs
 `Heuristic fallback for <file>` and is still ingested.
 
+## Scheduled operation (launchd — the production setup)
+
+`scripts/run-naptime.sh` is the launchd entry point: one sweep per firing
+over `~/.napmem/memory_logs` into `~/.napmem/napmem_pyramid.json`
+(`NAPMEM_HOME` overrides the data dir), `--semantic-dedup` enabled.
+Credentials resolve from the operator's `ant auth login` OAuth profile — no
+key in the plist or script; without a profile the sweep degrades to the
+heuristic extractor.
+
+Agent plist: `~/Library/LaunchAgents/com.mithudso.napmem-consolidator.plist`
+(hourly `StartInterval`, `RunAtLoad`, logs to `~/.napmem/naptime.{log,err}`).
+launchd never starts a second instance of the same label, so overlapping
+sweeps — the one-writer-per-store hazard — cannot occur.
+
+```bash
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.mithudso.napmem-consolidator.plist   # install
+launchctl kickstart "gui/$(id -u)/com.mithudso.napmem-consolidator"                                 # run now
+launchctl print "gui/$(id -u)/com.mithudso.napmem-consolidator" | head -20                          # inspect
+launchctl bootout "gui/$(id -u)/com.mithudso.napmem-consolidator"                                   # uninstall
+tail ~/.napmem/naptime.log                                                                          # verify
+```
+
 ## Background loop (bounded)
 
 ```bash
