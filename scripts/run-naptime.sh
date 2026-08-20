@@ -39,9 +39,30 @@ mkdir -p "$WATCH_DIR"
 # --- Mirror agent memory files as uniquely-named symlinks ------------------
 setopt null_glob
 
+# Exfiltration guard: the sources are Syncthing-synced, so a compromised peer
+# could sync a symlink named foo.md pointing at an arbitrary local file (SSH
+# keys, tokens) and this pipeline would upload the target's content. Mirror
+# only files that RESOLVE inside the vetted memory roots — anything else is
+# refused and logged.
+ALLOWED_ROOTS=()
+for root in "$HOME/.claude" "$HOME/.gemini" /Volumes/mitch/.claude /Volumes/mitch/.gemini; do
+  [[ -d "$root" ]] && ALLOWED_ROOTS+=("$(readlink -f -- "$root")")
+done
+
 mirror() {  # mirror <src> <link-name> [keep-existing]
   local src="$1" link="$WATCH_DIR/$2" keep="${3:-}"
   [[ "$src" == *sync-conflict* ]] && return 0  # skip Syncthing conflict copies
+  local real ok=""
+  real="$(readlink -f -- "$src" 2>/dev/null)" || return 0
+  [[ -f "$real" ]] || return 0
+  for root in "${ALLOWED_ROOTS[@]}"; do
+    [[ "$real" == "$root"/* ]] && ok=1 && break
+  done
+  if [[ -z "$ok" ]]; then
+    print -u2 "run-naptime: REFUSED out-of-root source: $src -> $real"
+    rm -f -- "$link"   # revoke a previously-mirrored link for this name
+    return 0
+  fi
   if [[ -n "$keep" && ( -L "$link" || -e "$link" ) ]]; then
     return 0  # volume twin: local mirror already owns this name
   fi
