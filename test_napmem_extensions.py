@@ -299,6 +299,17 @@ class TestGuardedRead(unittest.TestCase):
         os.symlink(src, link)
         self.assertEqual(_read_file_guarded(link, [self.root]), "safe content")
 
+    def test_unverifiable_fd_path_fails_closed(self):
+        """No kernel-reported fd path -> refuse; a realpath fallback would
+        reintroduce the TOCTOU race."""
+        import naptime_consolidator as nc
+        src = os.path.join(self.root, "notes.md")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("content")
+        with mock.patch.object(nc, "_fd_true_path", return_value=None), \
+             self.assertRaises(PermissionError):
+            nc._read_file_guarded(src, [self.root])
+
     def test_out_of_root_symlink_refused(self):
         from naptime_consolidator import _read_file_guarded
         secret = os.path.join(self.outside, "id_ed25519")

@@ -76,7 +76,11 @@ def _read_file_guarded(path: str, allowed_roots: list[str]) -> str:
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise PermissionError(f"{path}: not a regular file")
-        real = _fd_true_path(fd) or os.path.realpath(path)
+        real = _fd_true_path(fd)
+        if real is None:
+            # No kernel-reported fd path (no F_GETPATH, no procfs): a realpath
+            # fallback would reintroduce the race — fail closed instead.
+            raise PermissionError(f"{path}: cannot verify opened file's true path")
         if not any(real == root or real.startswith(root + os.sep)
                    for root in allowed_roots):
             raise PermissionError(f"{path}: resolves outside allowed roots ({real})")
