@@ -9,11 +9,11 @@ to keep the NapMem Pyramid updated without impacting active agent context or
 response latency.
 """
 
+import argparse
+import logging
 import os
 import time
-import logging
-import argparse
-from typing import Dict
+
 from memory_pyramid_distiller import MemoryPyramidDistiller
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class NaptimeConsolidator:
         self.watch_dir = watch_dir
         self.pyramid_path = pyramid_path
         self.distiller = MemoryPyramidDistiller(pyramid_path=pyramid_path)
-        self.file_timestamps: Dict[str, float] = {}
+        self.file_timestamps: dict[str, float] = {}
 
     def scan_and_consolidate(self) -> int:
         """

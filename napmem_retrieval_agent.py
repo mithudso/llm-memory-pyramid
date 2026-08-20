@@ -12,10 +12,10 @@ Tools provided:
   - compute_context_budget_savings(): Demonstrates token cost savings vs passive RAG.
 """
 
-import os
-import json
 import argparse
-from typing import Dict, Any
+import json
+import os
+from typing import Any
 
 VALID_LAYERS = ("all", "profiles", "tracks", "records")
 
@@ -24,13 +24,13 @@ class NapMemRetrievalAgent:
         self.pyramid_path = pyramid_path
         self.data = self._load_pyramid()
 
-    def _load_pyramid(self) -> Dict[str, Any]:
+    def _load_pyramid(self) -> dict[str, Any]:
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please run memory_pyramid_distiller.py first.")
 
-    def search_memory_pyramid(self, query: str, layer: str = "all") -> Dict[str, Any]:
+    def search_memory_pyramid(self, query: str, layer: str = "all") -> dict[str, Any]:
         """
         Active memory search tool.
         layer can be 'profiles', 'tracks', 'records', or 'all'.
@@ -70,7 +70,7 @@ class NapMemRetrievalAgent:
 
         return results
 
-    def inspect_provenance(self, record_id: str) -> Dict[str, Any]:
+    def inspect_provenance(self, record_id: str) -> dict[str, Any]:
         """
         Resolves an atomic record back to its Layer 0 source anchor and raw conversation metadata.
 
@@ -107,7 +107,7 @@ class NapMemRetrievalAgent:
             result["canonical_id"] = canonical_id
         return result
 
-    def get_topic_track(self, topic_slug: str) -> Dict[str, Any]:
+    def get_topic_track(self, topic_slug: str) -> dict[str, Any]:
         """
         Retrieves a full topic track with all associated atomic records.
         """
@@ -125,7 +125,7 @@ class NapMemRetrievalAgent:
             "records": associated_records
         }
 
-    def compute_context_budget_savings(self) -> Dict[str, Any]:
+    def compute_context_budget_savings(self) -> dict[str, Any]:
         """
         Calculates token savings of using active NapMem retrieval vs dumping raw memory logs.
 

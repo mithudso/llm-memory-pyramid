@@ -15,13 +15,13 @@ another session still substantiates are re-anchored to that session) and then
 rebuilds Layers 2-3 from the surviving records.
 """
 
+import argparse
+import json
 import os
 import re
 import sys
-import json
-import argparse
 from datetime import datetime, timezone
-from typing import Dict, List, Any
+from typing import Any
 
 UNIT_TYPES = ["concept", "fact", "actionable", "question", "problem", "statement", "quote", "idea"]
 SALIENCE_LEVELS = ["high", "medium", "low"]
@@ -43,7 +43,7 @@ class MemoryPyramidDistiller:
         self.pyramid_path = pyramid_path
         self.data = self._load_pyramid()
 
-    def _load_pyramid(self) -> Dict[str, Any]:
+    def _load_pyramid(self) -> dict[str, Any]:
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -65,7 +65,7 @@ class MemoryPyramidDistiller:
             json.dump(self.data, f, indent=2)
         os.replace(tmp_path, self.pyramid_path)
 
-    def extract_atomic_units(self, content: str, session_id: str, file_path: str) -> List[Dict[str, Any]]:
+    def extract_atomic_units(self, content: str, session_id: str, file_path: str) -> list[dict[str, Any]]:
         """
         Parses raw content into atomic units following document-distiller taxonomy.
         In production, this integrates with LLM zero-fabrication extraction prompts.
@@ -96,7 +96,7 @@ class MemoryPyramidDistiller:
             elif "?" in line_str:
                 unit_type = "question"
                 salience = "high"
-            elif line_str.startswith(">") or line_str.startswith('"'):
+            elif line_str.startswith((">", '"')):
                 unit_type = "quote"
                 salience = "medium"
                 text = line_str.lstrip(">").strip().strip('"')
@@ -142,7 +142,7 @@ class MemoryPyramidDistiller:
 
         return units
 
-    def deduplicate_and_merge(self, new_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def deduplicate_and_merge(self, new_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Deduplicates newly extracted atomic units against existing Layer 1 memory records.
         Folds matching units into canonical records; the folded unit's source anchor is
@@ -166,7 +166,7 @@ class MemoryPyramidDistiller:
 
         return merged_records
 
-    def _reconcile_session_records(self, session_id: str, new_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _reconcile_session_records(self, session_id: str, new_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Reconciles a session's previously distilled Layer 1 records with a fresh
         extraction ahead of re-ingestion, and returns the new units still to merge.
@@ -181,12 +181,12 @@ class MemoryPyramidDistiller:
         with no recorded anchor are unresolvable dangling references and are
         dropped wherever found.
         """
-        new_by_text: Dict[str, Dict[str, Any]] = {}
+        new_by_text: dict[str, dict[str, Any]] = {}
         for unit in new_records:
             new_by_text.setdefault(unit["text"].lower().strip(), unit)
         consumed_ids = set()
 
-        kept: List[Dict[str, Any]] = []
+        kept: list[dict[str, Any]] = []
         for rec in self.data["memory_records"]:
             anchors = rec.get("duplicate_anchors", {})
             foreign = [
@@ -249,7 +249,7 @@ class MemoryPyramidDistiller:
         Synthesizes Layer 2 (Topic Tracks) and Layer 3 (User Profiles) from Layer 1 records.
         """
         # Group by topic_slug for Layer 2
-        topic_groups: Dict[str, List[Dict[str, Any]]] = {}
+        topic_groups: dict[str, list[dict[str, Any]]] = {}
         for rec in self.data["memory_records"]:
             slug = rec.get("topic_slug", "general")
             topic_groups.setdefault(slug, []).append(rec)
