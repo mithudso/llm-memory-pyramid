@@ -1,0 +1,46 @@
+{
+  "$comment": "Machine-readable per-file index for LLM retrieval. Keep in sync with docs/codebase-overview.md.",
+  "generated": "2026-08-20",
+  "files": [
+    {
+      "path": "memory_pyramid_distiller.py",
+      "signal": "high",
+      "summary": "Core distiller owning napmem_pyramid.json: extract_atomic_units (8-way taxonomy heuristics), deduplicate_and_merge (exact-text fold with duplicate_anchors), _reconcile_session_records (stable IDs across re-ingestion, duplicate promotion), rebuild_higher_layers (tracks + profiles), atomic save, CLI."
+    },
+    {
+      "path": "naptime_consolidator.py",
+      "signal": "high",
+      "summary": "Background consolidator: scans watch dir for .md files, re-ingests on any mtime change (not strictly-newer), per-file OSError/UnicodeDecodeError isolation, polling loop with max-ticks, CLI."
+    },
+    {
+      "path": "napmem_retrieval_agent.py",
+      "signal": "high",
+      "summary": "Read-only retrieval tools: search_memory_pyramid (layer-scoped, ValueError on bad layer), inspect_provenance (resolves canonical and duplicate IDs), get_topic_track, compute_context_budget_savings (discloses missing raw files), CLI."
+    },
+    {
+      "path": "llm_extraction_prompts.py",
+      "signal": "high",
+      "summary": "Zero-fabrication LLM extraction prompt: untrusted-content + zero-fabrication guards, sentinel delimiter with loop neutralization (_neutralize_sentinel), newline-stripped metadata interpolation (_neutralize_metadata), get_extraction_prompt."
+    },
+    {
+      "path": "test_napmem_pipeline.py",
+      "signal": "high",
+      "summary": "9 unittest tests: extraction typing/salience, dedup + duplicate anchors, re-ingestion ID stability, duplicate promotion, layer rebuild, provenance, sentinel neutralization."
+    },
+    {
+      "path": "memory_pyramid_schema.json",
+      "signal": "medium",
+      "summary": "JSON Schema for the pyramid store: layers 0-3 shapes, record fields, profile category enum."
+    },
+    {
+      "path": "napmem_pyramid.json",
+      "signal": "low",
+      "summary": "Example pyramid store produced from sample data."
+    },
+    {
+      "path": "sample_agent_memory.md",
+      "signal": "low",
+      "summary": "Sample input memory file used in demos and docs."
+    }
+  ]
+}

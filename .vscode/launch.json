@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/test_napmem_pipeline.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Distill sample memory",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/memory_pyramid_distiller.py",
+      "args": ["--input", "sample_agent_memory.md"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Naptime consolidator (once)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/naptime_consolidator.py",
+      "args": ["--watch-dir", "./memory_logs", "--once"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
