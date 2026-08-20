@@ -23,6 +23,7 @@ the pyramid never silently misses an update.
 import argparse
 import logging
 import os
+import stat
 import time
 
 from memory_pyramid_distiller import MemoryPyramidDistiller
@@ -31,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 EXTRACTION_MODES = ("auto", "llm", "heuristic")
 
+# Colon-separated list of directories memory files must RESOLVE into. When
+# set, every file read is verified race-free (see _read_file_guarded) so a
+# watched entry swapped into a symlink between scan and read cannot leak an
+# out-of-root file's content into the extraction/embedding egress paths.
+ALLOWED_ROOTS_ENV = "NAPMEM_ALLOWED_ROOTS"
+
 
 def _anthropic_available() -> bool:
     try:
@@ -38,6 +45,49 @@ def _anthropic_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _fd_true_path(fd: int) -> str | None:
+    """Kernel-reported path of an open fd (macOS F_GETPATH / Linux procfs)."""
+    try:
+        import fcntl
+        if hasattr(fcntl, "F_GETPATH"):
+            raw = fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024))
+            return raw.split(b"\x00", 1)[0].decode()
+    except (OSError, ValueError, UnicodeDecodeError):
+        pass
+    try:
+        return os.readlink(f"/proc/self/fd/{fd}")
+    except OSError:
+        return None
+
+
+def _read_file_guarded(path: str, allowed_roots: list[str]) -> str:
+    """
+    Reads a file, enforcing that the object actually opened is a regular file
+    inside allowed_roots. The check runs on the OPEN fd (kernel-reported path
+    + fstat), not on the pre-open path, so it cannot be raced by swapping the
+    file into a symlink between validation and read (TOCTOU).
+    """
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise PermissionError(f"{path}: not a regular file")
+        real = _fd_true_path(fd) or os.path.realpath(path)
+        if not any(real == root or real.startswith(root + os.sep)
+                   for root in allowed_roots):
+            raise PermissionError(f"{path}: resolves outside allowed roots ({real})")
+        with os.fdopen(fd, "r", encoding="utf-8") as f:
+            fd = -1  # ownership transferred to the file object
+            return f.read()
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _allowed_roots_from_env() -> list[str]:
+    raw = os.environ.get(ALLOWED_ROOTS_ENV, "")
+    return [os.path.realpath(p) for p in raw.split(":") if p.strip()]
 
 
 class NaptimeConsolidator:
@@ -58,7 +108,10 @@ class NaptimeConsolidator:
         self.use_llm = (extraction == "llm"
                         or (extraction == "auto" and _anthropic_available()))
         self._client = None
+        self.allowed_roots = _allowed_roots_from_env()
         logger.info("Extraction mode: %s", "llm" if self.use_llm else "heuristic")
+        if self.allowed_roots:
+            logger.info("Read guard active; allowed roots: %s", self.allowed_roots)
 
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
@@ -77,11 +130,14 @@ class NaptimeConsolidator:
                 # (backup restore, rsync -t, git checkout).
                 if fpath in self.file_timestamps and mtime == self.file_timestamps[fpath]:
                     continue
-                with open(fpath, "r", encoding="utf-8") as f:
-                    content = f.read()
+                if self.allowed_roots:
+                    content = _read_file_guarded(fpath, self.allowed_roots)
+                else:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        content = f.read()
                 session_id = f"sess_{os.path.splitext(fname)[0]}"
                 changed.append((session_id, fpath, content, mtime))
-            except OSError as exc:
+            except OSError as exc:  # includes PermissionError from the read guard
                 logger.error("Skipping memory file %s: %s", fpath, exc)
             except UnicodeDecodeError as exc:
                 logger.error("Skipping non-UTF-8 memory file %s: %s", fpath, exc)

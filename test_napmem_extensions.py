@@ -277,6 +277,66 @@ class TestConsolidatorLLMWiring(unittest.TestCase):
             NaptimeConsolidator(self.watch, self.pyramid, extraction="magic")
 
 
+class TestGuardedRead(unittest.TestCase):
+    """Race-free read guard: validation happens on the open fd, so a watched
+    entry swapped into a symlink cannot leak an out-of-root file."""
+
+    def setUp(self):
+        self.tmp = os.path.realpath(tempfile.mkdtemp(prefix="napmem_guard_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.root = os.path.join(self.tmp, "vetted")
+        self.watch = os.path.join(self.tmp, "watch")
+        self.outside = os.path.join(self.tmp, "outside")
+        for d in (self.root, self.watch, self.outside):
+            os.makedirs(d)
+
+    def test_legit_symlink_chain_reads(self):
+        from naptime_consolidator import _read_file_guarded
+        src = os.path.join(self.root, "notes.md")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("safe content")
+        link = os.path.join(self.watch, "proj__notes.md")
+        os.symlink(src, link)
+        self.assertEqual(_read_file_guarded(link, [self.root]), "safe content")
+
+    def test_out_of_root_symlink_refused(self):
+        from naptime_consolidator import _read_file_guarded
+        secret = os.path.join(self.outside, "id_ed25519")
+        with open(secret, "w", encoding="utf-8") as f:
+            f.write("PRIVATE KEY MATERIAL")
+        link = os.path.join(self.watch, "proj__notes.md")
+        os.symlink(secret, link)
+        with self.assertRaises(PermissionError):
+            _read_file_guarded(link, [self.root])
+
+    def test_consolidator_skips_refused_file(self):
+        from naptime_consolidator import ALLOWED_ROOTS_ENV
+        secret = os.path.join(self.outside, "secret.txt")
+        with open(secret, "w", encoding="utf-8") as f:
+            f.write("PRIVATE")
+        good = os.path.join(self.root, "good.md")
+        with open(good, "w", encoding="utf-8") as f:
+            f.write("# N\n- good fact stays here.\n")
+        os.symlink(secret, os.path.join(self.watch, "evil.md"))
+        os.symlink(good, os.path.join(self.watch, "good.md"))
+
+        pyramid = os.path.join(self.tmp, "p.json")
+        with mock.patch.dict(os.environ, {ALLOWED_ROOTS_ENV: self.root}):
+            consolidator = NaptimeConsolidator(self.watch, pyramid,
+                                               extraction="heuristic")
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        texts = " ".join(r["text"] for r in consolidator.distiller.data["memory_records"])
+        self.assertNotIn("PRIVATE", texts)
+        self.assertIn("good fact", texts)
+
+    def test_guard_off_without_env(self):
+        from naptime_consolidator import _allowed_roots_from_env
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NAPMEM_ALLOWED_ROOTS", None)
+            self.assertEqual(_allowed_roots_from_env(), [])
+
+
 class TestOllamaFailover(unittest.TestCase):
     def test_probe_returns_none_when_all_hosts_dead(self):
         # Ports 1 and 2 refuse connections immediately on loopback.

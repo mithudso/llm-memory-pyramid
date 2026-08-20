@@ -49,6 +49,10 @@ for root in "$HOME/.claude" "$HOME/.gemini" /Volumes/mitch/.claude /Volumes/mitc
   [[ -d "$root" ]] && ALLOWED_ROOTS+=("$(readlink -f -- "$root")")
 done
 
+# Race-free second layer: the consolidator re-verifies every file AT READ TIME
+# against the same roots (fd-based, cannot be raced by a post-mirror swap).
+export NAPMEM_ALLOWED_ROOTS="${(j.:.)ALLOWED_ROOTS}"
+
 mirror() {  # mirror <src> <link-name> [keep-existing]
   local src="$1" link="$WATCH_DIR/$2" keep="${3:-}"
   [[ "$src" == *sync-conflict* ]] && return 0  # skip Syncthing conflict copies
