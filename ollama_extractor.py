@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -87,18 +88,31 @@ def _coerce_array_text(content: str) -> str:
     except ValueError:
         return content
     if isinstance(data, dict):
+        # A lone unit object (json-mode grammars force a top-level object,
+        # so a one-unit extraction arrives bare): wrap it.
+        if "type" in data and "text" in data:
+            return json.dumps([data])
         lists = [v for v in data.values() if isinstance(v, list)]
         if len(lists) == 1:
             return json.dumps(lists[0])
     return content
 
 
+THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
 def _chat_once(url: str, model: str, prompt: str) -> str:
+    # No `format: "json"`: Ollama's json-mode grammar forces a top-level
+    # OBJECT, but the extraction contract is a top-level ARRAY — the cage
+    # made compliant answers impossible. The prompt's return-only-JSON
+    # instruction plus the strict downstream parser carry the contract.
+    # `think: false` disables qwen3-style reasoning preambles; hosts whose
+    # models don't think ignore the field.
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
-        "format": "json",
+        "think": False,
         "options": GEN_OPTIONS,
     }).encode()
     req = urllib.request.Request(
@@ -109,6 +123,9 @@ def _chat_once(url: str, model: str, prompt: str) -> str:
     content = (data.get("message") or {}).get("content")
     if not isinstance(content, str) or not content.strip():
         raise OllamaExtractionError(f"{url} returned no message content")
+    content = THINK_RE.sub("", content).strip()
+    if not content:
+        raise OllamaExtractionError(f"{url} returned only a think block")
     return _coerce_array_text(content)
 
 
