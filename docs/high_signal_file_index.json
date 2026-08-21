@@ -10,7 +10,7 @@
     {
       "path": "naptime_consolidator.py",
       "signal": "high",
-      "summary": "Background consolidator: scans watch dir for .md files, re-ingests on any mtime change (not strictly-newer), per-file OSError/UnicodeDecodeError isolation, polling loop with max-ticks, CLI."
+      "summary": "Background consolidator: scans watch dir for .md files, re-ingests on content change (mtime fast-path + persistent sha256 sweep-state in <pyramid>.sweepstate.json — touched-but-unchanged files skip extraction across --once restarts), per-file OSError/UnicodeDecodeError isolation, extraction chain auto = anthropic -> ollama -> heuristic, polling loop with max-ticks, CLI."
     },
     {
       "path": "napmem_retrieval_agent.py",
@@ -26,6 +26,11 @@
       "path": "llm_extractor.py",
       "signal": "high",
       "summary": "Production LLM extraction: get_extraction_prompt -> Anthropic Message Batches API (claude-haiku-4-5 default) or direct call, parse_extraction_output (fence-tolerant), validate_unit schema gate, units_to_records, ingest via distiller.ingest_session_records. Optional anthropic dependency, lazy import."
+    },
+    {
+      "path": "ollama_extractor.py",
+      "signal": "high",
+      "summary": "Zero-API-cost extraction backend: NAPMEM_OLLAMA_CHAT url=model host chain, Ollama /api/chat json-mode with per-sweep dead-host benching and wrapped-object coercion; reuses the sentinel extraction prompt and llm_extractor's parse/validate gauntlet unchanged."
     },
     {
       "path": "semantic_index.py",

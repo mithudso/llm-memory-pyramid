@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 from unittest import mock
@@ -24,7 +25,14 @@ from memory_pyramid_distiller import MemoryPyramidDistiller
 from naptime_consolidator import NaptimeConsolidator
 from semantic_index import HashedTfBackend, OllamaBackend, SemanticIndex, cosine
 
+import ollama_extractor
+from ollama_extractor import _coerce_array_text, extract_ollama, parse_chat_hosts
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Network-free suite: point the Ollama chat chain at the discard port so any
+# accidental live probe refuses instantly instead of reaching a real daemon.
+os.environ.setdefault("NAPMEM_OLLAMA_CHAT", "http://127.0.0.1:9=test-model")
 
 
 class TestLLMExtractorParsing(unittest.TestCase):
@@ -622,6 +630,178 @@ class TestMCPServer(unittest.TestCase):
         by_id = {r["id"]: r for r in responses}
         self.assertTrue(by_id[1]["result"]["isError"])
         self.assertEqual(by_id[2]["error"]["code"], -32601)
+
+
+class TestOllamaExtraction(unittest.TestCase):
+    def _chat_response(self, content):
+        body = json.dumps({"message": {"role": "assistant", "content": content}})
+        resp = mock.MagicMock()
+        resp.read.return_value = body.encode()
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = lambda s, *a: False
+        return resp
+
+    def _unit_array_text(self, text="Ollama says: tabs preferred."):
+        return json.dumps([{
+            "type": "fact", "text": text,
+            "salience": "high", "topic_slug": "prefs",
+            "source_anchor": {"heading": "Prefs", "line_range": "L2"},
+        }])
+
+    def test_parse_chat_hosts_orders_and_validates(self):
+        hosts = parse_chat_hosts("http://a:1=m1, http://b:2=m2:7b")
+        self.assertEqual(hosts, [("http://a:1", "m1"), ("http://b:2", "m2:7b")])
+        with self.assertRaises(ValueError):
+            parse_chat_hosts("http://a:1")  # no model
+        with self.assertRaises(ValueError):
+            parse_chat_hosts(",")  # no hosts at all
+
+    def test_coerce_array_text_unwraps_single_list_object(self):
+        arr = self._unit_array_text()
+        wrapped = json.dumps({"units": json.loads(arr)})
+        self.assertEqual(json.loads(_coerce_array_text(wrapped)), json.loads(arr))
+        # Bare arrays and non-JSON pass through untouched.
+        self.assertEqual(_coerce_array_text(arr), arr)
+        self.assertEqual(_coerce_array_text("not json"), "not json")
+        # Ambiguous objects (two lists) are left for the strict parser to
+        # reject rather than guessed at.
+        ambiguous = json.dumps({"a": [], "b": []})
+        self.assertEqual(_coerce_array_text(ambiguous), ambiguous)
+
+    def test_extract_ollama_fails_over_and_benches_dead_host(self):
+        import urllib.error
+        hosts = [("http://dead:1", "m"), ("http://live:2", "m")]
+        calls = []
+
+        def fake_urlopen(req, timeout=None):
+            calls.append(req.full_url)
+            if "dead" in req.full_url:
+                raise urllib.error.URLError("refused")
+            return self._chat_response(self._unit_array_text())
+
+        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+                               side_effect=fake_urlopen):
+            outputs = extract_ollama(
+                {"sess_a": "prompt a", "sess_b": "prompt b"}, hosts)
+        self.assertEqual(set(outputs), {"sess_a", "sess_b"})
+        # The dead host is benched after its first failure: exactly one
+        # attempt against it, both extractions served by the live host.
+        self.assertEqual([u for u in calls if "dead" in u],
+                         ["http://dead:1/api/chat"])
+        self.assertEqual([u for u in calls if "live" in u],
+                         ["http://live:2/api/chat"] * 2)
+
+    def test_extract_ollama_omits_sessions_all_hosts_failed(self):
+        import urllib.error
+        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+                               side_effect=urllib.error.URLError("refused")):
+            outputs = extract_ollama({"sess_a": "p"}, [("http://dead:1", "m")])
+        self.assertEqual(outputs, {})
+
+
+class TestConsolidatorOllamaWiring(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="napmem_ollama_")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.watch = os.path.join(self.tmp, "logs")
+        os.makedirs(self.watch)
+        self.pyramid = os.path.join(self.tmp, "p.json")
+        with open(os.path.join(self.watch, "notes.md"), "w", encoding="utf-8") as f:
+            f.write("# Prefs\n- User prefers tabs over spaces.\n")
+
+    def _ollama_output(self):
+        return json.dumps([{
+            "type": "fact", "text": "Ollama says: tabs preferred.",
+            "salience": "high", "topic_slug": "prefs",
+            "source_anchor": {"heading": "Prefs", "line_range": "L2"},
+        }])
+
+    def test_ollama_mode_ingests_without_anthropic(self):
+        with mock.patch.object(ollama_extractor, "ollama_available", return_value=True), \
+             mock.patch.object(ollama_extractor, "extract_ollama",
+                               return_value={"sess_notes": self._ollama_output()}) as mocked:
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid,
+                                               extraction="ollama")
+            self.assertFalse(consolidator.use_llm)
+            self.assertTrue(consolidator.use_ollama)
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        mocked.assert_called_once()
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertEqual(texts, ["Ollama says: tabs preferred."])
+
+    def test_ollama_unreachable_falls_back_to_heuristic(self):
+        with mock.patch.object(ollama_extractor, "ollama_available", return_value=False):
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid,
+                                               extraction="ollama")
+            processed = consolidator.scan_and_consolidate()
+        self.assertEqual(processed, 1)
+        texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
+        self.assertIn("User prefers tabs over spaces.", texts)
+
+    def test_auto_mode_skips_ollama_when_anthropic_succeeds(self):
+        llm_output = json.dumps([{
+            "type": "fact", "text": "LLM says: tabs preferred.",
+            "salience": "high", "topic_slug": "prefs",
+            "source_anchor": {"heading": "Prefs", "line_range": "L2"},
+        }])
+        with mock.patch.dict(sys.modules, {"anthropic": _fake_anthropic_module()}), \
+             mock.patch.object(llm_extractor, "extract_batch",
+                               return_value={"sess_notes": llm_output}), \
+             mock.patch.object(ollama_extractor, "extract_ollama") as ollama_mock:
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid,
+                                               extraction="auto")
+            consolidator.scan_and_consolidate()
+        ollama_mock.assert_not_called()
+
+
+class TestSweepStatePersistence(unittest.TestCase):
+    """The persistent hash gate: touched-but-unchanged files must not
+    re-extract across PROCESS restarts (systemd --once mode), in either
+    timestamp direction; changed content must."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="napmem_state_")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.watch = os.path.join(self.tmp, "logs")
+        os.makedirs(self.watch)
+        self.pyramid = os.path.join(self.tmp, "p.json")
+        self.state = os.path.join(self.tmp, "state.json")
+        self.fpath = os.path.join(self.watch, "notes.md")
+        with open(self.fpath, "w", encoding="utf-8") as f:
+            f.write("# Prefs\n- User prefers tabs over spaces.\n")
+
+    def _fresh(self):
+        return NaptimeConsolidator(self.watch, self.pyramid,
+                                   extraction="heuristic",
+                                   state_path=self.state)
+
+    def test_touched_but_unchanged_skips_across_restarts(self):
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+        os.utime(self.fpath, (time.time() + 60, time.time() + 60))
+        self.assertEqual(self._fresh().scan_and_consolidate(), 0)
+        # Older-timestamp restore must also skip (hash, not mtime ordering).
+        os.utime(self.fpath, (1000, 1000))
+        self.assertEqual(self._fresh().scan_and_consolidate(), 0)
+
+    def test_changed_content_still_extracts(self):
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+        with open(self.fpath, "a", encoding="utf-8") as f:
+            f.write("- Also: never use sudo in scripts.\n")
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+
+    def test_corrupt_state_file_is_tolerated(self):
+        with open(self.state, "w", encoding="utf-8") as f:
+            f.write("{corrupt")
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+
+    def test_state_prunes_deleted_files(self):
+        self._fresh().scan_and_consolidate()
+        os.remove(self.fpath)
+        c = self._fresh()
+        c.scan_and_consolidate()
+        with open(self.state, encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["files"], {})
 
 
 if __name__ == "__main__":

@@ -54,3 +54,11 @@ Versioned record of user requests, in order. Newest last.
     per-prompt hook; pipeline_manager repo-status/index-repo/watch-repo),
     fixing the daemon's dead interpreter, the /-walking indexer loop, and an
     fd-leak crash along the way.
+13. "What's the API usage rate? Make it not use API spend — ollama, or a task
+    on the normal budget?" — measured: one successful batch sweep ever
+    (~$0.30–0.50); cap was killed by other month usage; projected burn came
+    from state-less hourly full re-extraction. Shipped: persistent sha256
+    sweep state (delta-only sweeps) + ollama_extractor.py zero-API backend
+    (qwen3.5:35b on the 5080) with --extraction ollama / auto chain;
+    subscription-budget headless-claude option assessed and declined (burns
+    the Max allowance the whole project exists to conserve).

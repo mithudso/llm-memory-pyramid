@@ -16,7 +16,7 @@ calls; optional extras: `anthropic` SDK (LLM extraction) and local Ollama
 python3 -m unittest discover -s . -p "test_*.py"                 # run all tests (must stay green)
 python3 memory_pyramid_distiller.py --input <file.md>            # distill a memory file (heuristic)
 python3 llm_extractor.py --input <file.md> [--no-batch|--dry-run]# LLM extraction (Batches API)
-python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one sweep (--extraction auto|llm|heuristic)
+python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one sweep (--extraction auto|llm|ollama|heuristic)
 python3 napmem_retrieval_agent.py --query <q> --layer all        # substring query
 python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
 python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
@@ -29,12 +29,16 @@ python3 napmem_mcp_server.py --pyramid <p.json>                  # MCP stdio ser
 writes via tmp+`os.replace`). `ingest_session()` is the single write path:
 extract → reconcile prior generation of the session → dedup/merge → rebuild
 Layers 2–3 → save. `naptime_consolidator.py` maps each watched `.md` file to a
-stable `sess_<basename>` session id and re-ingests on any mtime change.
+stable `sess_<basename>` session id and re-ingests on content change (mtime
+fast-path + persistent sha256 gate in `<pyramid>.sweepstate.json`, so
+touched-but-unchanged files skip extraction across `--once` restarts).
 `napmem_retrieval_agent.py` is read-only. `llm_extractor.py` is the production
 extraction path (Anthropic Batches API + schema validation feeding
-`ingest_session_records`); the consolidator uses it automatically when
-`anthropic` is installed (`--extraction auto`, per-file heuristic fallback on
-any failure). `semantic_index.py` caches embeddings per record (Ollama with a
+`ingest_session_records`); `ollama_extractor.py` is the zero-API-cost
+alternative (local Ollama chat models, `NAPMEM_OLLAMA_CHAT` url=model chain,
+same prompt and validation gauntlet). `--extraction auto` chains
+Anthropic → Ollama → per-file heuristic fallback; `--extraction ollama`
+guarantees no Anthropic API spend. `semantic_index.py` caches embeddings per record (Ollama with a
 remote→local host failover chain, stdlib hashed-TF fallback) for cosine
 search and opt-in semantic dedup. `napmem_mcp_server.py` wraps the retrieval
 tools in a stdlib MCP stdio server.

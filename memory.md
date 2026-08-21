@@ -2,6 +2,35 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.5.0 — 2026-08-21 (later still)
+
+**Active task:** none — zero-API-spend extraction shipped.
+
+**Completed:**
+- Spend post-mortem: NapMem itself spent well under $1 (exactly one
+  successful 142-file batch sweep before the org cap hit — the cap was
+  already near-exhausted by 20 days of other API usage). But the projected
+  rate was ~$5–10/day because the sweep state was in-memory only: every
+  systemd `--once` run re-extracted all 143 files.
+- Persistent sweep state: `<pyramid>.sweepstate.json` (mtime fast-path +
+  sha256 content gate, atomic writes, prunes deleted files) — touched-but-
+  unchanged files now skip extraction across process restarts, in both
+  timestamp directions.
+- `ollama_extractor.py`: zero-API-cost extraction via local Ollama chat
+  models (`NAPMEM_OLLAMA_CHAT` url=model chain, json-mode, per-sweep
+  dead-host benching, wrapped-object coercion). Same sentinel prompt, same
+  untrusted-output validation gauntlet as the Anthropic path.
+- Consolidator chain: `--extraction auto` = anthropic → ollama → heuristic;
+  `--extraction ollama` guarantees no API spend; wrapper honors
+  `NAPMEM_EXTRACTION`. Tests 44 → 55, all green; docs + file index updated.
+
+**Next steps:**
+- Deploy: box drop-in `NAPMEM_EXTRACTION=ollama` (qwen3.5:35b on the 5080),
+  one-shot backfill re-extracting all files at LLM quality, then hourly
+  delta sweeps.
+- After 2026-09-01 (cap reset): optionally flip to `auto` — with the hash
+  gate the Anthropic cost would be pennies/day for delta-only sweeps.
+
 ## v1.4.1 — 2026-08-21 (later)
 
 **Active task:** none — usage-learning auto-index loop live.
