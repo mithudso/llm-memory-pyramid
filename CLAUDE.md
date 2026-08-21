@@ -62,7 +62,7 @@ tools in a stdlib MCP stdio server.
   default pipeline must stay deterministic. Tests force
   `NAPMEM_EMBED_BACKEND=hashed`.
 - `logging` module for runtime output in daemons; CLI tools print to stdout.
-- Tests are plain `unittest` in `test_napmem_pipeline.py`; add tests for any
+- Tests are plain `unittest` (`test_napmem_pipeline.py` core, `test_napmem_extensions.py` production path); add tests for any
   behavior change, especially reconciliation edge cases.
 - Update `memory.md` (work log) and `prompts.md` (request log) each session.
 

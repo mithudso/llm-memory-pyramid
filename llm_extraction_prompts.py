@@ -48,12 +48,22 @@ Return a JSON array of atomic objects adhering to the schema:
 RAW_TEXT_DELIMITER = "<<<RAW_MEMORY_SOURCE>>>"
 
 
+_SENTINEL_RUN_RE = None
+
+
 def _neutralize_sentinel(value: str) -> str:
-    # Loop until no occurrence survives: a single replace is bypassable because
-    # deleting one bracket from e.g. <<<<...>>>> reconstitutes the delimiter.
-    # The replacement uses a space-free, shorter token, so the loop terminates.
-    while RAW_TEXT_DELIMITER in value:
-        value = value.replace(RAW_TEXT_DELIMITER, "<<RAW_MEMORY_SOURCE>>")
+    # Single-pass O(n) neutralization: replace any bracket-run form of the
+    # sentinel with a token containing no '<', '>', or the sentinel word, so
+    # nothing adjacent can reconstitute the delimiter. (The previous
+    # replace-in-a-loop shrank nested runs one bracket per pass — O(n^2) on
+    # hostile input, a measured CPU DoS at ~100KB of brackets.)
+    global _SENTINEL_RUN_RE
+    if _SENTINEL_RUN_RE is None:
+        import re
+        _SENTINEL_RUN_RE = re.compile(r"<{2,}RAW_MEMORY_SOURCE>{2,}")
+    value = _SENTINEL_RUN_RE.sub("[SENTINEL-REDACTED]", value)
+    if RAW_TEXT_DELIMITER in value:  # unreachable backstop: break the token itself
+        value = value.replace("RAW_MEMORY_SOURCE", "RAW-MEMORY-SOURCE")
     return value
 
 

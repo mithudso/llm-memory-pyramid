@@ -42,6 +42,12 @@ EXTRACTION_MODES = ("auto", "llm", "heuristic")
 ALLOWED_ROOTS_ENV = "NAPMEM_ALLOWED_ROOTS"
 
 
+def _session_id_for(fname: str) -> str:
+    """Stable session id for a watched file — the replace-by-session key.
+    Shared definition; llm_extractor's CLI derives ids the same way."""
+    return f"sess_{os.path.splitext(os.path.basename(fname))[0]}"
+
+
 def _anthropic_available() -> bool:
     try:
         import anthropic  # noqa: F401
@@ -72,10 +78,19 @@ def _read_file_guarded(path: str, allowed_roots: list[str]) -> str:
     + fstat), not on the pre-open path, so it cannot be raced by swapping the
     file into a symlink between validation and read (TOCTOU).
     """
-    fd = os.open(path, os.O_RDONLY)
+    # O_NONBLOCK: opening a FIFO planted in the watch dir would otherwise
+    # block forever BEFORE the S_ISREG refusal can run (hostile sync peers
+    # can deliver FIFOs — rsync -a syncs them). Harmless for regular files,
+    # which never return EAGAIN on read.
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
     try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
             raise PermissionError(f"{path}: not a regular file")
+        if st.st_nlink > 1:
+            # A hard link inside a root can alias an out-of-root inode while
+            # the fd path still reports the in-root name — refuse aliased files.
+            raise PermissionError(f"{path}: refusing multi-linked file (nlink={st.st_nlink})")
         real = _fd_true_path(fd)
         if real is None:
             # No kernel-reported fd path (no F_GETPATH, no procfs): a realpath
@@ -98,7 +113,13 @@ def _resolve_allowed_roots(watch_dir: str) -> list[str]:
         return [os.path.realpath(watch_dir)]  # fail-closed default
     if raw.strip().lower() == "off":
         return []
-    return [os.path.realpath(p) for p in raw.split(":") if p.strip()]
+    roots = [os.path.realpath(p) for p in raw.split(":") if p.strip()]
+    if not roots:
+        # Degenerate values like ":::" must not silently equal "off" —
+        # that would fail open on a config typo. Refuse to start instead.
+        raise ValueError(
+            f"{ALLOWED_ROOTS_ENV}={raw!r} yields no roots; use 'off' to disable the guard")
+    return roots
 
 
 class NaptimeConsolidator:
@@ -111,6 +132,10 @@ class NaptimeConsolidator:
         self.distiller = MemoryPyramidDistiller(pyramid_path=pyramid_path,
                                                 semantic_dedup=semantic_dedup)
         self.file_timestamps: dict[str, float] = {}
+        # (path -> mtime) of files refused/unreadable at that mtime: log the
+        # refusal ONCE per change instead of flooding ERROR every sweep (a
+        # parked hostile symlink would otherwise emit ~17k lines/day).
+        self._refused: dict[str, float] = {}
 
         if extraction == "llm" and not _anthropic_available():
             raise RuntimeError(
@@ -124,7 +149,8 @@ class NaptimeConsolidator:
         if self.allowed_roots:
             logger.info("Read guard active; allowed roots: %s", self.allowed_roots)
         else:
-            logger.warning("Read guard DISABLED (%s=off)", ALLOWED_ROOTS_ENV)
+            logger.warning("Read guard DISABLED (%s=%r)", ALLOWED_ROOTS_ENV,
+                           os.environ.get(ALLOWED_ROOTS_ENV))
 
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
@@ -136,6 +162,7 @@ class NaptimeConsolidator:
             fpath = os.path.join(self.watch_dir, fname)
             # One bad file (deleted mid-scan, unreadable, undecodable) must not
             # kill the background loop; log it and keep consolidating the rest.
+            mtime = None
             try:
                 mtime = os.path.getmtime(fpath)
                 # Any mtime CHANGE counts as modified: a strictly-newer check
@@ -143,17 +170,23 @@ class NaptimeConsolidator:
                 # (backup restore, rsync -t, git checkout).
                 if fpath in self.file_timestamps and mtime == self.file_timestamps[fpath]:
                     continue
+                if self._refused.get(fpath) == mtime:
+                    continue  # already refused at this mtime; logged once
                 if self.allowed_roots:
                     content = _read_file_guarded(fpath, self.allowed_roots)
                 else:
                     with open(fpath, "r", encoding="utf-8") as f:
                         content = f.read()
-                session_id = f"sess_{os.path.splitext(fname)[0]}"
-                changed.append((session_id, fpath, content, mtime))
+                self._refused.pop(fpath, None)
+                changed.append((_session_id_for(fname), fpath, content, mtime))
             except OSError as exc:  # includes PermissionError from the read guard
                 logger.error("Skipping memory file %s: %s", fpath, exc)
+                if mtime is not None:
+                    self._refused[fpath] = mtime
             except UnicodeDecodeError as exc:
                 logger.error("Skipping non-UTF-8 memory file %s: %s", fpath, exc)
+                if mtime is not None:
+                    self._refused[fpath] = mtime
         return changed
 
     def _extract_llm(self, changed: list[tuple[str, str, str, float]]) -> set[str]:
@@ -205,18 +238,24 @@ class NaptimeConsolidator:
             llm_done = self._extract_llm(changed)
 
         for session_id, fpath, content, mtime in changed:
-            if session_id in llm_done:
-                logger.info("LLM-extracted %s", os.path.basename(fpath))
-            else:
-                if self.use_llm:
-                    logger.warning("Heuristic fallback for %s", os.path.basename(fpath))
-                self.distiller.ingest_session(
-                    session_id=session_id,
-                    title=f"Memory File {os.path.basename(fpath)}",
-                    file_path=fpath,
-                    content=content,
-                )
-            self.file_timestamps[fpath] = mtime
+            # Per-file guard: one failing ingest (store write error, malformed
+            # content) must not kill the daemon or abandon the rest of the
+            # sweep — same contract as the collect phase.
+            try:
+                if session_id in llm_done:
+                    logger.info("LLM-extracted %s", os.path.basename(fpath))
+                else:
+                    if self.use_llm:
+                        logger.warning("Heuristic fallback for %s", os.path.basename(fpath))
+                    self.distiller.ingest_session(
+                        session_id=session_id,
+                        title=f"Memory File {os.path.basename(fpath)}",
+                        file_path=fpath,
+                        content=content,
+                    )
+                self.file_timestamps[fpath] = mtime
+            except Exception:
+                logger.exception("Ingest failed for %s; will retry next sweep", fpath)
 
         logger.info("Consolidated %d memory file(s) into %s", len(changed), self.pyramid_path)
         return len(changed)
@@ -229,7 +268,10 @@ class NaptimeConsolidator:
                     self.watch_dir, poll_interval_sec, max_ticks)
         ticks = 0
         while ticks < max_ticks:
-            self.scan_and_consolidate()
+            try:
+                self.scan_and_consolidate()
+            except Exception:
+                logger.exception("Sweep failed; continuing on next tick")
             ticks += 1
             if ticks < max_ticks:
                 time.sleep(poll_interval_sec)

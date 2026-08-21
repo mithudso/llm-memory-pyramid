@@ -71,12 +71,23 @@ class MemoryPyramidDistiller:
 
     def save(self):
         self.data["updated_at"] = _utcnow()
-        # Atomic write: the consolidator daemon rewrites this store repeatedly;
-        # a crash mid-write must not corrupt the only copy.
-        tmp_path = f"{self.pyramid_path}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=2)
-        os.replace(tmp_path, self.pyramid_path)
+        # Atomic + durable write: per-PID tmp so a concurrent CLI run cannot
+        # interleave into the daemon's tmp file (whichever replace runs last
+        # wins wholesale, never a corrupt mix); fsync before replace so a
+        # power loss cannot make the rename durable ahead of the data.
+        tmp_path = f"{self.pyramid_path}.{os.getpid()}.tmp"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.pyramid_path)
+        except OSError:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def extract_atomic_units(self, content: str, session_id: str, file_path: str) -> list[dict[str, Any]]:
         """
@@ -225,16 +236,25 @@ class MemoryPyramidDistiller:
         session whose text is re-asserted keeps its ID and gets its anchor
         refreshed (the matching new unit is consumed). A canonical whose text is
         gone survives only if a duplicate from another session still substantiates
-        it; that duplicate is promoted to canonical (same text by construction of
-        the exact-match dedup). Duplicate references from the re-ingested session
-        are stripped (re-folded on merge if re-asserted). Legacy duplicate IDs
-        with no recorded anchor are unresolvable dangling references and are
-        dropped wherever found.
+        it; that duplicate is promoted to canonical, adopting its own wording
+        (the anchor's `paraphrase_text`, recorded at fold time for semantic and
+        case-variant folds) so record text always matches text the anchoring
+        file actually contained. Duplicate references from the re-ingested
+        session are stripped, and a re-asserted unit reclaims its previous
+        duplicate ID on merge so external references survive no-op re-ingests.
+        Legacy duplicate IDs with no recorded anchor are unresolvable dangling
+        references and are dropped wherever found.
         """
         new_by_text: dict[str, dict[str, Any]] = {}
         for unit in new_records:
             new_by_text.setdefault(unit["text"].lower().strip(), unit)
         consumed_ids = set()
+        # Same-session duplicate IDs stripped from OTHER sessions' canonicals:
+        # if the re-ingested content re-asserts that text, the unit must
+        # reclaim its previous duplicate ID (it will re-fold on merge) instead
+        # of being renumbered — external provenance references stay valid
+        # across a no-op re-ingest.
+        reclaimable: dict[str, str] = {}
 
         kept: list[dict[str, Any]] = []
         for rec in self.data["memory_records"]:
@@ -245,6 +265,10 @@ class MemoryPyramidDistiller:
             ]
             if rec["source_anchor"]["session_id"] != session_id:
                 if len(foreign) != len(rec.get("duplicates", [])):
+                    for d in rec.get("duplicates", []):
+                        if d not in foreign and d in anchors:
+                            dup_text = anchors[d].get("paraphrase_text", rec["text"])
+                            reclaimable.setdefault(dup_text.lower().strip(), d)
                     rec["duplicates"] = foreign
                     rec["duplicate_anchors"] = {d: a for d, a in anchors.items() if d in foreign}
                 kept.append(rec)
@@ -260,14 +284,31 @@ class MemoryPyramidDistiller:
             if not foreign:
                 continue
             promoted_id = foreign[0]
+            old_text = rec["text"]
+            promoted_anchor = dict(anchors[promoted_id])
             rec["id"] = promoted_id
             rec["canonical"] = promoted_id
-            rec["source_anchor"] = anchors[promoted_id]
+            # Provenance invariant: a record's text must be text its anchor's
+            # file actually contained. A duplicate folded SEMANTICALLY carries
+            # its own wording in the anchor's `paraphrase_text`; on promotion
+            # that wording becomes the record text (and the key is dropped).
+            # Exact-text duplicates that remain under the new canonical then
+            # get `paraphrase_text` = the old canonical text, since their
+            # files contained THAT wording, not the promoted one.
+            if "paraphrase_text" in promoted_anchor:
+                rec["text"] = promoted_anchor.pop("paraphrase_text")
+            rec["source_anchor"] = promoted_anchor
             # The record's topic must follow its new anchor, not the removed
             # session's heading.
-            rec["topic_slug"] = _slugify(anchors[promoted_id].get("heading", "General"))
+            rec["topic_slug"] = _slugify(promoted_anchor.get("heading", "General"))
             rec["duplicates"] = foreign[1:]
-            rec["duplicate_anchors"] = {d: anchors[d] for d in foreign[1:]}
+            remaining_anchors = {}
+            for d in foreign[1:]:
+                a = dict(anchors[d])
+                if rec["text"] != old_text and "paraphrase_text" not in a:
+                    a["paraphrase_text"] = old_text
+                remaining_anchors[d] = a
+            rec["duplicate_anchors"] = remaining_anchors
             kept.append(rec)
         self.data["memory_records"] = kept
 
@@ -277,8 +318,22 @@ class MemoryPyramidDistiller:
         # line, or re-ingesting a session whose duplicate was promoted). Number
         # strictly after the session's highest surviving suffix.
         remaining = [u for u in new_records if u["id"] not in consumed_ids]
-        next_n = self._next_unit_number(session_id)
-        for offset, unit in enumerate(remaining):
+        # Reclaim first, then number fresh units past BOTH the surviving and
+        # the just-reclaimed suffixes so the two ranges cannot collide.
+        fresh: list[dict[str, Any]] = []
+        max_reclaimed = 0
+        prefix = f"rec_{session_id}_"
+        for unit in remaining:
+            reclaimed = reclaimable.pop(unit["text"].lower().strip(), None)
+            if reclaimed is not None:
+                unit["id"] = reclaimed
+                unit["canonical"] = reclaimed
+                if reclaimed.startswith(prefix) and reclaimed[len(prefix):].isdigit():
+                    max_reclaimed = max(max_reclaimed, int(reclaimed[len(prefix):]))
+            else:
+                fresh.append(unit)
+        next_n = max(self._next_unit_number(session_id), max_reclaimed + 1)
+        for offset, unit in enumerate(fresh):
             unit["id"] = f"rec_{session_id}_{next_n + offset:03d}"
             unit["canonical"] = unit["id"]
         return remaining
@@ -424,10 +479,17 @@ def main():
             sys.exit(1)
         with open(args.input, "r", encoding="utf-8") as f:
             content = f.read()
-        # Derive the default session ID from the input file (mirroring the
-        # consolidator): a fixed default would make two runs on DIFFERENT files
-        # silently replace each other's records via re-ingest semantics.
+        # Derive the default session ID from the input BASENAME (mirroring the
+        # consolidator). Caveat: two different files sharing a basename map to
+        # the same session and replace each other's records — warn when the
+        # stored Layer 0 entry points at a different path.
         session_id = args.session_id or f"sess_{os.path.splitext(os.path.basename(args.input))[0]}"
+        prior = next((s for s in distiller.data["raw_conversations"]
+                      if s["session_id"] == session_id), None)
+        if prior and os.path.abspath(prior.get("file_path", "")) != os.path.abspath(args.input):
+            print(f"Warning: session {session_id!r} previously ingested from "
+                  f"{prior.get('file_path')!r}; this run REPLACES those records "
+                  f"(pass --session-id to keep them separate)", file=sys.stderr)
         num_extracted = distiller.ingest_session(session_id, args.title, args.input, content)
         print(f"Successfully distilled {num_extracted} atomic units from {args.input} into {args.pyramid}")
         print("\n" + distiller.render_markdown_summary())

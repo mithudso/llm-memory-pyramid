@@ -87,7 +87,7 @@ class NapMemRetrievalAgent:
                 "mode": f"semantic:{index.backend.name}",
                 "matches": [{"score": h["score"], **h["record"]} for h in hits],
             }
-        except (RuntimeError, OSError, ValueError) as exc:
+        except (RuntimeError, OSError, ValueError, ImportError) as exc:
             fallback = self.search_memory_pyramid(query, layer="records")
             return {
                 "query": query,

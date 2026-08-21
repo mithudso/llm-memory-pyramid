@@ -63,12 +63,13 @@ targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
 | `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
 | `napmem_pyramid.json` | Example pyramid store |
-| `test_napmem_pipeline.py` | Test suite (unittest, 9 tests) |
+| `test_napmem_pipeline.py` | Core test suite (unittest; 38 tests across both suites) |
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) · [Components](docs/COMPONENTS.md) · [Development](docs/DEVELOPMENT.md)
 - [Installation](docs/INSTALLATION.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md)
+- [Deployment topology](docs/deployment-topology.md) · [Deploy units](deploy/README.md) · [Security ledger](docs/security-review-ledger.md)
 - [Codebase overview](docs/codebase-overview.md) · [Known issues](docs/known-issues.md) · [Onboarding](docs/onboarding.md)
 
 ## License

@@ -48,6 +48,21 @@
       "summary": "10 unittest tests, network-free: extractor parse/validate/convert + LLM-record re-ingest stability, hashed-backend cosine, semantic search ranking, semantic dedup fold and off-by-default, MCP handshake/tools/errors via subprocess."
     },
     {
+      "path": "scripts/run-naptime.sh",
+      "signal": "high",
+      "summary": "Portable bash sweep wrapper (launchd + systemd): mirrors Claude/Antigravity/mounted-twin memory files as prefixed symlinks, skips sync-conflict copies, refuses+revokes out-of-root sources, exports NAPMEM_ALLOWED_ROOTS, runs one consolidation sweep."
+    },
+    {
+      "path": "deploy/napmem-consolidator.service",
+      "signal": "medium",
+      "summary": "systemd oneshot user service for one sweep; pool weights for the Linux 5080 box; paired with hourly Persistent timer."
+    },
+    {
+      "path": "docs/deployment-topology.md",
+      "signal": "high",
+      "summary": "Fleet topology (Linux canonical consolidator, M5 pool member, M3 ssh-MCP client), data flow, 3-layer security model, full 2026-08-20 build history."
+    },
+    {
       "path": "memory_pyramid_schema.json",
       "signal": "medium",
       "summary": "JSON Schema for the pyramid store: layers 0-3 shapes, record fields, profile category enum."

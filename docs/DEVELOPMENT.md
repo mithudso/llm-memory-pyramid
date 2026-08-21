@@ -8,7 +8,7 @@ install step.
 ```bash
 git clone https://github.com/mithudso/llm-memory-pyramid.git
 cd llm-memory-pyramid
-python3 test_napmem_pipeline.py   # verify: 9 tests, OK
+python3 -m unittest discover -s . -p "test_*.py"   # verify: 38 tests, OK
 ```
 
 ## Commands

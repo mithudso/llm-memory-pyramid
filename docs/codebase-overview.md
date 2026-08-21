@@ -34,5 +34,7 @@ repo root. Every file accounted for below.
 | `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `LICENSE` | Contribution meta (Apache 2.0) |
 | `docs/` | Full documentation suite (architecture, components, development, testing, security, installation, requirements, logging, caching, runbooks, indexes) |
 | `.mcp.json` | Registers the napmem MCP server for MCP clients |
+| `scripts/run-naptime.sh` | Portable bash sweep wrapper (launchd + systemd): multi-source mirror, guards, one sweep |
+| `deploy/` | systemd user units + deployment README (Linux canonical consolidator) |
 | `.github/` | CI workflow, dependabot, CODEOWNERS, templates, security policy, copilot instructions |
 | `.vscode/`, `.editorconfig`, `.gitattributes`, `.gitignore` | Editor/toolchain meta |

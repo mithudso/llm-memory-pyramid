@@ -21,3 +21,16 @@ Versioned record of user requests, in order. Newest last.
    auto|llm|heuristic with per-file fallback; NAPMEM_OLLAMA_URLS failover
    chain (remote first, localhost backup); pulled mxbai-embed-large locally
    to match the remote's model; tests 19 → 26.
+5. "Install anthropic into this machine's python" — user-site install;
+   hardened credential-missing fallback; security findings fixed; tests → 28.
+6. "Set it up with launchd, use my ant auth login profile" — hourly agent,
+   ant CLI, OAuth (org-credits detour), end-to-end batch extraction verified.
+7. "Point it at my real Claude Code memory files" / "also antigravity + the
+   volume copies" — multi-source mirror; custom_id fix; exfiltration guards
+   (mirror-time, TOCTOU fd-guard, fail-closed default); tests → 35.
+8. "Ollama on 3 machines ... used according to their capacity" — weighted
+   pool, batched dedup, cache race + corruption fixes; tests → 38.
+9. "Migrate the consolidator to the linux box; initialize global-ai-hub repo"
+   — portable bash wrapper, systemd units, canonical on 192.168.4.75, M3
+   ssh-MCP cutover, hub pushed with skills submodule.
+10. "Document everything, run full /cdo, rerun bootstrapper" — this commit.

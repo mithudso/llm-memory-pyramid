@@ -10,3 +10,7 @@ ExecStart=%h/dev/llm-memory-pyramid/scripts/run-naptime.sh
 Environment=NAPMEM_OLLAMA_URLS=http://localhost:11434=4,http://192.168.4.1:11434=2
 Nice=10
 IOSchedulingClass=idle
+# oneshot defaults to an infinite start timeout: a hung sweep (dead embedding
+# host, stuck batch poll) would otherwise pin the unit in `activating` and
+# block every future timer firing until reboot.
+TimeoutStartSec=45min

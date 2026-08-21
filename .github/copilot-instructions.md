@@ -1,8 +1,8 @@
 ## Default Execution Strategy
 
 Work directly and verify with the test suite. This is a pure-stdlib Python
-project with no build step: edit, then run `python3 test_napmem_pipeline.py`
-(all 9 tests must pass) before reporting success.
+project with no build step: edit, then run `python3 -m unittest discover -s . -p "test_*.py"`
+(all 38 tests must pass) before reporting success.
 
 ## Project rules
 

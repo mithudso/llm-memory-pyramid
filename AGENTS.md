@@ -5,9 +5,9 @@ are defined; this file carries the shared agent contract.
 
 ## Contract
 
-- Run `python3 test_napmem_pipeline.py` before claiming any change works; all 9
+- Run `python3 -m unittest discover -s . -p "test_*.py"` before claiming any change works; all 38
   tests must pass.
-- Standard library only — do not add dependencies without operator approval.
+- Core is stdlib-only; sanctioned optional extras are `anthropic` (lazy) and Ollama over HTTP. Further dependencies need operator approval.
 - Respect the invariants in [CLAUDE.md](CLAUDE.md): stable record IDs across
   re-ingestion, atomic store writes, exact-text dedup with resolvable duplicate
   anchors, derived Layers 2–3, sentinel-guarded prompt interpolation.

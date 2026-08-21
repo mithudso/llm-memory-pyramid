@@ -4,7 +4,7 @@
 
 ## How verified
 
-- [ ] `python3 test_napmem_pipeline.py` passes (9+ tests)
+- [ ] `python3 -m unittest discover -s . -p "test_*.py"` passes (38+ tests)
 - [ ] New behavior covered by a test
 - [ ] Invariants preserved (stable record IDs, atomic store writes, sentinel-guarded prompts)
 

@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "claude-haiku-4-5"
 MAX_OUTPUT_TOKENS = 16000
+MAX_INPUT_CHARS = 600_000  # ~150k tokens; keeps requests under model/batch caps
 BATCH_POLL_INTERVAL_SEC = 15
 BATCH_TIMEOUT_SEC = 3600
 
@@ -81,8 +82,16 @@ def validate_unit(unit: Any) -> str | None:
     if unit.get("salience") not in SALIENCE_LEVELS:
         return f"invalid salience {unit.get('salience')!r}"
     anchor = unit.get("source_anchor")
-    if not isinstance(anchor, dict) or not anchor.get("heading") or not anchor.get("line_range"):
-        return "missing source_anchor.heading or .line_range"
+    # Type checks matter, not just truthiness: LLM output is untrusted, and a
+    # non-string heading/topic_slug crashes _slugify or (worse) reaches the
+    # store and crashes rebuild_higher_layers on an unhashable key.
+    if (not isinstance(anchor, dict)
+            or not isinstance(anchor.get("heading"), str) or not anchor["heading"].strip()
+            or not isinstance(anchor.get("line_range"), str) or not anchor["line_range"].strip()):
+        return "missing or non-string source_anchor.heading/.line_range"
+    slug = unit.get("topic_slug")
+    if slug is not None and (not isinstance(slug, str) or not slug.strip()):
+        return f"invalid topic_slug {slug!r}"
     return None
 
 
@@ -151,6 +160,9 @@ def extract_direct(client, prompt: str, model: str) -> str:
         raise ExtractionError(f"API error {exc.status_code}: {exc.message}") from exc
     except anthropic.APIConnectionError as exc:
         raise ExtractionError(f"Network error reaching the API: {exc}") from exc
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        logger.warning("Extraction hit the %d-token output cap; JSON is likely "
+                       "truncated", MAX_OUTPUT_TOKENS)
     logger.info("Extraction usage: input=%s output=%s",
                 response.usage.input_tokens, response.usage.output_tokens)
     return "".join(block.text for block in response.content if block.type == "text")
@@ -162,6 +174,8 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
     polls until the batch ends. Returns {session_id: raw_response_text} for
     succeeded requests; failed requests are logged and omitted.
     """
+    if not prompts_by_session:
+        return {}  # batches.create rejects empty request lists with a 400
     # custom_id is capped at 64 chars by the API and session ids derived from
     # mirrored file names routinely exceed that — use short index ids and map
     # them back to sessions on the way out.
@@ -178,22 +192,40 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
     deadline = time.monotonic() + BATCH_TIMEOUT_SEC
     while batch.processing_status != "ended":
         if time.monotonic() > deadline:
-            raise ExtractionError(f"Batch {batch.id} did not end within {BATCH_TIMEOUT_SEC}s")
+            # Cancel so the abandoned batch stops billing; results (if any)
+            # stay retrievable by id for 29 days for manual recovery.
+            try:
+                client.messages.batches.cancel(batch.id)
+            except Exception as exc:  # noqa: BLE001 — cancel is best-effort
+                logger.warning("Could not cancel timed-out batch %s: %s", batch.id, exc)
+            raise ExtractionError(
+                f"Batch {batch.id} did not end within {BATCH_TIMEOUT_SEC}s "
+                f"(cancelled; retrieve results manually with that id if needed)")
         time.sleep(BATCH_POLL_INTERVAL_SEC)
         batch = client.messages.batches.retrieve(batch.id)
 
     outputs: dict[str, str] = {}
     for result in client.messages.batches.results(batch.id):
-        session_id = id_to_session.get(result.custom_id, result.custom_id)
+        session_id = id_to_session.get(result.custom_id)
+        if session_id is None:
+            # Never alias an unexpected custom_id into a fake session id —
+            # downstream file_paths lookups would crash the whole ingest.
+            logger.error("Batch %s returned unknown custom_id %r — skipped",
+                         batch.id, result.custom_id)
+            continue
         if result.result.type == "succeeded":
             message = result.result.message
+            if getattr(message, "stop_reason", None) == "max_tokens":
+                logger.warning("Batch item %s hit the %d-token output cap; "
+                               "its JSON is likely truncated", session_id, MAX_OUTPUT_TOKENS)
             outputs[session_id] = "".join(
                 block.text for block in message.content if block.type == "text"
             )
             logger.info("Batch item %s: input=%s output=%s tokens", session_id,
                         message.usage.input_tokens, message.usage.output_tokens)
         else:
-            logger.error("Batch item %s failed: %s", session_id, result.result.type)
+            logger.error("Batch item %s failed: %s %s", session_id, result.result.type,
+                         getattr(result.result, "error", "") or "")
     return outputs
 
 
@@ -258,6 +290,17 @@ def main():
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
         session_id = f"sess_{os.path.splitext(os.path.basename(path))[0]}"
+        if session_id in file_paths:
+            # Session ids derive from basenames: a/notes.md + b/notes.md would
+            # silently overwrite each other — refuse instead of losing one.
+            print(f"Error: {path} and {file_paths[session_id]} map to the same "
+                  f"session id {session_id!r}; rename one input", file=sys.stderr)
+            sys.exit(1)
+        if len(content) > MAX_INPUT_CHARS:
+            logger.error("Skipping %s: %d chars exceeds the %d-char input cap "
+                         "(would blow the model context/batch limits)",
+                         path, len(content), MAX_INPUT_CHARS)
+            continue
         prompts[session_id] = get_extraction_prompt(content, session_id, os.path.basename(path))
         file_paths[session_id] = path
 
@@ -275,7 +318,15 @@ def main():
             except ExtractionError as exc:
                 logger.error("Session %s: %s — skipped", session_id, exc)
     else:
-        outputs = extract_batch(client, prompts, args.model)
+        # The batch path must honor the same fallback contract as the direct
+        # path: any submission/poll failure yields empty outputs (callers can
+        # re-route to the heuristic) rather than a crash after billing.
+        import anthropic
+        try:
+            outputs = extract_batch(client, prompts, args.model)
+        except (ExtractionError, anthropic.APIError, OSError) as exc:
+            logger.error("Batch extraction failed: %s", exc)
+            outputs = {}
 
     distiller = MemoryPyramidDistiller(pyramid_path=args.pyramid,
                                        semantic_dedup=args.semantic_dedup)

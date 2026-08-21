@@ -16,7 +16,15 @@ installed, heuristic otherwise. Force with `--extraction llm|heuristic`; add
 `Extraction mode: llm|heuristic`; any per-file LLM failure logs
 `Heuristic fallback for <file>` and is still ingested.
 
-## Scheduled operation (launchd — the production setup)
+## Scheduled operation
+
+**The canonical consolidator runs on the Linux box via systemd** — see
+[`deploy/README.md`](../../deploy/README.md) and
+[deployment-topology.md](../deployment-topology.md). Run exactly one
+consolidator per pyramid store fleet-wide. The launchd variant below remains
+for macOS-local stores.
+
+### launchd (macOS)
 
 `scripts/run-naptime.sh` is the launchd entry point: one sweep per firing
 over `~/.napmem/memory_logs` into `~/.napmem/napmem_pyramid.json`

@@ -2,8 +2,10 @@
 Description=Hourly NapMem consolidation sweep
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=1h
+# OnCalendar (not monotonic OnUnitActiveSec) so Persistent=true actually
+# applies: a sweep window missed while the box was down runs at next boot.
+OnCalendar=hourly
+RandomizedDelaySec=5min
 Persistent=true
 
 [Install]

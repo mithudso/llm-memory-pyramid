@@ -40,6 +40,14 @@ mkdir -p "$WATCH_DIR"
 # The watch dir itself is a vetted root so plain files dropped directly into
 # it still ingest; a hostile symlink there RESOLVES outside every root and is
 # refused by the consolidator's race-free fd-based read guard.
+# Hard requirement: without readlink -f (macOS < 12.3) resolve() would
+# silently degrade and mirror() would skip EVERY source — a no-op sweep with
+# exit 0. Refuse loudly instead.
+if ! readlink -f / >/dev/null 2>&1; then
+  echo "run-naptime: this system's readlink lacks -f; cannot run safely" >&2
+  exit 1
+fi
+
 resolve() { readlink -f -- "$1" 2>/dev/null || echo "$1"; }
 
 ALLOWED_ROOTS="$(resolve "$WATCH_DIR")"
@@ -56,18 +64,27 @@ mirror() {  # mirror <src> <link-name> [keep-existing]
   real="$(readlink -f -- "$src" 2>/dev/null)" || return 0
   [ -f "$real" ] || return 0
   local ok=""
+  # set -f: the IFS-split root words must not undergo pathname expansion
+  # (a root containing glob chars would silently mis-iterate).
   local IFS=':'
+  set -f
   for root in $ALLOWED_ROOTS; do
     case "$real" in "$root"/*) ok=1; break;; esac
   done
-  unset IFS
+  set +f
   if [ -z "$ok" ]; then
     echo "run-naptime: REFUSED out-of-root source: $src -> $real" >&2
     rm -f -- "$link"   # revoke a previously-mirrored link for this name
     return 0
   fi
-  if [ -n "$keep" ] && [ -e "$link" -o -L "$link" ]; then
+  if [ -n "$keep" ] && { [ -e "$link" ] || [ -L "$link" ]; }; then
     return 0  # mounted twin: local mirror already owns this name
+  fi
+  if [ -e "$link" ] && [ ! -L "$link" ]; then
+    # A plain file an operator dropped into the watch dir owns its name —
+    # never clobber it with a mirror link.
+    echo "run-naptime: name collision with operator file, skipping: $link" >&2
+    return 0
   fi
   if [ ! -L "$link" ] || [ "$(readlink -- "$link")" != "$src" ]; then
     ln -sf -- "$src" "$link"

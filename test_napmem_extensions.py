@@ -187,6 +187,45 @@ class TestSemanticIndex(unittest.TestCase):
         self.assertEqual(anchor["session_id"], "sess_b")
         self.assertIn("paraphrase_text", anchor)
 
+    def test_promotion_adopts_paraphrase_text(self):
+        """F1 regression: a semantically-folded duplicate promoted to
+        canonical must adopt its own wording — record text must be text its
+        anchoring file actually contained — and stay stable on re-ingest."""
+        distiller = MemoryPyramidDistiller(
+            pyramid_path=self.pyramid, semantic_dedup=True, semantic_threshold=0.8
+        )
+        distiller.ingest_session("sess_a", "A", "a.md",
+                                 "# N\n- User prefers tabs over spaces always.\n")
+        b_text = "user Prefers TABS over spaces always"
+        distiller.ingest_session("sess_b", "B", "b.md", f"# N\n- {b_text}\n")
+        distiller.ingest_session("sess_a", "A2", "a.md",
+                                 "# N\n- Something else entirely here.\n")
+        promoted = next(r for r in distiller.data["memory_records"]
+                        if r["source_anchor"]["session_id"] == "sess_b")
+        self.assertEqual(promoted["text"], b_text)
+        self.assertNotIn("paraphrase_text", promoted["source_anchor"])
+        promoted_id = promoted["id"]
+        # No-op re-ingest of sess_b keeps the promoted record's ID.
+        distiller.ingest_session("sess_b", "B2", "b.md", f"# N\n- {b_text}\n")
+        ids = [r["id"] for r in distiller.data["memory_records"]
+               if r["source_anchor"]["session_id"] == "sess_b"]
+        self.assertIn(promoted_id, ids)
+
+    def test_noop_reingest_reclaims_duplicate_ids(self):
+        """A session whose line folded into ANOTHER session's canonical must
+        keep its duplicate ID across a no-op re-ingest (no churn to _NNN+1)."""
+        shared = "- Uses PostgreSQL for storage.\n"
+        distiller = MemoryPyramidDistiller(pyramid_path=self.pyramid)
+        distiller.ingest_session("sess_a", "A", "a.md", "# N\n" + shared)
+        distiller.ingest_session("sess_b", "B", "b.md", "# N\n" + shared + "- Second line here.\n")
+        canonical = next(r for r in distiller.data["memory_records"]
+                         if r["text"] == "Uses PostgreSQL for storage.")
+        dup_id = canonical["duplicates"][0]
+        distiller.ingest_session("sess_b", "B2", "b.md", "# N\n" + shared + "- Second line here.\n")
+        canonical = next(r for r in distiller.data["memory_records"]
+                         if r["text"] == "Uses PostgreSQL for storage.")
+        self.assertEqual(canonical["duplicates"], [dup_id])
+
     def test_semantic_dedup_off_by_default(self):
         distiller = MemoryPyramidDistiller(pyramid_path=self.pyramid)
         distiller.ingest_session("sess_a", "A", "a.md", "# N\n- alpha beta gamma one.\n")
@@ -320,6 +359,36 @@ class TestGuardedRead(unittest.TestCase):
         with self.assertRaises(PermissionError):
             _read_file_guarded(link, [self.root])
 
+    def test_sibling_prefix_root_refused(self):
+        """`/x/vetted-evil` must not satisfy root `/x/vetted` — the check is
+        prefix-boundary-exact, and a regression to bare startswith must fail."""
+        from naptime_consolidator import _read_file_guarded
+        evil_dir = self.root + "-evil"
+        os.makedirs(evil_dir)
+        secret = os.path.join(evil_dir, "leak.md")
+        with open(secret, "w", encoding="utf-8") as f:
+            f.write("SIBLING SECRET")
+        link = os.path.join(self.watch, "proj__leak.md")
+        os.symlink(secret, link)
+        with self.assertRaises(PermissionError):
+            _read_file_guarded(link, [self.root])
+
+    def test_fifo_refused_not_hung(self):
+        """A FIFO planted in the watch dir must be refused, not block the
+        daemon forever at open()."""
+        from naptime_consolidator import _read_file_guarded
+        fifo = os.path.join(self.watch, "hang.md")
+        os.mkfifo(fifo)
+        with self.assertRaises(PermissionError):
+            _read_file_guarded(fifo, [self.root])
+
+    def test_degenerate_roots_env_refused(self):
+        """':::' must not silently equal 'off' (fail-open on a typo)."""
+        from naptime_consolidator import _resolve_allowed_roots
+        with mock.patch.dict(os.environ, {"NAPMEM_ALLOWED_ROOTS": ":::"}), \
+             self.assertRaises(ValueError):
+            _resolve_allowed_roots(self.watch)
+
     def test_consolidator_skips_refused_file(self):
         from naptime_consolidator import ALLOWED_ROOTS_ENV
         secret = os.path.join(self.outside, "secret.txt")
@@ -390,6 +459,8 @@ class TestOllamaFailover(unittest.TestCase):
             {"embeddings": [[True, False]]},              # bools masquerading
             {"embeddings": [[]]},                         # empty vector
             {"embeddings": [{"v": 1}]},                   # wrong structure
+            {"embeddings": [[float("nan"), 0.1]]},        # NaN poisoning
+            {"embeddings": [[float("inf"), 0.1]]},        # Infinity poisoning
         ):
             resp = mock.MagicMock()
             resp.__enter__ = lambda s: s
@@ -513,8 +584,34 @@ class TestMCPServer(unittest.TestCase):
         stats_payload = json.loads(by_id[4]["result"]["content"][0]["text"])
         self.assertIn("token_compression_ratio", stats_payload)
         semantic_payload = json.loads(by_id[5]["result"]["content"][0]["text"])
-        self.assertTrue(semantic_payload["mode"].startswith("semantic:")
-                        or semantic_payload["mode"] == "substring-fallback")
+        # Env pins the hashed backend, so the mode is deterministic — a
+        # disjunction here would pass even with the semantic path broken.
+        self.assertEqual(semantic_payload["mode"], "semantic:hashed-tf")
+
+    def test_malformed_input_never_kills_server(self):
+        """Crash-class regression: batch arrays, non-dict params, wrong-typed
+        arguments, missing method — server must answer every one and keep
+        serving (final ping proves the loop survived)."""
+        responses = self._rpc_session([
+            [{"jsonrpc": "2.0", "id": 1, "method": "ping"}],          # batch array
+            {"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": []},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+             "params": {"name": "search_memory", "arguments": "notadict"}},
+            {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+             "params": {"name": "search_memory", "arguments": {"query": 123}}},
+            {"jsonrpc": "2.0", "id": 5},                               # no method
+            {"jsonrpc": "2.0", "id": 6, "method": "initialize",
+             "params": {"protocolVersion": "9999-12-31"}},
+            {"jsonrpc": "2.0", "id": 7, "method": "ping"},
+        ])
+        by_id = {r.get("id"): r for r in responses}
+        self.assertEqual(by_id[None]["error"]["code"], -32600)         # batch rejected
+        self.assertIn("result", by_id[2])                              # params coerced
+        self.assertEqual(by_id[3]["error"]["code"], -32602)
+        self.assertTrue(by_id[4]["result"]["isError"])                 # in-band tool error
+        self.assertEqual(by_id[5]["error"]["code"], -32600)
+        self.assertEqual(by_id[6]["result"]["protocolVersion"], "2025-06-18")  # negotiated down
+        self.assertIn("result", by_id[7])                              # loop survived
 
     def test_unknown_tool_and_method(self):
         responses = self._rpc_session([

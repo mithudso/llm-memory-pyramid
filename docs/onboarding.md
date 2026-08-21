@@ -7,7 +7,7 @@ New-contributor walkthrough — 15 minutes to productive.
 ```bash
 git clone https://github.com/mithudso/llm-memory-pyramid.git
 cd llm-memory-pyramid
-python3 test_napmem_pipeline.py                       # 9 tests, OK
+python3 -m unittest discover -s . -p "test_*.py"       # 38 tests, OK
 python3 memory_pyramid_distiller.py --input sample_agent_memory.md --pyramid /tmp/onboard.json
 python3 napmem_retrieval_agent.py --pyramid /tmp/onboard.json --stats
 ```

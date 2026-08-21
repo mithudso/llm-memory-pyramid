@@ -2,6 +2,32 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.3.0 — 2026-08-20 (late)
+
+**Active task:** none — fleet deployment complete.
+
+**Completed:**
+- Real memory ingestion: symlink mirror over Claude Code projects,
+  Antigravity brain, and mounted twins; batch custom_id cap fixed;
+  five security-review findings fixed as raised (ledger:
+  docs/security-review-ledger.md).
+- Capacity-weighted Ollama pool (5080 w=4, M5 Max w=2, local w=1; M5
+  exposed via app sqlite settings.expose=1); batched semantic dedup
+  (~10x sweep speedup); index cache made concurrent-writer-safe and
+  corrupt-tolerant.
+- Wrapper ported to portable bash; systemd units in deploy/; canonical
+  consolidator MIGRATED to the Linux 5080 box (hourly Persistent timer,
+  linger on, ant OAuth active). First canonical sweep: 143 sessions,
+  142 LLM-extracted, 2,043 records / 1,523 tracks / 702 profiles.
+- M3 launchd retired; M3 queries canonical store via user-scope
+  ssh-stdio MCP. global-ai-hub pushed to github.com/mithudso/global-ai-hub
+  (skills/ as submodule).
+- Full-repo CDO audit pass + doc refresh (this entry's commit).
+
+**Next steps:**
+- Submit-now/collect-later batch mode for non-blocking sweeps.
+- skills repo (mithudso/skills) has ~687 uncommitted local changes.
+
 ## v1.2.0 — 2026-08-20
 
 **Active task:** none.

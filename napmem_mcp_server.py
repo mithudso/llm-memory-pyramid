@@ -31,8 +31,10 @@ from napmem_retrieval_agent import VALID_LAYERS, NapMemRetrievalAgent
 
 logger = logging.getLogger(__name__)
 
-SERVER_INFO = {"name": "napmem", "version": "1.0.0"}
+SERVER_INFO = {"name": "napmem", "version": "1.1.0"}
 PROTOCOL_VERSION = "2025-06-18"
+SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+MAX_LINE_BYTES = 16 * 1024 * 1024  # cap inbound request lines (OOM guard)
 
 TOOLS: list[dict[str, Any]] = [
     {
@@ -117,32 +119,51 @@ class NapMemMCPServer:
         msg_id = message.get("id")
         is_notification = "id" not in message
 
+        # Structural validation first: a request whose method is not a string
+        # (or whose params is not an object) is Invalid Request per JSON-RPC,
+        # never a crash and never -32601.
+        if not isinstance(method, str):
+            return None if is_notification else self._error(msg_id, -32600, "Invalid Request")
+        params = message.get("params")
+        if not isinstance(params, dict):
+            params = {}
+
         if method == "initialize":
-            client_version = message.get("params", {}).get("protocolVersion", PROTOCOL_VERSION)
+            # Version negotiation: echo the client's version only when we
+            # actually speak it; otherwise answer with ours.
+            client_version = params.get("protocolVersion")
+            version = client_version if client_version in SUPPORTED_PROTOCOL_VERSIONS \
+                else PROTOCOL_VERSION
             return self._result(msg_id, {
-                "protocolVersion": client_version,
+                "protocolVersion": version,
                 "capabilities": {"tools": {}},
                 "serverInfo": SERVER_INFO,
             })
         if method in ("notifications/initialized", "notifications/cancelled"):
-            return None
+            # A request (id present) using a notification method is malformed;
+            # answer it so the client doesn't hang to timeout.
+            return None if is_notification else self._error(msg_id, -32600, "Invalid Request")
         if method == "ping":
             return self._result(msg_id, {})
         if method == "tools/list":
             return self._result(msg_id, {"tools": TOOLS})
         if method == "tools/call":
-            params = message.get("params", {})
             name = params.get("name", "")
-            arguments = params.get("arguments") or {}
+            arguments = params.get("arguments")
+            if arguments is None:
+                arguments = {}
+            if not isinstance(name, str) or not isinstance(arguments, dict):
+                return self._error(msg_id, -32602, "Invalid params")
             try:
                 payload = self.call_tool(name, arguments)
                 return self._result(msg_id, {
                     "content": [{"type": "text", "text": json.dumps(payload, indent=2)}],
                     "isError": False,
                 })
-            except (KeyError, ValueError, TypeError, FileNotFoundError) as exc:
-                # Tool-level failure: MCP reports it in-band, not as JSON-RPC error.
-                logger.error("Tool %s failed: %s", name, exc)
+            except Exception as exc:
+                # whatever their type (wrong-typed arguments raise AttributeError,
+                # a missing optional module ImportError, malformed stores anything).
+                logger.exception("Tool %s failed", name)
                 return self._result(msg_id, {
                     "content": [{"type": "text", "text": f"Error: {exc}"}],
                     "isError": True,
@@ -160,10 +181,16 @@ class NapMemMCPServer:
         return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
 
     def serve(self, stdin=None, stdout=None):
-        """Newline-delimited JSON-RPC loop until EOF."""
+        """Newline-delimited JSON-RPC loop until EOF. No client input — valid,
+        malformed, or hostile — may kill the loop; the only exits are EOF and
+        a broken outbound pipe."""
         stdin = stdin or sys.stdin
         stdout = stdout or sys.stdout
         for line in stdin:
+            if len(line) > MAX_LINE_BYTES:
+                logger.warning("Dropping oversized request line (%d bytes)", len(line))
+                self._write(stdout, self._error(None, -32700, "Parse error: line too large"))
+                continue
             line = line.strip()
             if not line:
                 continue
@@ -172,9 +199,24 @@ class NapMemMCPServer:
             except json.JSONDecodeError as exc:
                 self._write(stdout, self._error(None, -32700, f"Parse error: {exc}"))
                 continue
-            response = self.handle(message)
+            if not isinstance(message, dict):
+                # Includes JSON-RPC batch arrays — valid JSON-RPC 2.0, but the
+                # MCP stdio transport forbids them: reject, don't crash.
+                self._write(stdout, self._error(None, -32600, "Invalid Request"))
+                continue
+            try:
+                response = self.handle(message)
+            except Exception:
+                logger.exception("Internal error handling request")
+                msg_id = message.get("id")
+                response = self._error(msg_id if not isinstance(msg_id, (dict, list)) else None,
+                                       -32603, "Internal error")
             if response is not None:
-                self._write(stdout, response)
+                try:
+                    self._write(stdout, response)
+                except (BrokenPipeError, OSError):
+                    logger.info("Client closed the pipe; shutting down")
+                    return
 
     @staticmethod
     def _write(stdout, response: dict[str, Any]):

@@ -16,8 +16,8 @@ There is no package to install — the tools run directly from the checkout.
 ## Verify
 
 ```bash
-python3 test_napmem_pipeline.py
-# Expected: "Ran 9 tests ... OK"
+python3 -m unittest discover -s . -p "test_*.py"
+# Expected: "Ran 38 tests ... OK"
 
 python3 memory_pyramid_distiller.py --input sample_agent_memory.md --pyramid /tmp/verify_pyramid.json
 # Expected: "Successfully distilled N atomic units ..." plus a markdown summary
@@ -27,7 +27,7 @@ python3 memory_pyramid_distiller.py --input sample_agent_memory.md --pyramid /tm
 
 ```bash
 git pull
-python3 test_napmem_pipeline.py
+python3 -m unittest discover -s . -p "test_*.py"
 ```
 
 The store format carries a `version` field; current stores are `1.0.0`. Format

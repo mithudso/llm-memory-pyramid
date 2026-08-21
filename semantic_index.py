@@ -24,6 +24,7 @@ Usage:
 
 import argparse
 import hashlib
+import http.client
 import json
 import logging
 import math
@@ -76,6 +77,11 @@ BACKEND_ENV = "NAPMEM_EMBED_BACKEND"  # "ollama" | "hashed" | unset (auto)
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 HASHED_DIM = 512
+MAX_EMBED_DIM = 8192  # reject absurd vector dims (cache-bloat DoS guard)
+
+
+def _reject_nonfinite_token(token: str):
+    raise ValueError(f"non-finite JSON token rejected: {token}")
 
 
 def _text_key(text: str) -> str:
@@ -168,23 +174,31 @@ class OllamaBackend:
             f"{url}/api/embed", data=payload,
             headers={"Content-Type": "application/json"}, method="POST",
         )
+        # Any transport-or-parse failure must surface as RuntimeError — the
+        # failover loops key on it; a bare JSONDecodeError/HTTPException from a
+        # misbehaving host would otherwise escape embed() and defeat the pool.
         try:
             with urllib.request.urlopen(req, timeout=300) as resp:
-                body = json.load(resp)
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                # parse_constant: stdlib json accepts NaN/Infinity tokens by
+                # default — reject them so they never reach the cache.
+                body = json.load(resp, parse_constant=_reject_nonfinite_token)
+        except (urllib.error.URLError, OSError, TimeoutError, ValueError,
+                http.client.HTTPException) as exc:
             raise RuntimeError(f"Ollama embedding request failed ({url}): {exc}") from exc
-        embeddings = body.get("embeddings")
+        embeddings = body.get("embeddings") if isinstance(body, dict) else None
         if not isinstance(embeddings, list) or len(embeddings) != len(texts):
             raise RuntimeError(f"Ollama returned a malformed embeddings response ({url})")
         # The response travels plain HTTP from a LAN host and lands in the
-        # persistent vector cache — validate shape strictly (numeric-only
-        # vectors of one consistent dimension) so a compromised or spoofed
-        # server cannot poison the cache with crafted structures.
+        # persistent vector cache — validate strictly (finite-numeric-only
+        # vectors, one consistent bounded dimension) so a compromised or
+        # spoofed server cannot poison the cache: NaN silently disables
+        # cosine dedup, and unbounded dims are a disk/CPU DoS.
         dim = None
         for vec in embeddings:
-            if (not isinstance(vec, list) or not vec
-                    or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vec)):
-                raise RuntimeError(f"Ollama returned a non-numeric embedding vector ({url})")
+            if (not isinstance(vec, list) or not vec or len(vec) > MAX_EMBED_DIM
+                    or not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                               and math.isfinite(v) for v in vec)):
+                raise RuntimeError(f"Ollama returned an invalid embedding vector ({url})")
             if dim is None:
                 dim = len(vec)
             elif len(vec) != dim:
@@ -253,6 +267,12 @@ class OllamaBackend:
         out: list[list[float]] = []
         for i, (_, s, e) in enumerate(chunks):
             out.extend(results[i])
+        # Cross-chunk consistency: two hosts serving different builds under
+        # one model tag could return different dims; mixed dims make cosine
+        # silently return 0.0 downstream. Refuse the whole batch instead.
+        dims = {len(v) for v in out}
+        if len(dims) > 1:
+            raise RuntimeError(f"Ollama hosts returned mixed embedding dimensions: {sorted(dims)}")
         return out
 
 
@@ -303,9 +323,18 @@ class SemanticIndex:
         # os.replace consume the other's file (observed crash). Last writer
         # wins on the index itself — it is a rebuildable cache.
         tmp_path = f"{self.index_path}.{os.getpid()}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(self._cache, f)
-        os.replace(tmp_path, self.index_path)
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(self._cache, f, allow_nan=False)
+            os.replace(tmp_path, self.index_path)
+        except (OSError, ValueError):
+            # Never leave a partial tmp behind: PIDs recycle, and a stale
+            # partial could later be replaced over a good index.
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def _vectors_for(self, records: list[dict[str, Any]]) -> dict[str, list[float]]:
         """Returns {record_id: vector}, embedding only cache misses."""
@@ -344,11 +373,11 @@ class SemanticIndex:
 
     def nearest_record_id(self, text: str, records: list[dict[str, Any]],
                           threshold: float) -> str | None:
-        """Id of the most similar record at or above threshold, else None."""
-        results = self.search(text, records, top_k=1)
-        if results and results[0]["score"] >= threshold:
-            return results[0]["record"]["id"]
-        return None
+        """Id of the most similar record at or above threshold, else None.
+        Delegates to nearest_many so single and batched calls can never
+        disagree at threshold boundaries (search() rounds for display; the
+        dedup decision must not)."""
+        return self.nearest_many([text], records, threshold)[0] if records else None
 
     def nearest_many(self, texts: list[str], records: list[dict[str, Any]],
                      threshold: float) -> list[str | None]:
@@ -365,7 +394,7 @@ class SemanticIndex:
         query_vecs = self.backend.embed(texts)
         out: list[str | None] = []
         for qv in query_vecs:
-            best_id, best_score = None, 0.0
+            best_id, best_score = None, -math.inf
             for r in records:
                 score = cosine(qv, vectors[r["id"]])
                 if score > best_score:

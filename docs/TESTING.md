@@ -3,7 +3,7 @@
 ## Strategy
 
 Plain `unittest`, two suites (`test_napmem_pipeline.py`,
-`test_napmem_extensions.py`), 26 tests, no test dependencies, network-free:
+`test_napmem_extensions.py`), 38 tests, no test dependencies, network-free:
 extractor tests exercise parsing/validation offline, semantic tests force
 `NAPMEM_EMBED_BACKEND=hashed`, and the MCP test drives the real server binary
 over a subprocess pipe. Tests assert observable behavior on real pyramid
