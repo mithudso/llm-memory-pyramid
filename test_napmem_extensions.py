@@ -660,6 +660,10 @@ class TestOllamaExtraction(unittest.TestCase):
         arr = self._unit_array_text()
         wrapped = json.dumps({"units": json.loads(arr)})
         self.assertEqual(json.loads(_coerce_array_text(wrapped)), json.loads(arr))
+        # A lone bare unit object (json-mode grammars force a top-level
+        # object) is wrapped into a one-element array.
+        lone = json.loads(arr)[0]
+        self.assertEqual(json.loads(_coerce_array_text(json.dumps(lone))), [lone])
         # Bare arrays and non-JSON pass through untouched.
         self.assertEqual(_coerce_array_text(arr), arr)
         self.assertEqual(_coerce_array_text("not json"), "not json")
@@ -690,6 +694,17 @@ class TestOllamaExtraction(unittest.TestCase):
                          ["http://dead:1/api/chat"])
         self.assertEqual([u for u in calls if "live" in u],
                          ["http://live:2/api/chat"] * 2)
+
+    def test_chat_strips_think_block(self):
+        content = "<think>reasoning here</think>\n" + self._unit_array_text()
+
+        def fake_urlopen(req, timeout=None):
+            return self._chat_response(content)
+
+        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+                               side_effect=fake_urlopen):
+            outputs = extract_ollama({"s": "p"}, [("http://h:1", "m")])
+        self.assertEqual(json.loads(outputs["s"]), json.loads(self._unit_array_text()))
 
     def test_extract_ollama_omits_sessions_all_hosts_failed(self):
         import urllib.error
