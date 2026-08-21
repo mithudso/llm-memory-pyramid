@@ -43,3 +43,14 @@ Versioned record of user requests, in order. Newest last.
     first-touch PreToolUse decision surfacing, SessionStart bulk brief) +
     candidate-logging monitor with threshold-sweep recommendations; orphan
     memorydistiller launchd job killed.
+12. "Push it / PR, commit, make it happen / check the .env files / clarify the
+    agbrain fallbacks / build a constant ML feedback loop of my usage that
+    auto-indexes whatever is most likely, always the cwd repo, hook on
+    unindexed file opens, zero maintenance, wired into pipeline_manager" —
+    skills main pushed (env templates verified + committed), log PR merged,
+    fallback root-caused to the exhausted org API spend cap, and the
+    usage-learning auto-index loop shipped against the global-ai-hub daemon
+    (access sensor → predictor → /index|/index-tree; /search into the
+    per-prompt hook; pipeline_manager repo-status/index-repo/watch-repo),
+    fixing the daemon's dead interpreter, the /-walking indexer loop, and an
+    fd-leak crash along the way.

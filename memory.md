@@ -2,6 +2,32 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.4.1 — 2026-08-21 (later)
+
+**Active task:** none — usage-learning auto-index loop live.
+
+**Completed (deployment-side + global-ai-hub; no code changes in this repo):**
+- Diagnosed the sweep-wide heuristic fallbacks: the Anthropic org's monthly
+  API spend cap is exhausted (400 "reached your specified API usage limits",
+  reset 2026-09-01) — every consolidator sweep since Aug 20 23:21 falls back
+  to heuristic extraction. Graceful degradation worked; extraction quality
+  is capped until the limit resets or is raised.
+- Wired retrieval into the global-ai-hub file index and built the usage
+  feedback loop: PostToolUse access sensor → frequency+recency predictor →
+  hub-daemon /index + /index-tree; SessionStart always indexes the cwd repo;
+  per-prompt hook adds "related file" hits from hub /search. Managed via
+  `pipeline_manager.py repo-status|index-repo|watch-repo` (hub PRs #1–#3).
+- Fixed three latent hub outages while integrating: daemon launchd
+  interpreter lacked fastapi (dead since Aug 18); gen-universal-index walked
+  / under launchd on a self-retriggering WatchPaths loop (hub.db bloated to
+  268MB — purged to 89MB); hub_sqlite leaked one fd per call and crashed the
+  daemon under indexing load.
+
+**Next steps:**
+- Raise the org API limit (or wait for 2026-09-01) to restore LLM extraction.
+- Watch `pipeline_manager.py repo-status` and the retrieval monitor after a
+  few days of organic use; retune floors from data.
+
 ## v1.4.0 — 2026-08-21
 
 **Active task:** none — auto-retrieval hook suite live.
