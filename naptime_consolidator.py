@@ -21,6 +21,8 @@ the pyramid never silently misses an update.
 """
 
 import argparse
+import hashlib
+import json
 import logging
 import os
 import stat
@@ -30,7 +32,7 @@ from memory_pyramid_distiller import MemoryPyramidDistiller
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_MODES = ("auto", "llm", "heuristic")
+EXTRACTION_MODES = ("auto", "llm", "ollama", "heuristic")
 
 # Colon-separated list of directories memory files must RESOLVE into; every
 # file read is verified race-free (see _read_file_guarded) so a watched entry
@@ -124,7 +126,8 @@ def _resolve_allowed_roots(watch_dir: str) -> list[str]:
 
 class NaptimeConsolidator:
     def __init__(self, watch_dir: str, pyramid_path: str = "napmem_pyramid.json",
-                 extraction: str = "auto", semantic_dedup: bool = False):
+                 extraction: str = "auto", semantic_dedup: bool = False,
+                 state_path: str | None = None):
         if extraction not in EXTRACTION_MODES:
             raise ValueError(f"extraction must be one of {EXTRACTION_MODES}")
         self.watch_dir = watch_dir
@@ -132,6 +135,14 @@ class NaptimeConsolidator:
         self.distiller = MemoryPyramidDistiller(pyramid_path=pyramid_path,
                                                 semantic_dedup=semantic_dedup)
         self.file_timestamps: dict[str, float] = {}
+        # Persistent change state: under systemd/launchd --once mode every
+        # sweep is a fresh process, so in-memory mtimes alone re-extract the
+        # ENTIRE watch dir every hour — that is what burned the API budget.
+        # {fpath: {"mtime": float, "sha256": hex}}; mtime is the cheap
+        # fast-path, the hash catches touched-but-unchanged files (Syncthing,
+        # mirror relinks) in both timestamp directions.
+        self.state_path = state_path or (pyramid_path + ".sweepstate.json")
+        self.file_hashes: dict[str, dict] = self._load_state()
         # (path -> mtime) of files refused/unreadable at that mtime: log the
         # refusal ONCE per change instead of flooding ERROR every sweep (a
         # parked hostile symlink would otherwise emit ~17k lines/day).
@@ -143,14 +154,44 @@ class NaptimeConsolidator:
             )
         self.use_llm = (extraction == "llm"
                         or (extraction == "auto" and _anthropic_available()))
+        # ollama mode never touches the Anthropic API (zero API spend); auto
+        # tries anthropic first, then ollama, then heuristic — reachability
+        # is probed per sweep so an offline daemon costs one 3s check.
+        self.use_ollama = extraction in ("ollama", "auto")
         self._client = None
         self.allowed_roots = _resolve_allowed_roots(watch_dir)
-        logger.info("Extraction mode: %s", "llm" if self.use_llm else "heuristic")
+        mode = ("llm" if self.use_llm else
+                "ollama" if self.use_ollama else "heuristic")
+        logger.info("Extraction mode: %s (chain: %s)", mode, extraction)
         if self.allowed_roots:
             logger.info("Read guard active; allowed roots: %s", self.allowed_roots)
         else:
             logger.warning("Read guard DISABLED (%s=%r)", ALLOWED_ROOTS_ENV,
                            os.environ.get(ALLOWED_ROOTS_ENV))
+
+    def _load_state(self) -> dict[str, dict]:
+        try:
+            with open(self.state_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            files = data.get("files", {})
+            return files if isinstance(files, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _save_state(self) -> None:
+        # Prune entries for files gone from the watch dir so the state file
+        # cannot grow without bound; write atomically like the store itself.
+        try:
+            live = {fp: st for fp, st in self.file_hashes.items()
+                    if os.path.exists(fp)}
+            tmp = self.state_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"files": live}, f)
+            os.replace(tmp, self.state_path)
+            self.file_hashes = live
+        except OSError as exc:
+            logger.warning("Could not persist sweep state to %s: %s",
+                           self.state_path, exc)
 
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
@@ -170,6 +211,9 @@ class NaptimeConsolidator:
                 # (backup restore, rsync -t, git checkout).
                 if fpath in self.file_timestamps and mtime == self.file_timestamps[fpath]:
                     continue
+                prior = self.file_hashes.get(fpath)
+                if prior and prior.get("mtime") == mtime:
+                    continue  # persistent fast-path: unchanged since last sweep
                 if self._refused.get(fpath) == mtime:
                     continue  # already refused at this mtime; logged once
                 if self.allowed_roots:
@@ -178,6 +222,13 @@ class NaptimeConsolidator:
                     with open(fpath, "r", encoding="utf-8") as f:
                         content = f.read()
                 self._refused.pop(fpath, None)
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                if prior and prior.get("sha256") == digest:
+                    # Touched but content-identical (mirror relink, Syncthing,
+                    # timestamp restore): record the new mtime, skip the
+                    # extraction entirely.
+                    self.file_hashes[fpath] = {"mtime": mtime, "sha256": digest}
+                    continue
                 changed.append((_session_id_for(fname), fpath, content, mtime))
             except OSError as exc:  # includes PermissionError from the read guard
                 logger.error("Skipping memory file %s: %s", fpath, exc)
@@ -223,6 +274,40 @@ class NaptimeConsolidator:
         _, ingested = ingest_extractions(self.distiller, outputs, file_paths)
         return ingested
 
+    def _extract_ollama(self, changed: list[tuple[str, str, str, float]]) -> set[str]:
+        """
+        Extracts the given files via local Ollama chat models (zero API
+        spend). Same contract as _extract_llm: returns the session_ids
+        successfully ingested; callers run the heuristic path for the rest.
+        """
+        from llm_extractor import get_extraction_prompt, ingest_extractions
+        from ollama_extractor import (
+            extract_ollama,
+            ollama_available,
+            parse_chat_hosts,
+        )
+        try:
+            hosts = parse_chat_hosts()
+        except ValueError as exc:
+            logger.error("Ollama extraction misconfigured (%s); skipping", exc)
+            return set()
+        if not ollama_available(hosts):
+            logger.warning("No Ollama chat host reachable; skipping Ollama extraction")
+            return set()
+
+        prompts = {
+            session_id: get_extraction_prompt(content, session_id, os.path.basename(fpath))
+            for session_id, fpath, content, _ in changed
+        }
+        file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
+        try:
+            outputs = extract_ollama(prompts, hosts)
+        except OSError as exc:
+            logger.error("Ollama extraction failed (%s); falling back to heuristic", exc)
+            return set()
+        _, ingested = ingest_extractions(self.distiller, outputs, file_paths)
+        return ingested
+
     def scan_and_consolidate(self) -> int:
         """
         Scans watch_dir for new or updated .md memory files and incrementally
@@ -231,11 +316,16 @@ class NaptimeConsolidator:
         """
         changed = self._collect_changed()
         if not changed:
+            self._save_state()  # touched-but-unchanged mtimes still need persisting
             return 0
 
         llm_done: set[str] = set()
         if self.use_llm:
             llm_done = self._extract_llm(changed)
+        if self.use_ollama:
+            remaining = [c for c in changed if c[0] not in llm_done]
+            if remaining:
+                llm_done |= self._extract_ollama(remaining)
 
         for session_id, fpath, content, mtime in changed:
             # Per-file guard: one failing ingest (store write error, malformed
@@ -245,7 +335,7 @@ class NaptimeConsolidator:
                 if session_id in llm_done:
                     logger.info("LLM-extracted %s", os.path.basename(fpath))
                 else:
-                    if self.use_llm:
+                    if self.use_llm or self.use_ollama:
                         logger.warning("Heuristic fallback for %s", os.path.basename(fpath))
                     self.distiller.ingest_session(
                         session_id=session_id,
@@ -254,9 +344,14 @@ class NaptimeConsolidator:
                         content=content,
                     )
                 self.file_timestamps[fpath] = mtime
+                self.file_hashes[fpath] = {
+                    "mtime": mtime,
+                    "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                }
             except Exception:
                 logger.exception("Ingest failed for %s; will retry next sweep", fpath)
 
+        self._save_state()
         logger.info("Consolidated %d memory file(s) into %s", len(changed), self.pyramid_path)
         return len(changed)
 
@@ -284,7 +379,8 @@ def main():
     parser.add_argument("--max-ticks", type=int, default=10, help="Number of scan sweeps before exiting.")
     parser.add_argument("--once", action="store_true", help="Run single consolidation sweep and exit.")
     parser.add_argument("--extraction", choices=list(EXTRACTION_MODES), default="auto",
-                        help="Extractor: llm (Batches API), heuristic, or auto (llm when available).")
+                        help="Extractor: llm (Batches API), ollama (local chat model, zero API "
+                             "spend), heuristic, or auto (llm -> ollama -> heuristic).")
     parser.add_argument("--semantic-dedup", action="store_true",
                         help="Fold semantic near-duplicates via the embedding index.")
     args = parser.parse_args()
