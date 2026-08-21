@@ -34,3 +34,12 @@ Versioned record of user requests, in order. Newest last.
    — portable bash wrapper, systemd units, canonical on 192.168.4.75, M3
    ssh-MCP cutover, hub pushed with skills submodule.
 10. "Document everything, run full /cdo, rerun bootstrapper" — this commit.
+11. "Is the pyramid running and are you using it?" → infra verified healthy
+    but retrieval was pull-only and unused; "auto-call search_memory per
+    prompt / semantic instead of grep / index the scripts" + "how would I
+    know the thresholds are right — build an offline monitor; add the
+    PreToolUse and SessionStart hooks; push semantic indexing further" —
+    global hook suite (per-prompt semantic pull with local-embed query cache,
+    first-touch PreToolUse decision surfacing, SessionStart bulk brief) +
+    candidate-logging monitor with threshold-sweep recommendations; orphan
+    memorydistiller launchd job killed.

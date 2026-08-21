@@ -2,6 +2,36 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.4.0 — 2026-08-21
+
+**Active task:** none — auto-retrieval hook suite live.
+
+**Completed (deployment-side; hook code lives in `~/.claude/hooks/`, not this
+repo):**
+- Push-based retrieval: the pyramid was pull-only (MCP tools never invoked),
+  so a global hook suite now auto-injects memory — per-prompt semantic pull
+  (UserPromptSubmit), first-touch file/commit decision surfacing (PreToolUse),
+  once-per-session bulk brief of profiles + largest tracks (SessionStart).
+- Semantic query cache on the M3: prompts embedded locally (Ollama
+  mxbai-embed-large), remote results reused when query-cosine >= 0.90 within
+  the hourly consolidation TTL — paraphrased repeats skip ssh (~130ms).
+- Noise control: cosine >= 0.75 passes alone; 0.65–0.75 needs content-word
+  overlap with the prompt; < 15 chars always dropped (pure cosine floors let
+  filler match filler at 0.6–0.7).
+- Offline tuning loop: every event logs its full top-8 candidate set with
+  features; `napmem-retrieval-monitor.py` replays the keep rule across a
+  (floor × overlap) grid and prints recommended constants; `--tail` for
+  eyeball audits.
+- Killed orphan launchd job `com.mitchhudson.memorydistiller` (unrelated
+  `.gemini` aider nightly, failing on `tput: no $TERM` since creation).
+
+**Next steps:**
+- Re-run the monitor after ~20+ organic prompts; apply its recommendation.
+- Investigate per-file heuristic fallbacks for `agbrain_*` walkthrough files
+  in the 03:03 sweep (LLM extraction otherwise active).
+- Candidate next layers: track-summary substitution when hits cluster on one
+  topic, per-type floors, code/docs chunk index fed by file-access frequency.
+
 ## v1.3.0 — 2026-08-20 (late)
 
 **Active task:** none — fleet deployment complete.
