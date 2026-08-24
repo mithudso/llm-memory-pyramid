@@ -1,11 +1,14 @@
 {
   "mcpServers": {
     "napmem": {
-      "command": "python3",
-      "args": ["napmem_mcp_server.py"],
-      "env": {
-        "NAPMEM_PYRAMID": "napmem_pyramid.json"
-      }
+      "command": "ssh",
+      "args": [
+        "-o", "ControlMaster=auto",
+        "-o", "ControlPath=/tmp/napmem-ssh-ctrl-%C",
+        "-o", "ControlPersist=10m",
+        "mithudso@192.168.4.75",
+        "cd /home/mithudso/dev/llm-memory-pyramid && NAPMEM_PYRAMID=/home/mithudso/.napmem/napmem_pyramid.json python3 napmem_mcp_server.py"
+      ]
     }
   }
 }
