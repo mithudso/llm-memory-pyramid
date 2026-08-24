@@ -49,6 +49,9 @@ server (real embeddings — otherwise a stdlib hashed-TF backend is used).
 `napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
 Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
 targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
+`.mcp.json` in this repo runs the server over SSH against the canonical
+production pyramid, not the local example file below — see the note in
+`CLAUDE.md`.
 
 ## Components
 
@@ -62,7 +65,7 @@ targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
 | `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
 | `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
-| `napmem_pyramid.json` | Example pyramid store |
+| `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
 | `test_napmem_pipeline.py` | Core test suite (unittest; 38 tests across both suites) |
 
 ## Documentation

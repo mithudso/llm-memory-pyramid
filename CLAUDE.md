@@ -43,6 +43,18 @@ remote→local host failover chain, stdlib hashed-TF fallback) for cosine
 search and opt-in semantic dedup. `napmem_mcp_server.py` wraps the retrieval
 tools in a stdlib MCP stdio server.
 
+### Local `napmem_pyramid.json` is a dev/test store, not the production one
+
+`.mcp.json` points Claude Code's `napmem` MCP tool over SSH at the canonical
+production pyramid (`mithudso@192.168.4.75:/home/mithudso/.napmem/napmem_pyramid.json`,
+~2.7k records — the same store the global `~/.claude/hooks/napmem-*.py` session
+hooks read). The `napmem_pyramid.json` / `napmem_pyramid.json.embindex.json`
+files checked into this repo are a separate, small, orphaned local store (12
+records as of 2026-08-11) — nothing wires them to the MCP server or the global
+hooks. Keep using them for local development and the `test_napmem_*.py` suites
+against a throwaway file; don't expect edits here to show up via the `napmem`
+MCP tool or vice versa.
+
 ## Invariants — do not break
 
 - **Record IDs are stable across re-ingestion.** Re-asserted text keeps its ID;
