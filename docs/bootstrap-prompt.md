@@ -24,7 +24,7 @@ reimplement it from scratch — clone and verify it:
   git clone https://github.com/mithudso/llm-memory-pyramid.git
   cd llm-memory-pyramid
   python3 -m unittest discover -s . -p "test_*.py"
-    # expect "Ran 38 tests ... OK"
+    # expect all tests to pass ("OK") — count grows over time, currently 50+
   python3 memory_pyramid_distiller.py --input sample_agent_memory.md \
       --pyramid /tmp/verify_pyramid.json
     # expect "Successfully distilled N atomic units ..."
