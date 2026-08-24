@@ -89,5 +89,8 @@ TESTING, SECURITY, INSTALLATION, codebase-overview, high_signal_file_index.json,
 known-issues, onboarding. `deployment-topology.md` covers the live fleet;
 `semantic-indexing-and-hooks-reference.md` covers every semantic-index hook
 and script across both this repo and the global `~/.claude/hooks/` /
-`~/.global-ai-hub/` systems. Keep `docs/codebase-overview.md` and the file
-index current after adding or moving files.
+`~/.global-ai-hub/` systems; `bootstrap-prompt.md` is a copy-paste prompt
+for recreating the whole system (core pyramid, Ollama, MCP wiring, and the
+optional hook suite / codebase indexer) from a base Claude Code install.
+Keep `docs/codebase-overview.md` and the file index current after adding
+or moving files.
