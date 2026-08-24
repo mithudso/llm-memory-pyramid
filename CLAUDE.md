@@ -86,5 +86,8 @@ MCP tool or vice versa.
 
 `docs/` carries the full suite: ARCHITECTURE, COMPONENTS, DEVELOPMENT,
 TESTING, SECURITY, INSTALLATION, codebase-overview, high_signal_file_index.json,
-known-issues, onboarding. Keep `docs/codebase-overview.md` and the file index
-current after adding or moving files.
+known-issues, onboarding. `deployment-topology.md` covers the live fleet;
+`semantic-indexing-and-hooks-reference.md` covers every semantic-index hook
+and script across both this repo and the global `~/.claude/hooks/` /
+`~/.global-ai-hub/` systems. Keep `docs/codebase-overview.md` and the file
+index current after adding or moving files.
