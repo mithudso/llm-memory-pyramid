@@ -20,13 +20,12 @@ import unittest
 from unittest import mock
 
 import llm_extractor
+import ollama_extractor
 from llm_extractor import ExtractionError, parse_extraction_output, units_to_records
 from memory_pyramid_distiller import MemoryPyramidDistiller
 from naptime_consolidator import NaptimeConsolidator
-from semantic_index import HashedTfBackend, OllamaBackend, SemanticIndex, cosine
-
-import ollama_extractor
 from ollama_extractor import _coerce_array_text, extract_ollama, parse_chat_hosts
+from semantic_index import HashedTfBackend, OllamaBackend, SemanticIndex, cosine
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
