@@ -7,7 +7,7 @@ Type=oneshot
 ExecStart=%h/dev/llm-memory-pyramid/scripts/run-naptime.sh
 # Weights from this box's perspective: local 5080 daemon heaviest, M5 Max
 # next, the M3 work laptop's daemon is loopback-only and excluded.
-Environment=NAPMEM_OLLAMA_URLS=http://localhost:11434=4,http://192.168.4.1:11434=2
+Environment=NAPMEM_OLLAMA_URLS=http://localhost:11434=4,http://198.51.100.1:11434=2
 Nice=10
 IOSchedulingClass=idle
 # oneshot defaults to an infinite start timeout: a hung sweep (dead embedding

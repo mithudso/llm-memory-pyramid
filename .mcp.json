@@ -6,7 +6,7 @@
         "-o", "ControlMaster=auto",
         "-o", "ControlPath=/tmp/napmem-ssh-ctrl-%C",
         "-o", "ControlPersist=10m",
-        "mithudso@192.168.4.75",
+        "user@box.example",
         "cd /home/mithudso/dev/llm-memory-pyramid && NAPMEM_PYRAMID=/home/mithudso/.napmem/napmem_pyramid.json python3 napmem_mcp_server.py"
       ]
     }
