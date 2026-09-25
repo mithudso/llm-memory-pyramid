@@ -1,0 +1,589 @@
+<!-- Generated 2026-09-25 [gen: p/2.0.0]; verified-as-of 2026-09-25 -->
+
+# llm-memory-pyramid
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/README.md
+
+## llm-memory-pyramid
+
+NapMem: a 4-layer multi-granularity memory pyramid for LLM agents. Distills raw
+session logs and memory files into deduplicated atomic records, thematic topic
+tracks, and high-level user/system profiles — with full provenance back to the
+raw source — then serves them through active, tool-driven retrieval instead of
+passive context dumping.
+
+### The pyramid
+
+| Layer | Contents | Built by |
+|---|---|---|
+| 3 | User & system profiles (traits, constraints, goals) | `rebuild_higher_layers()` |
+| 2 | Topic tracks (thematic clusters with summaries) | `rebuild_higher_layers()` |
+| 1 | Atomic memory records (document-distiller taxonomy, deduped) | `extract_atomic_units()` |
+| 0 | Raw conversations & source anchors | `ingest_session()` |
+
+Re-ingesting a session (same `session_id`) replaces that session's Layer 1
+records with stable record IDs, then rebuilds Layers 2–3 from the survivors.
+
+### Quick start
+
+```bash
+# Distill one memory file into the pyramid store
+python3 memory_pyramid_distiller.py --input sample_agent_memory.md
+
+# Watch a directory and consolidate in the background ("naptime")
+python3 naptime_consolidator.py --watch-dir ./memory_logs --once
+
+# Query the pyramid
+python3 napmem_retrieval_agent.py --query "architecture" --layer all
+python3 napmem_retrieval_agent.py --query "editor prefs" --semantic --top-k 5
+python3 napmem_retrieval_agent.py --provenance rec_sess_sample_agent_memory_001
+python3 napmem_retrieval_agent.py --stats
+
+# Production extraction via the Anthropic Batches API (needs `pip install anthropic`)
+python3 llm_extractor.py --input memory_logs/notes.md --semantic-dedup
+
+# Run the test suite
+python3 -m unittest discover -s . -p "test_*.py"
+```
+
+Core pipeline is Python 3.10+ standard library only. Optional extras:
+`anthropic` (LLM extraction path) and a local [Ollama](https://ollama.com)
+server (real embeddings — otherwise a stdlib hashed-TF backend is used).
+
+### MCP server
+
+`napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
+Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
+targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
+`.mcp.json` in this repo runs the server over SSH against the canonical
+production pyramid, not the local example file below — see the note in
+`CLAUDE.md`.
+
+### Components
+
+| File | Purpose |
+|---|---|
+| `memory_pyramid_distiller.py` | Core distiller: extraction, dedup, session reconciliation, layer rebuild |
+| `naptime_consolidator.py` | Background watcher that incrementally re-ingests changed `.md` files |
+| `napmem_retrieval_agent.py` | Active retrieval tools: search, provenance, topic tracks, token-savings stats |
+| `llm_extraction_prompts.py` | Zero-fabrication LLM extraction prompt templates with injection guards |
+| `llm_extractor.py` | Production extraction: Haiku via Anthropic Batches API, schema-validated ingest |
+| `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
+| `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
+| `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
+| `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
+| `test_napmem_pipeline.py` | Core test suite (unittest; 38 tests across both suites) |
+
+### Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) · [Components](docs/COMPONENTS.md) · [Development](docs/DEVELOPMENT.md)
+- [Installation](docs/INSTALLATION.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md)
+- [Deployment topology](docs/deployment-topology.md) · [Deploy units](deploy/README.md) · [Security ledger](docs/security-review-ledger.md)
+- [Codebase overview](docs/codebase-overview.md) · [Known issues](docs/known-issues.md) · [Onboarding](docs/onboarding.md)
+
+### License
+
+[Apache 2.0](LICENSE)
+
+# CLAUDE.md
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/CLAUDE.md
+
+## CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+### Project
+
+NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
+tracks → profiles) with incremental re-ingestion, dedup with provenance, and
+active retrieval tools. Core is Python 3.10+ standard library with no network
+calls; optional extras: `anthropic` SDK (LLM extraction) and local Ollama
+(embeddings), both with graceful degradation.
+
+### Commands
+
+```bash
+python3 -m unittest discover -s . -p "test_*.py"                 # run all tests (must stay green)
+python3 memory_pyramid_distiller.py --input <file.md>            # distill a memory file (heuristic)
+python3 llm_extractor.py --input <file.md> [--no-batch|--dry-run]# LLM extraction (Batches API)
+python3 naptime_consolidator.py --watch-dir ./memory_logs --once # one sweep (--extraction auto|llm|ollama|heuristic)
+python3 napmem_retrieval_agent.py --query <q> --layer all        # substring query
+python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
+python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
+python3 napmem_mcp_server.py --pyramid <p.json>                  # MCP stdio server
+```
+
+### Architecture in one paragraph
+
+`memory_pyramid_distiller.py` owns the store (`napmem_pyramid.json`, atomic
+writes via tmp+`os.replace`). `ingest_session()` is the single write path:
+extract → reconcile prior generation of the session → dedup/merge → rebuild
+Layers 2–3 → save. `naptime_consolidator.py` maps each watched `.md` file to a
+stable `sess_<basename>` session id and re-ingests on content change (mtime
+fast-path + persistent sha256 gate in `<pyramid>.sweepstate.json`, so
+touched-but-unchanged files skip extraction across `--once` restarts).
+`napmem_retrieval_agent.py` is read-only. `llm_extractor.py` is the production
+extraction path (Anthropic Batches API + schema validation feeding
+`ingest_session_records`); `ollama_extractor.py` is the zero-API-cost
+alternative (local Ollama chat models, `NAPMEM_OLLAMA_CHAT` url=model chain,
+same prompt and validation gauntlet). `--extraction auto` chains
+Anthropic → Ollama → per-file heuristic fallback; `--extraction ollama`
+guarantees no Anthropic API spend. `semantic_index.py` caches embeddings per record (Ollama with a
+remote→local host failover chain, stdlib hashed-TF fallback) for cosine
+search and opt-in semantic dedup. `napmem_mcp_server.py` wraps the retrieval
+tools in a stdlib MCP stdio server.
+
+#### Local `napmem_pyramid.json` is a dev/test store, not the production one
+
+`.mcp.json` points Claude Code's `napmem` MCP tool over SSH at the canonical
+production pyramid (`<user>@<lan-host>:/home/<user>/.napmem/napmem_pyramid.json`,
+~2.7k records — the same store the global `~/.claude/hooks/napmem-*.py` session
+hooks read). The `napmem_pyramid.json` / `napmem_pyramid.json.embindex.json`
+files checked into this repo are a separate, small, orphaned local store (12
+records as of 2026-08-11) — nothing wires them to the MCP server or the global
+hooks. Keep using them for local development and the `test_napmem_*.py` suites
+against a throwaway file; don't expect edits here to show up via the `napmem`
+MCP tool or vice versa.
+
+### Invariants — do not break
+
+- **Record IDs are stable across re-ingestion.** Re-asserted text keeps its ID;
+  new units number after the session's highest surviving suffix
+  (`_next_unit_number`). Never renumber from 1.
+- **Dedup is exact-text (lowercased, stripped).** Duplicate IDs must stay
+  resolvable via `duplicate_anchors`; a duplicate from another session can be
+  promoted to canonical when its session's text disappears.
+- **Store writes are atomic** (`save()`); never write the store directly.
+- **Untrusted content stays data.** Extraction prompts wrap source text in the
+  sentinel delimiter with loop-neutralization (`_neutralize_sentinel`); never
+  interpolate raw text or metadata outside the guarded region.
+- Layers 2–3 are derived state — always rebuilt from Layer 1, never edited.
+
+### Conventions
+
+- Core stays stdlib-only; the sanctioned optional extras are `anthropic`
+  (lazy-imported in `llm_extractor.py`) and Ollama over HTTP. Any further
+  dependency is an architecture decision, ask first.
+- Semantic dedup is opt-in (`semantic_dedup=True` / `--semantic-dedup`); the
+  default pipeline must stay deterministic. Tests force
+  `NAPMEM_EMBED_BACKEND=hashed`.
+- `logging` module for runtime output in daemons; CLI tools print to stdout.
+- Tests are plain `unittest` (`test_napmem_pipeline.py` core, `test_napmem_extensions.py` production path); add tests for any
+  behavior change, especially reconciliation edge cases.
+- Update `memory.md` (work log) and `prompts.md` (request log) each session.
+
+### Docs map
+
+`docs/` carries the full suite: ARCHITECTURE, COMPONENTS, DEVELOPMENT,
+TESTING, SECURITY, INSTALLATION, codebase-overview, high_signal_file_index.json,
+known-issues, onboarding. `deployment-topology.md` covers the live fleet;
+`semantic-indexing-and-hooks-reference.md` covers every semantic-index hook
+and script across both this repo and the global `~/.claude/hooks/` /
+`~/.global-ai-hub/` systems; `bootstrap-prompt.md` is a copy-paste prompt
+for recreating the whole system (core pyramid, Ollama, MCP wiring, and the
+optional hook suite / codebase indexer) from a base Claude Code install.
+Keep `docs/codebase-overview.md` and the file index current after adding
+or moving files.
+
+# Architecture
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/ARCHITECTURE.md
+
+## Architecture
+
+### System context
+
+NapMem sits beside an LLM agent's raw memory artifacts (session transcripts,
+`MEMORY.md`-style files, agent logs). It compresses them into a queryable
+4-layer pyramid so the agent retrieves *targeted* memory via tools instead of
+dumping raw logs into context.
+
+```
+memory files (.md)                     LLM agent
+      │                                    ▲
+      ▼                                    │ tool calls
+naptime_consolidator.py ──▶ memory_pyramid_distiller.py ──▶ napmem_pyramid.json ◀── napmem_retrieval_agent.py
+   (watch/poll loop)           (single write path)             (JSON store)            (read-only tools)
+```
+
+### Layers
+
+| Layer | Store key | Contents |
+|---|---|---|
+| 0 | `raw_conversations` | Session metadata + file path (raw text stays on disk) |
+| 1 | `memory_records` | Atomic units: type (8-way taxonomy), text, salience, topic slug, source anchor, duplicates |
+| 2 | `topic_tracks` | Per-topic clusters with summary and record IDs — derived |
+| 3 | `user_profiles` | Preference/constraint/workflow traits with provenance — derived |
+
+Layers 2–3 are always rebuilt from Layer 1 (`rebuild_higher_layers()`); they
+are never edited directly.
+
+### Data flow: `ingest_session()`
+
+1. **Extract** — `extract_atomic_units()` parses content into typed units with
+   per-line source anchors. (Heuristic stand-in; the production path is the LLM
+   extractor prompted by `llm_extraction_prompts.py`.)
+2. **Reconcile** — `_reconcile_session_records()` diffs the fresh extraction
+   against the session's prior generation: re-asserted text keeps its stable
+   record ID; stale canonicals are dropped or handed to a surviving duplicate
+   from another session (promotion); remaining new units are renumbered after
+   the session's highest surviving suffix to avoid ID collisions.
+3. **Dedup/merge** — `deduplicate_and_merge()` folds exact-text matches into
+   canonical records, preserving each duplicate's anchor in
+   `duplicate_anchors`.
+4. **Rebuild** — Layers 2–3 regenerated from surviving records.
+5. **Save** — atomic write (`.tmp` + `os.replace`).
+
+### Key decisions (ADRs)
+
+- **ADR-1: JSON file store, atomic replace.** Single-file store keeps the
+  system dependency-free and inspectable; `os.replace` guarantees the
+  consolidator daemon can't corrupt it mid-write. Trade-off: no concurrent
+  writers — one consolidator process at a time.
+- **ADR-2: Stable record IDs across re-ingestion.** Downstream consumers
+  (profiles' `provenance_records`, tracks' `record_ids`, external references)
+  survive re-ingestion. Enforced by reconcile-before-merge and
+  `_next_unit_number()` scanning canonical *and* duplicate IDs.
+- **ADR-3: Exact-text dedup.** Deterministic and cheap; semantic dedup is a
+  known future enhancement (see docs/known-issues.md).
+- **ADR-4: Sentinel-delimited prompts, not markdown fences.** A ``` inside
+  hostile source text would terminate a fence early; the sentinel is
+  loop-neutralized so it cannot be reconstituted by nesting.
+- **ADR-5: mtime *change* (not strictly-newer) triggers re-ingest.** Restores
+  with older timestamps (rsync -t, git checkout) must not be silently skipped.
+- **ADR-6: capacity-weighted embedding pool, one model everywhere.** Embedding
+  batches split across live Ollama hosts proportional to configured weights
+  (`NAPMEM_OLLAMA_URLS` `url=weight` entries) with per-chunk failover; every
+  host serves the same model so failover never invalidates the vector cache.
+- **ADR-7: fail-closed read guard at the read site.** File containment is
+  verified on the OPEN fd (kernel-reported path), not the pre-open path —
+  mirror-time checks alone are raceable by a sync peer. Default root = the
+  watch dir; the wrapper widens to the vetted memory trees.
+- **ADR-8: single canonical consolidator per store, fleet-wide.** The store
+  and its embedding cache are single-writer; other machines query over
+  ssh-stdio MCP. See [deployment-topology.md](deployment-topology.md).
+
+### Deployment
+
+Production topology (three-machine fleet, canonical consolidator on the
+always-on Linux box, launchd/systemd variants, security model) is documented
+in [deployment-topology.md](deployment-topology.md); unit files and install
+steps in [`deploy/`](../deploy/README.md).
+
+# Components
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/COMPONENTS.md
+
+## Components
+
+### `memory_pyramid_distiller.py` — core distiller
+
+**Purpose:** owns the pyramid store and the single write path.
+
+**API (`MemoryPyramidDistiller`):**
+- `ingest_session(session_id, title, file_path, content) -> int` — full
+  pipeline: extract → reconcile → dedup → rebuild → save. Returns unit count.
+- `extract_atomic_units(content, session_id, file_path)` — heuristic extractor
+  (8-way taxonomy + salience).
+- `deduplicate_and_merge(new_records)` — exact-text fold into canonicals.
+- `rebuild_higher_layers()` — regenerates topic tracks and profiles.
+- `render_markdown_summary() -> str` — human-readable pyramid report.
+- `save()` — atomic write.
+
+**CLI:** `--input <file>`, `--session-id` (default `sess_<basename>`),
+`--title`, `--pyramid <store.json>`.
+
+**Depends on:** stdlib only.
+
+### `naptime_consolidator.py` — background consolidator
+
+**Purpose:** idle-time ("naptime") incremental re-ingestion of changed memory
+files.
+
+**API (`NaptimeConsolidator`):** `scan_and_consolidate() -> int`,
+`run_loop(poll_interval_sec, max_ticks)`. Per-file errors (OSError, non-UTF-8)
+are logged and skipped — one bad file never kills the loop.
+
+**Extraction modes** (`extraction=` / `--extraction`): `auto` (default — LLM
+when `anthropic` is importable, decided at startup), `llm` (required, errors
+without the package), `heuristic`. In LLM mode each sweep's changed files go
+out as one Message Batches API batch; any session whose extraction fails
+(batch error, invalid JSON, all units rejected) falls back to the heuristic
+extractor for that file, so no update is ever silently dropped.
+
+**CLI:** `--watch-dir` (default `./memory_logs`), `--pyramid`, `--interval`,
+`--max-ticks`, `--once`, `--extraction`, `--semantic-dedup`.
+
+**Depends on:** `memory_pyramid_distiller`; `llm_extractor`/`anthropic` only
+in LLM mode (lazy).
+
+### `napmem_retrieval_agent.py` — active retrieval tools
+
+**Purpose:** read-only tool surface for LLM agents.
+
+**API (`NapMemRetrievalAgent`):**
+- `search_memory_pyramid(query, layer)` — substring search across profiles /
+  tracks / records; raises `ValueError` on unknown layer (typo ≠ "no memory").
+- `inspect_provenance(record_id)` — resolves canonical *or duplicate* IDs back
+  to Layer 0; duplicates resolve with their own anchor + `canonical_id`.
+- `get_topic_track(topic_slug)` — full track with associated records.
+- `compute_context_budget_savings()` — token compression stats vs raw logs;
+  only counts sessions whose raw file is still readable, disclosing missing
+  ones.
+
+**CLI:** `--query`, `--layer`, `--provenance`, `--stats`, `--pyramid`.
+
+**Depends on:** stdlib only; requires an existing pyramid store.
+
+### `llm_extraction_prompts.py` — production extraction prompts
+
+**Purpose:** zero-fabrication LLM extraction prompt templates with injection
+guards. `get_extraction_prompt(raw_text, session_id, file_name)` wraps
+untrusted text in a loop-neutralized sentinel delimiter and strips
+newlines/sentinels from metadata. Consumed by `llm_extractor.py`.
+
+### `llm_extractor.py` — LLM extraction pipeline
+
+**Purpose:** production extraction path replacing the heuristic extractor.
+
+**API:** `parse_extraction_output(raw)` (tolerates one JSON code fence),
+`validate_unit(unit)`, `units_to_records(units, session_id, file_path)`,
+`extract_direct(client, prompt, model)`, `extract_batch(client, prompts, model)`
+(Message Batches API — 50% cost, polls to completion),
+`ingest_extractions(distiller, outputs, file_paths)`. Invalid units are
+rejected and logged, never repaired.
+
+**CLI:** `--input <files>`, `--model` (default `claude-haiku-4-5`),
+`--no-batch`, `--semantic-dedup`, `--dry-run`, `--pyramid`.
+
+**Depends on:** `anthropic` (lazy import; clear error if missing).
+
+### `semantic_index.py` — embedding index
+
+**Purpose:** cosine retrieval + near-duplicate detection over Layer 1.
+
+**API (`SemanticIndex`):** `search(query, records, top_k)`,
+`nearest_record_id(text, records, threshold)`, `rebuild(records)`. Vectors
+cached in `<pyramid>.embindex.json` keyed by record id + text hash; a
+backend/model switch invalidates the cache. Backends: `OllamaBackend` with a
+host failover chain (`NAPMEM_OLLAMA_URLS`, default remote
+`<lan-ollama-host>:11434` then `localhost:11434`, both serving
+`mxbai-embed-large` so failover preserves the cache) and `HashedTfBackend`
+(stdlib hashed term-frequency, deterministic fallback). Force with
+`NAPMEM_EMBED_BACKEND=ollama|hashed`.
+
+**CLI:** `--rebuild`, `--query`, `--top-k`, `--pyramid`.
+
+### `napmem_mcp_server.py` — MCP stdio server
+
+**Purpose:** exposes retrieval tools to MCP clients (registered in
+`.mcp.json`). Pure-stdlib newline-delimited JSON-RPC 2.0; protocol
+`2025-06-18`. Tools: `search_memory` (substring or semantic),
+`inspect_provenance`, `get_topic_track`, `memory_stats`. Store re-read per
+call so consolidator updates are visible; tool failures return in-band
+`isError` results.
+
+### `memory_pyramid_schema.json` — store schema
+
+JSON Schema describing the pyramid store shape (layers 0–3, record fields,
+profile category enum).
+
+### `test_napmem_pipeline.py` / `test_napmem_extensions.py` — test suites
+
+19 `unittest` tests total. Pipeline suite (9): extraction, dedup/duplicate
+anchors, re-ingestion ID stability, duplicate promotion, layer rebuild,
+provenance resolution, prompt-guard neutralization. Extensions suite (10):
+extractor parsing/validation/record conversion, LLM-record re-ingest
+stability, hashed-backend cosine properties, semantic search ranking,
+semantic dedup fold (and off-by-default), MCP handshake/tools/errors via
+subprocess. Network-free by design.
+
+# MCP
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/MCP.md
+
+## MCP
+
+### NapMem MCP server
+
+`napmem_mcp_server.py` exposes the pyramid to any MCP client over the stdio
+transport (newline-delimited JSON-RPC 2.0, protocol `2025-06-18`). Pure
+stdlib — no MCP SDK dependency. Registered for this repo in `.mcp.json`:
+
+```json
+{"mcpServers": {"napmem": {"command": "python3", "args": ["napmem_mcp_server.py"]}}}
+```
+
+Point it at a different store with `--pyramid <path>` or `NAPMEM_PYRAMID`.
+The store is re-read on every tool call, so a concurrently running naptime
+consolidator's updates are always visible.
+
+### Tools
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `search_memory` | `query` (req), `layer`, `semantic`, `top_k` | Substring matches across profiles/tracks/records, or embedding cosine top-k when `semantic: true` |
+| `inspect_provenance` | `record_id` (req) | Record + source anchor + raw session metadata; duplicate ids resolve via their canonical |
+| `get_topic_track` | `topic_slug` (req) | Full Layer 2 track with associated records |
+| `memory_stats` | — | Token compression / context-budget savings stats |
+
+Tool failures (unknown record, bad layer, missing store) return in-band MCP
+errors (`isError: true`), not JSON-RPC protocol errors.
+
+### Manual smoke test
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  | python3 napmem_mcp_server.py --pyramid napmem_pyramid.json
+```
+
+The handshake, tool list, and tool calls are covered end-to-end (via
+subprocess) in `test_napmem_extensions.py`.
+
+# Security
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/SECURITY.md
+
+## Security
+
+### Threat model
+
+No subprocess execution; credentials only via the `anthropic` SDK's standard
+resolution (never read directly). Two attack surfaces:
+
+1. **Untrusted file content** — memory files are arbitrary text flowing into
+   the heuristic parser and LLM extraction prompts.
+2. **Data egress** — memory text *leaves the machine* on the optional paths:
+   full file content goes to the **Anthropic API** (TLS) in LLM extraction
+   mode, and record/query text goes to the configured **Ollama host** for
+   embeddings — by default the remote LAN server `<lan-ollama-host>:11434` over
+   **plain HTTP**. Treat the watch directory as the consent boundary: do not
+   point the consolidator at files that must never leave the machine, or run
+   `--extraction heuristic` with `NAPMEM_EMBED_BACKEND=hashed`. Cached
+   embedding vectors (`*.embindex.json`) are themselves partially invertible
+   and should be treated as sensitive as the text they encode.
+
+### STRIDE summary
+
+| Threat | Exposure | Mitigation |
+|---|---|---|
+| Spoofing | Ollama traffic is unauthenticated plain HTTP on the LAN — a spoofed/compromised host could serve crafted embeddings | Strict response validation in `OllamaBackend.embed` (numeric-only vectors, consistent dimension) blocks structural poisoning of the vector cache; semantically crafted vectors remain possible — put the Ollama hosts on a trusted network segment, or force `NAPMEM_EMBED_BACKEND=hashed` |
+| Tampering | Pyramid store and embedding cache are plain JSON on disk | Atomic writes (`.tmp` + `os.replace`) prevent corruption; filesystem permissions are the trust boundary |
+| Repudiation | Low | Every record carries a source anchor (session, file, heading, line) |
+| Information disclosure | Memory files may hold sensitive user data; text egresses to the Anthropic API (LLM mode) and the Ollama host (embeddings, plain HTTP); embedding vectors are partially invertible | See "Data egress" in the threat model. Do not commit real pyramid stores/memory logs or embedding caches (`.gitignore` excludes `memory_logs/` and `*.embindex.json`) |
+| Denial of service | Malformed/huge files | Consolidator skips unreadable/non-UTF-8 files per-file; no recursion on input |
+| Elevation of privilege | Prompt injection via memory-file content | See below |
+
+### Prompt-injection defenses (`llm_extraction_prompts.py`)
+
+- **Untrusted-content guard**: system prompt instructs the model to treat all
+  document text as data, never instructions.
+- **Sentinel delimiter, not markdown fence**: a ``` in hostile text would
+  close a fence early; the sentinel `<<<RAW_MEMORY_SOURCE>>>` bounds the data
+  region instead.
+- **Loop neutralization**: occurrences of the sentinel inside source text are
+  replaced *until none survive* — a single replace is bypassable because
+  stripping one bracket from a nested form reconstitutes the delimiter.
+- **Metadata hardening**: session ids and file names are interpolated outside
+  the delimited region, so they are stripped of newlines and sentinels — a
+  hostile filename cannot smuggle instruction lines.
+
+Instruction-following by the downstream LLM remains probabilistic; treat
+extractor output as untrusted data and validate against
+`memory_pyramid_schema.json` before ingestion.
+
+### Reporting
+
+See [.github/SECURITY.md](../.github/SECURITY.md) — private advisories only.
+
+# Testing
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/TESTING.md
+
+## Testing
+
+### Strategy
+
+Plain `unittest`, two suites (`test_napmem_pipeline.py`,
+`test_napmem_extensions.py`), 38 tests, no test dependencies, network-free:
+extractor tests exercise parsing/validation offline, semantic tests force
+`NAPMEM_EMBED_BACKEND=hashed`, and the MCP test drives the real server binary
+over a subprocess pipe. Tests assert observable behavior on real pyramid
+stores written to temp paths.
+
+### Running
+
+```bash
+python3 -m unittest discover -s . -p "test_*.py"   # everything (CI command)
+python3 test_napmem_pipeline.py                    # core suite only
+python3 test_napmem_extensions.py                  # extensions suite only
+```
+
+### Coverage target
+
+Meaningful coverage of important and changed/risky paths with real assertions
+on behavior — explicitly **not** a blanket 100%-line mandate. The risky paths
+in this codebase, all covered and to stay covered:
+
+- Session reconciliation (`_reconcile_session_records`): re-asserted text
+  keeps IDs; stale canonical dropped; duplicate promoted to canonical;
+  renumbering after highest surviving suffix.
+- Dedup (`deduplicate_and_merge`): fold + `duplicate_anchors` preservation.
+- Provenance (`inspect_provenance`): canonical and duplicate-ID resolution.
+- Prompt guards (`_neutralize_sentinel`): nested-sentinel reconstitution.
+- Extractor gate (`validate_unit`/`units_to_records`): invalid units rejected;
+  LLM-extracted records honor stable-ID re-ingest semantics.
+- Semantic dedup: fold with `paraphrase_text` anchor; off by default.
+- MCP protocol: handshake, tool list, in-band tool errors, -32601 on unknown
+  methods.
+- Consolidator LLM wiring: auto-mode batch use, per-file heuristic fallback on
+  batch error or invalid output, heuristic mode isolation (via a faked
+  `anthropic` module — no network).
+- Ollama failover: probe order prefers the first responding host; all-dead
+  chain returns None.
+
+### CI gate
+
+`.github/workflows/ci.yml` runs compile check + the suite on Python 3.10,
+3.12, and 3.14 for every push to `main` and every PR. The test job is the
+merge gate; the ruff lint job is advisory.
+
+Any behavior change ships with a test. Bug fixes ship with a regression test
+that fails before the fix.
+
+# Known issues
+Source: https://github.com/mithudso/llm-memory-pyramid/blob/HEAD/docs/known-issues.md
+
+## Known issues
+
+Active limitations and accepted trade-offs. No open defects; the test suite is
+green (9/9).
+
+### Limitations (by design, candidates for enhancement)
+
+- **Semantic dedup is opt-in and threshold-based.** Default pipeline remains
+  exact-text (deterministic). The hashed-TF fallback backend detects
+  token-overlap near-duplicates, not true paraphrase — real paraphrase folding
+  needs the Ollama backend.
+- **Semantic folds keep the canonical's text.** The paraphrase is preserved in
+  the duplicate anchor (`paraphrase_text`); a promoted duplicate therefore
+  carries the old canonical's wording with its own anchor disclosing the
+  original phrasing.
+- **LLM extraction needs the optional dependency.** The consolidator's `auto`
+  mode uses LLM extraction only when `anthropic` is installed (and an API
+  credential resolves at call time); otherwise it runs the heuristic
+  extractor. Real paraphrase-quality extraction also assumes an Ollama host
+  is reachable for the semantic index.
+- **Heuristic profile categories are a subset.** The stand-in emits only
+  `preference`/`constraint`/`workflow`; `identity` and `goal` from the schema
+  enum arrive via the LLM extraction path.
+- **Batch extraction polls synchronously.** `extract_batch` blocks up to 1h;
+  a submit-now/collect-later mode would suit cron-driven naptime better.
+- **Single writer.** No lock file; running two consolidators against one store
+  can lose updates (last atomic write wins).
+- **In-memory mtime cache.** The consolidator re-ingests every file on
+  restart (correct, just redundant work); no persisted watermark.
+- **Layer 2/3 summaries are naive.** Track summary = first three high-salience
+  texts; profile per high-salience fact/actionable record (no cross-record
+  synthesis).
+
+### TODO tracking
+
+Code carries no TODO/FIXME markers; enhancements above are tracked here and in
+`memory.md` next-steps.

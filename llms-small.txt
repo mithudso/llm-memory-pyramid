@@ -1,0 +1,15 @@
+<!-- Generated 2026-09-25 [gen: p/2.0.0]; verified-as-of 2026-09-25 -->
+
+# llm-memory-pyramid (NapMem) (small)
+
+> NapMem: a 4-layer multi-granularity memory pyramid for LLM agents. Distills session logs and memory files into deduplicated atomic records, topic tracks and profiles, with provenance back to the raw source, served through tool-driven retrieval and an MCP stdio server.
+
+## Essentials
+
+- Run tests: python3 -m unittest discover -s . -p "test_*.py"
+- Distill a file: python3 memory_pyramid_distiller.py --input <file.md>
+- Query: python3 napmem_retrieval_agent.py --query <q> --layer all [--semantic]
+- MCP server: python3 napmem_mcp_server.py --pyramid <p.json>
+- Core is Python 3.10+ stdlib only; extras: anthropic SDK, local Ollama
+
+See llms.txt for the index and llms-facts.txt for sourced facts.

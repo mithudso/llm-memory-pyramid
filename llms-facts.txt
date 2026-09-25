@@ -1,0 +1,25 @@
+<!-- Generated 2026-09-25 [gen: p/2.0.0]; verified-as-of 2026-09-25 -->
+
+# llm-memory-pyramid (NapMem): Sourced Project Facts
+
+One declarative fact per line, each with a `[src:]` tag.
+
+## 2026-09-25 [gen: manual]
+
+- The pyramid has four layers: 0 raw conversations and source anchors, 1 atomic memory records, 2 topic tracks, 3 user and system profiles [src: README.md]
+- Layer 1 records are built by extract_atomic_units(); Layers 2 and 3 are built by rebuild_higher_layers() [src: README.md]
+- Re-ingesting a session with the same session_id replaces that session's Layer 1 records with stable record IDs, then rebuilds Layers 2-3 [src: README.md]
+- The core pipeline needs Python 3.10+ and the standard library only; optional extras are the anthropic SDK and a local Ollama server [src: README.md]
+- Without Ollama, semantic_index.py falls back to a stdlib hashed term-frequency embedding backend [src: README.md]
+- napmem_mcp_server.py exposes the retrieval tools over MCP stdio and is registered in .mcp.json [src: README.md]
+- The test suite is unittest-based and run with `python3 -m unittest discover -s . -p "test_*.py"` [src: CLAUDE.md]
+- Record IDs are stable across re-ingestion: re-asserted text keeps its ID and new units number after the session's highest surviving suffix [src: CLAUDE.md]
+- Deduplication is exact-text (lowercased, stripped); duplicate IDs stay resolvable through duplicate_anchors [src: CLAUDE.md]
+- Store writes are atomic via save() using a tmp file plus os.replace; the store must never be written directly [src: CLAUDE.md]
+- Layers 2 and 3 are derived state, always rebuilt from Layer 1 and never edited by hand [src: CLAUDE.md]
+- Extraction prompts wrap untrusted source text in a sentinel delimiter with loop neutralization (_neutralize_sentinel) [src: CLAUDE.md]
+- naptime_consolidator.py maps each watched .md file to a stable sess_<basename> session id and re-ingests on content change using an mtime fast-path plus a sha256 gate stored in <pyramid>.sweepstate.json [src: CLAUDE.md]
+- --extraction auto chains Anthropic, then Ollama, then a per-file heuristic fallback; --extraction ollama guarantees no Anthropic API spend [src: CLAUDE.md]
+- Semantic dedup is opt-in (--semantic-dedup) so the default pipeline stays deterministic; tests force NAPMEM_EMBED_BACKEND=hashed [src: CLAUDE.md]
+- The napmem_pyramid.json checked into the repo is a small local dev/test store, separate from the production store the .mcp.json entry targets [src: CLAUDE.md]
+- The repository is licensed under Apache 2.0 [src: README.md]
