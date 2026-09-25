@@ -11,7 +11,7 @@ through llm_extractor.parse_extraction_output / units_to_records, which treat
 the model output as untrusted regardless of which model produced it.
 
 Host chain config (env NAPMEM_OLLAMA_CHAT):
-    "http://localhost:11434=qwen3.5:35b,http://192.168.4.1:11434=qwen2.5-coder:7b"
+    "http://localhost:11434=qwen3.5:35b,http://198.51.100.1:11434=qwen2.5-coder:7b"
 Each entry is url=model; hosts are tried in order per file. Default is the
 consolidator box's local daemon with its largest instruct model.
 

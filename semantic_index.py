@@ -7,7 +7,7 @@ memory records. Two embedding backends:
 
   - OllamaBackend: real embeddings from an Ollama server. Probes each host in
     NAPMEM_OLLAMA_URLS in order (default: the remote server at
-    http://192.168.4.75:11434, then http://localhost:11434 as the local
+    http://203.0.113.218:11434, then http://localhost:11434 as the local
     backup) and uses the first that responds. Zero API cost, no cloud
     dependency.
   - HashedTfBackend: pure-stdlib fallback — hashed bag-of-words term-frequency
@@ -43,8 +43,8 @@ logger = logging.getLogger(__name__)
 # MacBook Pro, and this box's local daemon. A single NAPMEM_OLLAMA_URL
 # overrides the whole list.
 DEFAULT_OLLAMA_URLS = (
-    "http://192.168.4.75:11434=4,"    # linux / RTX 5080
-    "http://192.168.4.1:11434=2,"     # M5 Max MBP 64GB
+    "http://203.0.113.218:11434=4,"    # linux / RTX 5080
+    "http://198.51.100.1:11434=2,"     # M5 Max MBP 64GB
     "http://localhost:11434=1"        # this box
 )
 
