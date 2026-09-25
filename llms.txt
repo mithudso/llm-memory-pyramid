@@ -1,0 +1,33 @@
+<!-- Generated 2026-09-25 [gen: p/2.0.0]; verified-as-of 2026-09-25 -->
+
+# llm-memory-pyramid (NapMem)
+
+> NapMem: a 4-layer multi-granularity memory pyramid for LLM agents. Distills session logs and memory files into deduplicated atomic records, topic tracks and profiles, with provenance back to the raw source, served through tool-driven retrieval and an MCP stdio server.
+
+## Docs
+
+- [README.md](README.md): Overview, pyramid layers, quick start, components
+- [CLAUDE.md](CLAUDE.md): Architecture paragraph, invariants, conventions
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Architecture
+- [docs/COMPONENTS.md](docs/COMPONENTS.md): Component reference
+- [docs/MCP.md](docs/MCP.md): MCP server tools
+- [docs/SECURITY.md](docs/SECURITY.md): Security notes
+- [docs/TESTING.md](docs/TESTING.md): Testing
+- [docs/known-issues.md](docs/known-issues.md): Known issues
+
+## Key files
+
+- [memory_pyramid_distiller.py](memory_pyramid_distiller.py): Core distiller: extraction, dedup, session reconciliation, layer rebuild
+- [naptime_consolidator.py](naptime_consolidator.py): Background watcher that re-ingests changed .md files
+- [napmem_retrieval_agent.py](napmem_retrieval_agent.py): Read-only retrieval: search, provenance, topic tracks, stats
+- [llm_extractor.py](llm_extractor.py): Production extraction via the Anthropic Batches API
+- [ollama_extractor.py](ollama_extractor.py): Local Ollama extraction alternative
+- [semantic_index.py](semantic_index.py): Embedding index with Ollama or hashed-TF backend
+- [napmem_mcp_server.py](napmem_mcp_server.py): Stdlib MCP stdio server
+- [memory_pyramid_schema.json](memory_pyramid_schema.json): JSON Schema for the pyramid store
+
+## Companion files
+
+- [llms-full.txt](llms-full.txt): concatenated key docs
+- [llms-small.txt](llms-small.txt): condensed summary
+- [llms-facts.txt](llms-facts.txt): sourced one-line facts
