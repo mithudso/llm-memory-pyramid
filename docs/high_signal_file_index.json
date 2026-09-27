@@ -43,6 +43,16 @@
       "summary": "Pure-stdlib MCP stdio server (newline JSON-RPC 2.0, protocol 2025-06-18): initialize/tools list/tools call; tools search_memory (substring+semantic), inspect_provenance, get_topic_track, memory_stats. Store re-read per call; in-band isError for tool failures."
     },
     {
+      "path": "napmem_mcp_failover.py",
+      "signal": "high",
+      "summary": "Stdlib MCP failover proxy registered in .mcp.json: relays to the canonical server over SSH (host from NAPMEM_REMOTE_HOST or ~/.napmem/remote_host); if SSH is down at startup or dies mid-session it spawns napmem_mcp_server.py on ~/.napmem/mirror, replays initialize + in-flight requests, and tags tool results with snapshot age. Background mirror refresh (tmp+os.replace, JSON-validated); --sync-mirror / --status CLI."
+    },
+    {
+      "path": "test_napmem_failover.py",
+      "signal": "medium",
+      "summary": "unittest suite for the failover proxy: mid-session failover with handshake replay, dead-before-initialize, start-offline, both-backends-dead errors, mirror sync atomicity/corrupt-remote guard, host config precedence."
+    },
+    {
       "path": "test_napmem_pipeline.py",
       "signal": "high",
       "summary": "9 unittest tests: extraction typing/salience, dedup + duplicate anchors, re-ingestion ID stability, duplicate promotion, layer rebuild, provenance, sentinel neutralization."

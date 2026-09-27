@@ -14,6 +14,8 @@ repo root. Every file accounted for below.
 | `llm_extractor.py` | Production extraction via Anthropic Batches API: parse, validate, ingest |
 | `semantic_index.py` | Embedding index (Ollama / stdlib hashed-TF), cosine search, semantic dedup |
 | `napmem_mcp_server.py` | Stdlib MCP stdio server (JSON-RPC) exposing retrieval tools |
+| `napmem_mcp_failover.py` | MCP proxy: remote SSH server with automatic local-mirror fallback |
+| `test_napmem_failover.py` | Failover proxy tests (handshake replay, mirror sync) |
 | `test_napmem_pipeline.py` | 9-test `unittest` suite for the core pipeline |
 | `test_napmem_extensions.py` | 10-test suite: extractor, semantic index/dedup, MCP server |
 

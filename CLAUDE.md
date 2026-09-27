@@ -21,6 +21,7 @@ python3 napmem_retrieval_agent.py --query <q> --layer all        # substring que
 python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
 python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
 python3 napmem_mcp_server.py --pyramid <p.json>                  # MCP stdio server
+python3 napmem_mcp_failover.py [--status|--sync-mirror]          # MCP proxy: remote SSH, local-mirror fallback
 ```
 
 ## Architecture in one paragraph
@@ -45,8 +46,9 @@ tools in a stdlib MCP stdio server.
 
 ### Local `napmem_pyramid.json` is a dev/test store, not the production one
 
-`.mcp.json` points Claude Code's `napmem` MCP tool over SSH at the canonical
-production pyramid (`mithudso@192.168.4.75:/home/mithudso/.napmem/napmem_pyramid.json`,
+`.mcp.json` runs `napmem_mcp_failover.py`, which points Claude Code's `napmem`
+MCP tool over SSH at the canonical production pyramid (`<remote_host>:~/.napmem/napmem_pyramid.json`;
+host from `NAPMEM_REMOTE_HOST` or `~/.napmem/remote_host`, never committed —
 ~2.7k records — the same store the global `~/.claude/hooks/napmem-*.py` session
 hooks read). The `napmem_pyramid.json` / `napmem_pyramid.json.embindex.json`
 files checked into this repo are a separate, small, orphaned local store (12
@@ -54,6 +56,14 @@ records as of 2026-08-11) — nothing wires them to the MCP server or the global
 hooks. Keep using them for local development and the `test_napmem_*.py` suites
 against a throwaway file; don't expect edits here to show up via the `napmem`
 MCP tool or vice versa.
+
+If the remote is unreachable at startup, or the SSH link dies mid-session,
+the proxy serves a local `napmem_mcp_server.py` on `~/.napmem/mirror/` (a
+snapshot of the canonical pyramid + embindex, refreshed in the background
+while the remote is up, or by `--sync-mirror`). It replays `initialize` and
+in-flight requests into the new backend and appends a `[napmem fallback]`
+note with the snapshot age to every tool result. The server is read-only, so
+the mirror can be stale but never divergent.
 
 ## Invariants — do not break
 

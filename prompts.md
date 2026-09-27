@@ -62,3 +62,11 @@ Versioned record of user requests, in order. Newest last.
     (qwen3.5:35b on the 5080) with --extraction ollama / auto chain;
     subscription-budget headless-claude option assessed and declined (burns
     the Max allowance the whole project exists to conserve).
+
+## v1.6.0 — 2026-09-26
+
+14. "I believe this is where napmem lives, create a local napmem fallback if
+    the remote napmem server fails or is offline." — root-caused the
+    CONNECTION_CLOSED to the placeholder host in `.mcp.json`; shipped
+    `napmem_mcp_failover.py` (remote SSH with local-mirror fallback,
+    mid-session handshake replay) and rewired project + user MCP configs.
