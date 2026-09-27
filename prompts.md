@@ -70,3 +70,6 @@ Versioned record of user requests, in order. Newest last.
     CONNECTION_CLOSED to the placeholder host in `.mcp.json`; shipped
     `napmem_mcp_failover.py` (remote SSH with local-mirror fallback,
     mid-session handshake replay) and rewired project + user MCP configs.
+15. "yes" (make the hooks fall back to the local mirror too) — shipped in
+    ~/.claude hooks (PR #37); documented in
+    docs/semantic-indexing-and-hooks-reference.md.
