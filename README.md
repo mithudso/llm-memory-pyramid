@@ -64,6 +64,7 @@ production pyramid, not the local example file below — see the note in
 | `llm_extractor.py` | Production extraction: Haiku via Anthropic Batches API, schema-validated ingest |
 | `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
 | `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
+| `napmem_mcp_failover.py` | MCP proxy registered in `.mcp.json`: remote SSH server, local-mirror fallback when it is offline |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
 | `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
 | `test_napmem_pipeline.py` | Core test suite (unittest; 38 tests across both suites) |

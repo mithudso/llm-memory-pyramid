@@ -2,6 +2,33 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.6.0 — 2026-09-26
+
+**Active task:** none — local MCP fallback shipped.
+
+**Completed:**
+- Root cause of `napmem (CONNECTION_CLOSED)`: PR #12 replaced the real ssh
+  target in the project `.mcp.json` with the placeholder `user@box.example`;
+  project scope overrides the working user-scope entry, so every session in
+  this repo failed to connect. The remote box itself was up.
+- `napmem_mcp_failover.py`: stdlib MCP proxy. Relays to the remote server
+  over SSH; falls back to a local `napmem_mcp_server.py` on
+  `~/.napmem/mirror/` when the remote is down at startup or dies
+  mid-session (replays `initialize` + in-flight requests). Tool results on
+  the mirror carry a `[napmem fallback]` snapshot-age note.
+- Mirror: pyramid (3.5 MB) + embindex (38 MB) copied over ssh in ~2 s,
+  tmp + `os.replace`, JSON-validated. Local Ollama serves the same
+  `mxbai-embed-large`, so semantic scores match the remote exactly (0.8415
+  on the same query both ways).
+- Host is read from `NAPMEM_REMOTE_HOST` / `~/.napmem/remote_host` (not
+  committed). Project `.mcp.json` and user-scope `~/.claude.json` both run
+  the proxy now. A watchdog kills a hung remote after 60 s unanswered.
+  Tests 56 → 65 (+9 in `test_napmem_failover.py`).
+
+**Next steps:**
+- Global `~/.claude/hooks/napmem_hook_lib.py` still SSHes directly; it could
+  read `~/.napmem/mirror/` when SSH fails.
+
 ## v1.5.0 — 2026-08-21 (later still)
 
 **Active task:** none — zero-API-spend extraction shipped.
