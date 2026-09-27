@@ -28,7 +28,7 @@ per-project. Global kill switch: `NAPMEM_HOOK_DISABLE=1`.
 
 | Hook file | Event | Matcher | Does |
 |---|---|---|---|
-| `napmem-session-brief.py` | `SessionStart` | — | One SSH pull of the canonical pyramid's top layers (biggest topic tracks, all profile traits) per session. Cached 30 min (`BRIEF_TTL_S`); serves stale cache marked as such on SSH failure. |
+| `napmem-session-brief.py` | `SessionStart` | — | One SSH pull of the canonical pyramid's top layers (biggest topic tracks, all profile traits) per session. Cached 30 min (`BRIEF_TTL_S`); on SSH failure serves the local mirror (or the stale cache, marked as such). |
 | `napmem-index-kick.py` | `SessionStart` | — | Adds the session's repo root to the **hub-daemon's** watch list and pings `/index-tree` on it. This is the global-ai-hub *codebase* indexer, not the memory pyramid — see Part 2. Also kicks the usage predictor. |
 | `napmem-context-hook.py` | `UserPromptSubmit` | every prompt | The main auto-retrieval hook: embeds the prompt locally, semantic-searches the canonical pyramid over SSH (with a local query cache), filters by the keep-rule below, and also checks the repo's `docs/high_signal_file_index.json` + `CLAUDE.md` commands block, plus the hub-daemon's file-level search. Injects up to 3 lines as `[napmem-auto]` context. |
 | `napmem-pretool-hook.py` | `PreToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | On the *first* touch of a file this session, or the first `git commit/push/merge/rebase/revert` per (repo, verb), surfaces past decisions/gotchas via the same SSH semantic search, stricter floor (`PRETOOL_FLOOR = 0.68`). Emits `hookSpecificOutput.additionalContext`, never a permission decision. Per-session dedup cache makes repeat touches free. |
@@ -66,13 +66,31 @@ be re-tuned offline without re-querying.
 ### Transport
 
 Both the session-brief and per-prompt/pretool hooks reach the canonical
-pyramid the same way as the `napmem` MCP server does post-this-repo's
-`.mcp.json` change (see the commit that retargeted it): SSH to
-`mithudso@192.168.4.75` with a persistent `ControlMaster` (`ControlPersist=120`,
-socket `/tmp/napmem-ssh-ctrl-%C`), running `napmem_retrieval_agent.py
---semantic` remotely against `/home/mithudso/.napmem/napmem_pyramid.json`.
-The session-brief hook's SSH call pre-warms the control socket that the
+pyramid over SSH to the host in `~/.napmem/remote_host` (override:
+`NAPMEM_HOOK_SSH_HOST`; the same file `napmem_mcp_failover.py` reads), with
+a persistent `ControlMaster` (`ControlPersist=120`, socket
+`/tmp/napmem-ssh-ctrl-%C`), running `napmem_retrieval_agent.py --semantic`
+remotely against `~/.napmem/napmem_pyramid.json` on that box. The
+session-brief hook's SSH call pre-warms the control socket that the
 per-prompt/pretool hooks then reuse for free.
+
+### Local mirror fallback
+
+If SSH fails, the hooks read `~/.napmem/mirror/napmem_pyramid.json`, the
+snapshot that `napmem_mcp_failover.py` keeps (see `docs/MCP.md`).
+
+- `ssh_semantic()` runs the local `napmem_retrieval_agent.py` on the mirror
+  (~0.45 s, local Ollama `mxbai-embed-large`). Each match carries
+  `via: "mirror"`.
+- After any SSH failure, the hooks write `~/.napmem/cache/remote-down` and
+  skip SSH for 120 s (`REMOTE_DOWN_TTL_S`). Offline prompts then cost
+  ~0.45 s instead of the 3 s connect timeout each.
+- `napmem-session-brief.py` computes the brief from the mirror when SSH
+  fails and the mirror is newer than the cached brief. The header then says
+  `(local mirror, snapshot N h old — canonical store unreachable)`.
+- When SSH works and the mirror is older than 1 h, the session brief starts
+  a detached `napmem_mcp_failover.py --sync-mirror`.
+- `NAPMEM_HOOK_NO_MIRROR=1` turns the fallback off.
 
 ## Part 2 — global-ai-hub codebase indexer (separate system)
 

@@ -26,8 +26,9 @@ Versioned log of active task, completed work, and next steps. Newest first.
   Tests 56 → 65 (+9 in `test_napmem_failover.py`).
 
 **Next steps:**
-- Global `~/.claude/hooks/napmem_hook_lib.py` still SSHes directly; it could
-  read `~/.napmem/mirror/` when SSH fails.
+- Done same day: the global napmem hooks now fall back to the mirror too
+  (github.com/mithudso/skills PR #37), with a 120 s remote-down marker and
+  a background mirror refresh from the session brief.
 
 ## v1.5.0 — 2026-08-21 (later still)
 
