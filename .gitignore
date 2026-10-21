@@ -21,3 +21,4 @@ memory_logs/
 
 # Codex local config (contains real ssh targets)
 .codex/
+*.egg-info/

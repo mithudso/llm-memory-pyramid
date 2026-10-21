@@ -90,8 +90,8 @@ rejected and logged, never repaired.
 `nearest_record_id(text, records, threshold)`, `rebuild(records)`. Vectors
 cached in `<pyramid>.embindex.json` keyed by record id + text hash; a
 backend/model switch invalidates the cache. Backends: `OllamaBackend` with a
-host failover chain (`NAPMEM_OLLAMA_URLS`, default remote
-`192.168.4.75:11434` then `localhost:11434`, both serving
+weighted host pool via the shared `ollama-client` library (`NAPMEM_OLLAMA_URLS`;
+unset falls back to `OLLAMA_URLS`/`OLLAMA_HOST`/`localhost:11434`; all hosts serving
 `mxbai-embed-large` so failover preserves the cache) and `HashedTfBackend`
 (stdlib hashed term-frequency, deterministic fallback). Force with
 `NAPMEM_EMBED_BACKEND=ollama|hashed`.

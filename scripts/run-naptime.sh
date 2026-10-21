@@ -128,7 +128,9 @@ done
 # NAPMEM_EXTRACTION picks the extractor chain (auto|llm|ollama|heuristic);
 # "ollama" guarantees zero Anthropic API spend. Set it in the service unit
 # (systemd drop-in / launchd EnvironmentVariables) rather than editing here.
-exec python3 "$REPO_DIR/naptime_consolidator.py" \
+PY=python3
+[ -x "$REPO_DIR/.venv/bin/python" ] && PY="$REPO_DIR/.venv/bin/python"  # venv carries ollama-client
+exec "$PY" "$REPO_DIR/naptime_consolidator.py" \
   --watch-dir "$WATCH_DIR" \
   --pyramid "$NAPMEM_HOME/napmem_pyramid.json" \
   --extraction "${NAPMEM_EXTRACTION:-auto}" \

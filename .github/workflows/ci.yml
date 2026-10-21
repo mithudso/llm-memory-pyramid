@@ -10,12 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12", "3.14"]
+        python-version: ["3.11", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install ollama-client (private library; needs a read token secret)
+        run: pip install "ollama-client @ git+https://x-access-token:${LIB_TOKEN}@github.com/mithudso/ollama-client"
+        env:
+          LIB_TOKEN: ${{ secrets.LIBS_READ_TOKEN }}
       - name: Compile check
         run: python -m compileall -q .
       - name: Run tests

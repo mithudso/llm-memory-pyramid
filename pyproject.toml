@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-memory-pyramid"
+version = "0.1.0"
+description = "NapMem layered agent-memory pyramid; Ollama embeddings and extraction via the shared ollama-client library."
+requires-python = ">=3.11"
+dependencies = [
+    "ollama-client @ git+https://github.com/mithudso/ollama-client",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic"]
+
+[tool.setuptools]
+py-modules = [
+    "semantic_index",
+    "ollama_extractor",
+    "llm_extractor",
+    "llm_extraction_prompts",
+    "memory_pyramid_distiller",
+    "naptime_consolidator",
+    "napmem_retrieval_agent",
+    "napmem_mcp_server",
+    "napmem_mcp_failover",
+]

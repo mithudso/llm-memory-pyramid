@@ -460,6 +460,7 @@ class TestOllamaFailover(unittest.TestCase):
         """Crafted responses (non-numeric or ragged vectors) must never reach
         the persistent vector cache."""
         backend = OllamaBackend("http://127.0.0.1:9999")
+        backend.pool.retries = 0  # no backoff sleeps in the test
         for bad in (
             {"embeddings": [["a", "b"]]},                 # non-numeric
             {"embeddings": [[0.1, 0.2], [0.3]]},          # inconsistent dims
@@ -470,10 +471,10 @@ class TestOllamaFailover(unittest.TestCase):
             {"embeddings": [[float("inf"), 0.1]]},        # Infinity poisoning
         ):
             resp = mock.MagicMock()
+            resp.read.return_value = json.dumps(bad).encode()  # NaN/Infinity serialise as tokens
             resp.__enter__ = lambda s: s
             resp.__exit__ = lambda s, *a: False
-            with mock.patch("semantic_index.urllib.request.urlopen", return_value=resp), \
-                 mock.patch("semantic_index.json.load", return_value=bad):
+            with mock.patch("urllib.request.urlopen", return_value=resp):
                 texts = ["x", "y"] if len(bad["embeddings"]) == 2 else ["x"]
                 with self.assertRaises(RuntimeError, msg=f"accepted {bad}"):
                     backend.embed(texts)
@@ -495,9 +496,29 @@ class TestOllamaFailover(unittest.TestCase):
             "http://a:1/=4, http://b:2=2 ,http://c:3,bad=weight=x")
         self.assertEqual(hosts[:3], [("http://a:1", 4), ("http://b:2", 2), ("http://c:3", 1)])
         pool = OllamaBackend(hosts=[("http://a:1", 3), ("http://b:2", 1)])
-        chunks = pool._split_by_weight(list(range(8)))
-        self.assertEqual(chunks, [("http://a:1", 0, 6), ("http://b:2", 6, 8)])
         self.assertEqual(pool.name, "ollama-pool[2]")
+        self.assertEqual([(h.url, h.weight) for h in pool.pool.hosts],
+                         [("http://a:1", 3), ("http://b:2", 1)])
+
+    def test_embed_cuts_batch_by_total_weight_and_keeps_order(self):
+        """8 texts over weights 3+1 -> 4 requests of 2; results stay in input order."""
+        pool = OllamaBackend(hosts=[("http://a:1", 3), ("http://b:2", 1)])
+        sizes = []
+
+        def fake_urlopen(req, timeout=0):
+            texts = json.loads(req.data)["input"]
+            sizes.append(len(texts))
+            resp = mock.MagicMock()
+            resp.read.return_value = json.dumps(
+                {"embeddings": [[float(t), 1.0] for t in texts]}).encode()
+            resp.__enter__ = lambda s: s
+            resp.__exit__ = lambda s, *a: False
+            return resp
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            out = pool.embed([str(i) for i in range(8)])
+        self.assertEqual(sorted(sizes), [2, 2, 2, 2])
+        self.assertEqual([v[0] for v in out], [float(i) for i in range(8)])
 
     def test_nearest_many_matches_singles(self):
         os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
@@ -524,12 +545,13 @@ class TestOllamaFailover(unittest.TestCase):
             if alive in req.full_url:
                 resp = mock.MagicMock()
                 resp.status = 200
+                resp.read.return_value = b'{"models": []}'
                 resp.__enter__ = lambda s: resp
                 resp.__exit__ = lambda s, *a: False
                 return resp
             raise OSError("refused")
 
-        with mock.patch("semantic_index.urllib.request.urlopen", side_effect=fake_urlopen):
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
             backend = OllamaBackend.probe(urls=["http://127.0.0.1:1", alive])
         self.assertIsNotNone(backend)
         self.assertEqual(backend.base_url, alive)
@@ -682,7 +704,7 @@ class TestOllamaExtraction(unittest.TestCase):
                 raise urllib.error.URLError("refused")
             return self._chat_response(self._unit_array_text())
 
-        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+        with mock.patch("urllib.request.urlopen",
                                side_effect=fake_urlopen):
             outputs = extract_ollama(
                 {"sess_a": "prompt a", "sess_b": "prompt b"}, hosts)
@@ -700,14 +722,14 @@ class TestOllamaExtraction(unittest.TestCase):
         def fake_urlopen(req, timeout=None):
             return self._chat_response(content)
 
-        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+        with mock.patch("urllib.request.urlopen",
                                side_effect=fake_urlopen):
             outputs = extract_ollama({"s": "p"}, [("http://h:1", "m")])
         self.assertEqual(json.loads(outputs["s"]), json.loads(self._unit_array_text()))
 
     def test_extract_ollama_omits_sessions_all_hosts_failed(self):
         import urllib.error
-        with mock.patch.object(ollama_extractor.urllib.request, "urlopen",
+        with mock.patch("urllib.request.urlopen",
                                side_effect=urllib.error.URLError("refused")):
             outputs = extract_ollama({"sess_a": "p"}, [("http://dead:1", "m")])
         self.assertEqual(outputs, {})

@@ -281,11 +281,15 @@ class NaptimeConsolidator:
         successfully ingested; callers run the heuristic path for the rest.
         """
         from llm_extractor import get_extraction_prompt, ingest_extractions
-        from ollama_extractor import (
-            extract_ollama,
-            ollama_available,
-            parse_chat_hosts,
-        )
+        try:
+            from ollama_extractor import (
+                extract_ollama,
+                ollama_available,
+                parse_chat_hosts,
+            )
+        except ImportError as exc:  # ollama-client not installed in this interpreter
+            logger.error("Ollama extraction unavailable (%s); pip install ollama-client", exc)
+            return set()
         try:
             hosts = parse_chat_hosts()
         except ValueError as exc:

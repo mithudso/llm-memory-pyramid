@@ -81,9 +81,10 @@ the mirror can be stale but never divergent.
 
 ## Conventions
 
-- Core stays stdlib-only; the sanctioned optional extras are `anthropic`
-  (lazy-imported in `llm_extractor.py`) and Ollama over HTTP. Any further
-  dependency is an architecture decision, ask first.
+- Core stays stdlib-only; the sanctioned extras are `anthropic`
+  (lazy-imported in `llm_extractor.py`) and the shared `ollama-client` library
+  (`semantic_index.py`, `ollama_extractor.py`; never inline its code). Any
+  further dependency is an architecture decision, ask first.
 - Semantic dedup is opt-in (`semantic_dedup=True` / `--semantic-dedup`); the
   default pipeline must stay deterministic. Tests force
   `NAPMEM_EMBED_BACKEND=hashed`.

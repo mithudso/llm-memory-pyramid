@@ -2,13 +2,15 @@
 
 ## Setup
 
-None. Clone and run — Python 3.10+ standard library only, no virtualenv, no
-install step.
+Python 3.11+. The core pipeline is standard library only; Ollama access
+(`semantic_index.py`, `ollama_extractor.py`) uses the shared `ollama-client`
+library, installed into the repo venv (`scripts/run-naptime.sh` prefers it).
 
 ```bash
 git clone https://github.com/mithudso/llm-memory-pyramid.git
 cd llm-memory-pyramid
-python3 -m unittest discover -s . -p "test_*.py"   # verify: 38 tests, OK
+python3 -m venv .venv && .venv/bin/pip install -e .   # or: -e ~/dev/libraries/ollama-client
+.venv/bin/python -m unittest discover -s . -p "test_*.py"   # verify: 66 tests, OK
 ```
 
 ## Commands

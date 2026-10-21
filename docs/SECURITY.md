@@ -10,7 +10,7 @@ resolution (never read directly). Two attack surfaces:
 2. **Data egress** — memory text *leaves the machine* on the optional paths:
    full file content goes to the **Anthropic API** (TLS) in LLM extraction
    mode, and record/query text goes to the configured **Ollama host** for
-   embeddings — by default the remote LAN server `192.168.4.75:11434` over
+   embeddings — the hosts in `NAPMEM_OLLAMA_URLS` (a remote LAN server in the deployed fleet) over
    **plain HTTP**. Treat the watch directory as the consent boundary: do not
    point the consolidator at files that must never leave the machine, or run
    `--extraction heuristic` with `NAPMEM_EMBED_BACKEND=hashed`. Cached

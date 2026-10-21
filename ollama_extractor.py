@@ -11,13 +11,15 @@ through llm_extractor.parse_extraction_output / units_to_records, which treat
 the model output as untrusted regardless of which model produced it.
 
 Host chain config (env NAPMEM_OLLAMA_CHAT):
-    "http://localhost:11434=qwen3.5:35b,http://198.51.100.1:11434=qwen2.5-coder:7b"
+    "http://localhost:11434=qwen3.5:35b,http://gpu-box:11434=qwen2.5-coder:7b"
 Each entry is url=model; hosts are tried in order per file. Default is the
-consolidator box's local daemon with its largest instruct model.
+consolidator box's local daemon with its largest instruct model. The per-host
+model chain stays here; transport (request, timeout, error mapping) is the
+shared `ollama-client` library, one single-host client per chain entry.
 
-Stdlib-only (urllib), sequential by design: extraction runs inside the hourly
-naptime sweep where the GPU is also serving embeddings — one generation at a
-time keeps VRAM predictable.
+Sequential by design: extraction runs inside the hourly naptime sweep where
+the GPU is also serving embeddings — one generation at a time keeps VRAM
+predictable.
 """
 from __future__ import annotations
 
@@ -25,8 +27,8 @@ import json
 import logging
 import os
 import re
-import urllib.error
-import urllib.request
+
+from ollama_client import OllamaClient, OllamaPool, OllamaUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +65,17 @@ def parse_chat_hosts(raw: str | None = None) -> list[tuple[str, str]]:
     return hosts
 
 
+def _client_for(url: str) -> OllamaClient:
+    """Single-host client: no failover or retry here, the host chain is the failover."""
+    return OllamaClient(OllamaPool([url], retries=0))
+
+
 def ollama_available(hosts: list[tuple[str, str]] | None = None) -> bool:
     """True when at least one configured host answers and lists its model."""
     for url, model in hosts or parse_chat_hosts():
         try:
-            with urllib.request.urlopen(url + "/api/tags",
-                                        timeout=PROBE_TIMEOUT_S) as resp:
-                names = [m.get("name", "")
-                         for m in json.load(resp).get("models", [])]
-        except (urllib.error.URLError, OSError, ValueError):
+            names = _client_for(url).list_models(url, timeout=PROBE_TIMEOUT_S)
+        except (OllamaUnavailable, OSError, ValueError):
             continue
         if any(n == model or n.split(":")[0] == model.split(":")[0]
                for n in names):
@@ -101,26 +105,16 @@ def _coerce_array_text(content: str) -> str:
 THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
-def _chat_once(url: str, model: str, prompt: str) -> str:
+def _chat_once(url: str, model: str, prompt: str, client: OllamaClient | None = None) -> str:
     # No `format: "json"`: Ollama's json-mode grammar forces a top-level
     # OBJECT, but the extraction contract is a top-level ARRAY — the cage
     # made compliant answers impossible. The prompt's return-only-JSON
     # instruction plus the strict downstream parser carry the contract.
     # `think: false` disables qwen3-style reasoning preambles; hosts whose
     # models don't think ignore the field.
-    body = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False,
-        "think": False,
-        "options": GEN_OPTIONS,
-    }).encode()
-    req = urllib.request.Request(
-        url + "/api/chat", data=body,
-        headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=PER_FILE_TIMEOUT_S) as resp:
-        data = json.load(resp)
-    content = (data.get("message") or {}).get("content")
+    content = (client or _client_for(url)).chat(
+        [{"role": "user", "content": prompt}], model=model,
+        options=GEN_OPTIONS, think=False, timeout=PER_FILE_TIMEOUT_S)
     if not isinstance(content, str) or not content.strip():
         raise OllamaExtractionError(f"{url} returned no message content")
     content = THINK_RE.sub("", content).strip()
@@ -138,6 +132,7 @@ def extract_ollama(prompts_by_session: dict[str, str],
     route them to the heuristic fallback (same contract as extract_batch).
     """
     hosts = hosts or parse_chat_hosts()
+    clients = {url: _client_for(url) for url, _ in hosts}
     outputs: dict[str, str] = {}
     dead_hosts: set[str] = set()
     for session_id, prompt in prompts_by_session.items():
@@ -146,10 +141,10 @@ def extract_ollama(prompts_by_session: dict[str, str],
             if url in dead_hosts:
                 continue
             try:
-                outputs[session_id] = _chat_once(url, model, prompt)
+                outputs[session_id] = _chat_once(url, model, prompt, clients[url])
                 last_err = None
                 break
-            except (urllib.error.URLError, OSError) as exc:
+            except (OllamaUnavailable, OSError) as exc:
                 # Connection-level failure: bench the host for this sweep
                 # instead of paying its timeout again for every file.
                 logger.warning("Ollama host %s unreachable (%s); benching", url, exc)
