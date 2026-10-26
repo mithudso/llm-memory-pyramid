@@ -1,50 +1,58 @@
 # Testing
 
-## Strategy
+## Setup and running
 
-Plain `unittest`, two suites (`test_napmem_pipeline.py`,
-`test_napmem_extensions.py`), 38 tests, no test dependencies, network-free:
-extractor tests exercise parsing/validation offline, semantic tests force
-`NAPMEM_EMBED_BACKEND=hashed`, and the MCP test drives the real server binary
-over a subprocess pipe. Tests assert observable behavior on real pyramid
-stores written to temp paths.
-
-## Running
+Install the package in a project virtual environment as described in
+[Installation](INSTALLATION.md). The sanctioned shared `ollama-client`
+dependency is required to import the extension suite. Anthropic is mocked.
 
 ```bash
-python3 -m unittest discover -s . -p "test_*.py"   # everything (CI command)
-python3 test_napmem_pipeline.py                    # core suite only
-python3 test_napmem_extensions.py                  # extensions suite only
+source .venv/bin/activate
+NAPMEM_EMBED_BACKEND=hashed python3 -m unittest discover -s . -p "test_*.py"
+python3 -m compileall -q .
+ruff check .
+python3 scripts/repo_docs.py --check
+bash -n scripts/run-naptime.sh
 ```
+
+All discovered tests must pass. There is no fixed test-count or numeric line
+coverage gate. Ruff is a development/CI tool, pinned in the workflow; it is
+not a runtime dependency.
+
+## Suites and risky paths
+
+| Suite | Observable behavior |
+|---|---|
+| `test_napmem_pipeline.py` | Heuristic taxonomy, exact dedup, stable IDs, duplicate promotion, provenance, derived layers, sentinel neutralization |
+| `test_napmem_extensions.py` | Schema gates and safe rejection logs, mocked extraction chains, sweep-state recovery, hashed embeddings, host failover, MCP subprocess integration |
+| `test_napmem_failover.py` | Remote/local lifecycle with fake children, strict handshake replay, timeout and malformed-output recovery, mirror refresh configuration and atomicity |
+| `test_napmem_regressions.py` | Reasserted metadata/wording, disposable cache validation, dimension changes, deletion/empty persistence, exact text hashes, result-count bounds |
+| `test_napmem_protocol.py` | Protocol envelopes, silent notifications, bounded input reads, decoder failures and continued serving |
+| `test_napmem_safety.py` | Prompt CPU deadline and extracted shell mirror function on isolated filesystem fixtures |
+
+Tests use temporary stores, hashed vectors, mocked HTTP/SDK calls and local
+fake child processes. The wrapper test extracts `mirror()` without running
+its scheduling or source-discovery path. No test needs production data, SSH,
+a model server, embeddings or an API credential. Tests that alter the
+environment must restore the prior values. Do not parallelize these suites
+inside one process: mocks and environment overrides are process-global.
 
 ## Coverage target
 
-Meaningful coverage of important and changed/risky paths with real assertions
-on behavior — explicitly **not** a blanket 100%-line mandate. The risky paths
-in this codebase, all covered and to stay covered:
+Meaningful coverage of important and changed/risky paths with assertions on
+results, filesystem effects, protocol responses and safe logs. A regression
+must fail before its fix. Tests must preserve each store invariant; avoid
+assertion-free coverage work or a blanket 100% line mandate. The prompt CPU
+test runs its adversarial case in a child with a generous deadline so the
+old quadratic implementation cannot wedge the runner.
 
-- Session reconciliation (`_reconcile_session_records`): re-asserted text
-  keeps IDs; stale canonical dropped; duplicate promoted to canonical;
-  renumbering after highest surviving suffix.
-- Dedup (`deduplicate_and_merge`): fold + `duplicate_anchors` preservation.
-- Provenance (`inspect_provenance`): canonical and duplicate-ID resolution.
-- Prompt guards (`_neutralize_sentinel`): nested-sentinel reconstitution.
-- Extractor gate (`validate_unit`/`units_to_records`): invalid units rejected;
-  LLM-extracted records honor stable-ID re-ingest semantics.
-- Semantic dedup: fold with `paraphrase_text` anchor; off by default.
-- MCP protocol: handshake, tool list, in-band tool errors, -32601 on unknown
-  methods.
-- Consolidator LLM wiring: auto-mode batch use, per-file heuristic fallback on
-  batch error or invalid output, heuristic mode isolation (via a faked
-  `anthropic` module — no network).
-- Ollama failover: probe order prefers the first responding host; all-dead
-  chain returns None.
+## CI gates
 
-## CI gate
+`.github/workflows/ci.yml` runs compilation, unittest discovery, generated-map
+checks and shell syntax on Python 3.11, 3.12 and 3.14. A separate Ruff job
+checks configured syntax/correctness rules. Both jobs must pass. CI reads the
+shared library with the repository's `OLLAMA_CLIENT_DEPLOY_KEY` secret, at the same
+Git revision pinned in `pyproject.toml`.
 
-`.github/workflows/ci.yml` runs compile check + the suite on Python 3.10,
-3.12, and 3.14 for every push to `main` and every PR. The test job is the
-merge gate; the ruff lint job is advisory.
-
-Any behavior change ships with a test. Bug fixes ship with a regression test
-that fails before the fix.
+Local tests prove source behavior. They do not prove production deployment,
+scheduler health, remote authentication, live Ollama quality or hook loading.

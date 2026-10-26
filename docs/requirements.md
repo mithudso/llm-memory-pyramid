@@ -21,7 +21,7 @@
 
 ## Non-functional
 
-- **NFR-1** Python 3.10+ standard library only.
+- **NFR-1** Python 3.11+; core code uses the standard library.
 - **NFR-2** Store writes are crash-safe (atomic replace).
 - **NFR-3** Single-writer model; retrieval is read-only.
 - **NFR-4** Deterministic heuristic extraction (same input → same pyramid,
@@ -29,7 +29,8 @@
 
 ## Dependencies
 
-Core: none. Optional: `anthropic` package (LLM extraction path,
-lazy-imported) and a local Ollama server (real embeddings; stdlib hashed-TF
-fallback otherwise). CI-only: `ruff` (advisory lint), GitHub Actions
-`setup-python`/`checkout`.
+Core distillation and substring retrieval: standard library. Package install:
+shared `ollama-client` library, pinned to a reviewed Git revision. Optional:
+`anthropic` SDK (`.[llm]`) for API extraction; configured Ollama hosts for
+chat extraction and real embeddings. Hashed-TF embeddings run offline.
+Development/CI: Ruff and GitHub Actions. No numeric coverage gate is configured.

@@ -73,3 +73,11 @@ Versioned record of user requests, in order. Newest last.
 15. "yes" (make the hooks fall back to the local mirror too) — shipped in
     ~/.claude hooks (PR #37); documented in
     docs/semantic-indexing-and-hooks-reference.md.
+
+## v1.7.0 — 2026-10-26
+
+16. "Run the repo-bootstrapper on this repo. And the deep-code-optimizer"
+    — audit and refresh the existing Python repository standard; review and
+    fix confirmed source defects; validate offline; commit and publish.
+
+**Delta:** v1.6.0 → v1.7.0; one triggering request added.

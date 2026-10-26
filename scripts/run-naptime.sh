@@ -12,13 +12,12 @@
 #      session, mount-only files still get swept.
 # Syncthing *sync-conflict* copies are skipped. Dead symlinks are pruned.
 #
-# Credentials come from the operator's `ant auth login` OAuth profile, which
-# the anthropic SDK resolves natively — no key is stored here or in the
-# service definitions. Without a profile the consolidator degrades to the
-# heuristic extractor.
+# Anthropic credentials resolve through its SDK when that path is enabled.
+# This wrapper does not load login profiles or store credentials. Extraction
+# failures fall through the configured Ollama/heuristic chain.
 #
-# PRIVACY: everything this mirror sweeps is sent to the Anthropic API (LLM
-# extraction) and the Ollama embedding hosts — the mirror IS the consent
+# PRIVACY: enabled LLM extraction sends source text to Anthropic or Ollama;
+# semantic dedup sends records to embedding hosts. The mirror IS the consent
 # boundary (docs/SECURITY.md).
 #
 # launchd/systemd start jobs with a minimal environment, hence the explicit
@@ -74,7 +73,10 @@ mirror() {  # mirror <src> <link-name> [keep-existing]
   set +f
   if [ -z "$ok" ]; then
     echo "run-naptime: REFUSED out-of-root source: $src -> $real" >&2
-    rm -f -- "$link"   # revoke a previously-mirrored link for this name
+    # A plain operator file owns its name even when this source is refused.
+    if [ -L "$link" ]; then
+      rm -f -- "$link"   # revoke only a previously-mirrored symlink
+    fi
     return 0
   fi
   if [ -n "$keep" ] && { [ -e "$link" ] || [ -L "$link" ]; }; then
@@ -87,7 +89,7 @@ mirror() {  # mirror <src> <link-name> [keep-existing]
     return 0
   fi
   if [ ! -L "$link" ] || [ "$(readlink -- "$link")" != "$src" ]; then
-    ln -sf -- "$src" "$link"
+    ln -sfn -- "$src" "$link"  # replace directory symlinks; never follow them
   fi
 }
 

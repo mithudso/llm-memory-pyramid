@@ -1,15 +1,13 @@
-<!-- Generated 2026-09-25 [gen: p/2.0.0]; verified-as-of 2026-09-25 -->
+# NapMem digest
 
-# llm-memory-pyramid (NapMem) (small)
+- The package requires Python 3.11+ and ollama-client; Anthropic is optional. [src: pyproject.toml]
+- The pyramid has four layers: raw sessions, atomic records, tracks and profiles. [src: README.md]
+- Stable record IDs survive re-ingestion and duplicate anchors remain resolvable. [src: CLAUDE.md]
+- Layers 2–3 derive from Layer 1; store writes use atomic replacement. [src: CLAUDE.md]
+- Auto extraction tries Anthropic, then Ollama, then heuristics; ollama mode makes no Anthropic calls. [src: CLAUDE.md]
+- The consolidator persists mtime and sha256 state beside the pyramid. [src: CLAUDE.md]
+- MCP exposes search_memory, inspect_provenance, get_topic_track and memory_stats. [src: napmem_mcp_server.py#TOOLS]
+- The failover proxy starts a local mirrored server when remote SSH fails. [src: napmem_mcp_failover.py]
 
-> NapMem: a 4-layer multi-granularity memory pyramid for LLM agents. Distills session logs and memory files into deduplicated atomic records, topic tracks and profiles, with provenance back to the raw source, served through tool-driven retrieval and an MCP stdio server.
-
-## Essentials
-
-- Run tests: python3 -m unittest discover -s . -p "test_*.py"
-- Distill a file: python3 memory_pyramid_distiller.py --input <file.md>
-- Query: python3 napmem_retrieval_agent.py --query <q> --layer all [--semantic]
-- MCP server: python3 napmem_mcp_server.py --pyramid <p.json>
-- Core is Python 3.10+ stdlib only; extras: anthropic SDK, local Ollama
-
-See llms.txt for the index and llms-facts.txt for sourced facts.
+Validate: `python3 -m unittest discover -s . -p "test_*.py"` after activating the project venv. [src: docs/INSTALLATION.md]
+See llms.txt for current source and documentation paths.

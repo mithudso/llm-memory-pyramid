@@ -8,7 +8,7 @@ Anthropic Message Batches API (50% cost, async — a natural fit for naptime
 consolidation). Extracted units are schema-validated before ingestion; invalid
 units are rejected and logged, never silently repaired.
 
-Requires the `anthropic` package (the repo's only optional dependency):
+Requires the optional `anthropic` package:
     pip install anthropic
 
 Usage:
@@ -63,7 +63,9 @@ def parse_extraction_output(raw_text: str) -> list[dict[str, Any]]:
         text = fence.group(1).strip()
     try:
         units = json.loads(text)
-    except json.JSONDecodeError as exc:
+    except (ValueError, RecursionError) as exc:
+        # JSONDecodeError is a ValueError, but decoder resource limits (large
+        # integer literals and nesting depth) raise these broader exceptions.
         raise ExtractionError(f"Extractor did not return valid JSON: {exc}") from exc
     if not isinstance(units, list):
         raise ExtractionError(f"Extractor returned {type(units).__name__}, expected a JSON array")
@@ -75,12 +77,12 @@ def validate_unit(unit: Any) -> str | None:
     if not isinstance(unit, dict):
         return "unit is not an object"
     if unit.get("type") not in UNIT_TYPES:
-        return f"invalid type {unit.get('type')!r}"
+        return "invalid type"
     text = unit.get("text")
     if not isinstance(text, str) or not text.strip():
         return "missing or empty text"
     if unit.get("salience") not in SALIENCE_LEVELS:
-        return f"invalid salience {unit.get('salience')!r}"
+        return "invalid salience"
     anchor = unit.get("source_anchor")
     # Type checks matter, not just truthiness: LLM output is untrusted, and a
     # non-string heading/topic_slug crashes _slugify or (worse) reaches the
@@ -91,7 +93,7 @@ def validate_unit(unit: Any) -> str | None:
         return "missing or non-string source_anchor.heading/.line_range"
     slug = unit.get("topic_slug")
     if slug is not None and (not isinstance(slug, str) or not slug.strip()):
-        return f"invalid topic_slug {slug!r}"
+        return "invalid topic_slug"
     return None
 
 
@@ -105,10 +107,10 @@ def units_to_records(units: list[dict[str, Any]], session_id: str,
     """
     records: list[dict[str, Any]] = []
     rejections: list[str] = []
-    for unit in units:
+    for position, unit in enumerate(units, start=1):
         reason = validate_unit(unit)
         if reason is not None:
-            rejections.append(f"{reason}: {json.dumps(unit)[:200]}")
+            rejections.append(f"unit {position}: {reason}")
             continue
         anchor = unit["source_anchor"]
         unit_id = f"rec_{session_id}_{len(records) + 1:03d}"
@@ -237,6 +239,8 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
     Returns (total_units_ingested, session_ids_actually_ingested) — sessions
     whose output failed parsing or validation are omitted from the set so
     callers can route them to a fallback extractor.
+    Store write failures propagate. Without transaction rollback, continuing
+    could persist a failed session's partially mutated in-memory state.
     """
     total = 0
     ingested: set[str] = set()

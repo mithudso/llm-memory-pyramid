@@ -7,7 +7,8 @@ on GitHub. Do not open public issues for security problems.
 
 ## Scope notes
 
-This project makes no network calls and reads no credentials. The main
-security surface is prompt-injection resistance in `llm_extraction_prompts.py`
-(untrusted memory-file content interpolated into LLM prompts) — reports in that
-area are especially welcome. See `docs/SECURITY.md` for the threat model.
+Optional extractors and embeddings send memory text to Anthropic or configured
+Ollama hosts. The failover proxy starts SSH and local server subprocesses.
+Credentials resolve through the Anthropic SDK or operator SSH configuration.
+Prompt boundaries, read guards, cache validation and subprocess handling are
+security surfaces. See `docs/SECURITY.md` for the threat model.

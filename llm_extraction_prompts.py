@@ -60,7 +60,9 @@ def _neutralize_sentinel(value: str) -> str:
     global _SENTINEL_RUN_RE
     if _SENTINEL_RUN_RE is None:
         import re
-        _SENTINEL_RUN_RE = re.compile(r"<{2,}RAW_MEMORY_SOURCE>{2,}")
+        # Do not retry the greedy prefix at every position within an
+        # unmatched '<' run; that makes an unanchored substitution quadratic.
+        _SENTINEL_RUN_RE = re.compile(r"(?<!<)<{2,}RAW_MEMORY_SOURCE>{2,}")
     value = _SENTINEL_RUN_RE.sub("[SENTINEL-REDACTED]", value)
     if RAW_TEXT_DELIMITER in value:  # unreachable backstop: break the token itself
         value = value.replace("RAW_MEMORY_SOURCE", "RAW-MEMORY-SOURCE")
@@ -71,7 +73,7 @@ def _neutralize_metadata(value: str) -> str:
     # Metadata (session ids, file names) is interpolated OUTSIDE the delimited
     # data region, so it must carry neither the sentinel nor line breaks that
     # would let a hostile filename smuggle instruction lines into the prompt.
-    return _neutralize_sentinel(value.replace("\r", " ").replace("\n", " "))
+    return _neutralize_sentinel(" ".join(value.splitlines()))
 
 
 def get_extraction_prompt(raw_text: str, session_id: str, file_name: str) -> str:

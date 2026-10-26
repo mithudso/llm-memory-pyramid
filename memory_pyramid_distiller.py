@@ -20,7 +20,8 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from collections import deque
+from datetime import UTC, datetime
 from typing import Any
 
 UNIT_TYPES = ["concept", "fact", "actionable", "question", "problem", "statement", "quote", "idea"]
@@ -32,7 +33,7 @@ BULLET_RE = re.compile(r"^-\s+")
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _slugify(heading: str) -> str:
@@ -176,8 +177,6 @@ class MemoryPyramidDistiller:
         existing_texts = {r["text"].lower().strip(): r for r in self.data["memory_records"]}
         merged_records = []
 
-        index = self._get_semantic_index()
-
         def fold(rec, canonical_rec):
             if rec["id"] != canonical_rec["id"] and rec["id"] not in canonical_rec["duplicates"]:
                 canonical_rec["duplicates"].append(rec["id"])
@@ -203,16 +202,19 @@ class MemoryPyramidDistiller:
         # index failure (backend outage, cache-write race) degrades to
         # exact-only dedup for this merge instead of aborting the ingest.
         near_ids: list[str | None] = [None] * len(exact_misses)
-        if index is not None and exact_misses:
+        if self.semantic_dedup and exact_misses:
             try:
-                near_ids = index.nearest_many(
-                    [r["text"] for r in exact_misses],
-                    self.data["memory_records"], self.semantic_threshold,
-                )
-            except (RuntimeError, OSError, ValueError) as exc:
+                index = self._get_semantic_index()
+                if index is not None:
+                    near_ids = index.nearest_many(
+                        [r["text"] for r in exact_misses],
+                        self.data["memory_records"], self.semantic_threshold,
+                    )
+            except (ImportError, RuntimeError, OSError, ValueError) as exc:
                 import logging
                 logging.getLogger(__name__).warning(
-                    "Semantic dedup unavailable (%s); exact-only for this merge", exc)
+                    "Semantic dedup unavailable (%s); exact-only for this merge",
+                    type(exc).__name__)
 
         by_id = {r["id"]: r for r in self.data["memory_records"]}
         for rec, near_id in zip(exact_misses, near_ids):
@@ -249,35 +251,49 @@ class MemoryPyramidDistiller:
         for unit in new_records:
             new_by_text.setdefault(unit["text"].lower().strip(), unit)
         consumed_ids = set()
-        # Same-session duplicate IDs stripped from OTHER sessions' canonicals:
+        # Same-session duplicate IDs stripped from ANY session's canonical:
         # if the re-ingested content re-asserts that text, the unit must
         # reclaim its previous duplicate ID (it will re-fold on merge) instead
         # of being renumbered — external provenance references stay valid
         # across a no-op re-ingest.
-        reclaimable: dict[str, str] = {}
+        # Keep one ordered slot per occurrence, not just one ID per text.
+        reclaimable: dict[str, deque[str]] = {}
 
         kept: list[dict[str, Any]] = []
         for rec in self.data["memory_records"]:
             anchors = rec.get("duplicate_anchors", {})
+            for duplicate_id in rec.get("duplicates", []):
+                anchor = anchors.get(duplicate_id, {})
+                if anchor.get("session_id") == session_id:
+                    duplicate_text = anchor.get("paraphrase_text", rec["text"])
+                    reclaimable.setdefault(duplicate_text.lower().strip(), deque()).append(duplicate_id)
             foreign = [
                 d for d in rec.get("duplicates", [])
                 if anchors.get(d, {}).get("session_id") not in (session_id, None)
             ]
             if rec["source_anchor"]["session_id"] != session_id:
                 if len(foreign) != len(rec.get("duplicates", [])):
-                    for d in rec.get("duplicates", []):
-                        if d not in foreign and d in anchors:
-                            dup_text = anchors[d].get("paraphrase_text", rec["text"])
-                            reclaimable.setdefault(dup_text.lower().strip(), d)
                     rec["duplicates"] = foreign
                     rec["duplicate_anchors"] = {d: a for d, a in anchors.items() if d in foreign}
                 kept.append(rec)
                 continue
             match = new_by_text.get(rec["text"].lower().strip())
             if match is not None and match["id"] not in consumed_ids:
+                old_text = rec["text"]
+                kept_anchors = {d: dict(anchors[d]) for d in foreign}
+                if match["text"] != old_text:
+                    for anchor in kept_anchors.values():
+                        anchor.setdefault("paraphrase_text", old_text)
+                # Stable identity does not freeze extracted metadata. A heading
+                # move, classification change, or case-only edit must reach the
+                # derived layers and remain faithful to the current source.
+                for field in ("text", "type", "salience"):
+                    rec[field] = match[field]
+                rec["topic_slug"] = match.get(
+                    "topic_slug", _slugify(match["source_anchor"].get("heading", "General")))
                 rec["source_anchor"] = match["source_anchor"]
                 rec["duplicates"] = foreign
-                rec["duplicate_anchors"] = {d: anchors[d] for d in foreign}
+                rec["duplicate_anchors"] = kept_anchors
                 consumed_ids.add(match["id"])
                 kept.append(rec)
                 continue
@@ -324,7 +340,8 @@ class MemoryPyramidDistiller:
         max_reclaimed = 0
         prefix = f"rec_{session_id}_"
         for unit in remaining:
-            reclaimed = reclaimable.pop(unit["text"].lower().strip(), None)
+            prior_ids = reclaimable.get(unit["text"].lower().strip())
+            reclaimed = prior_ids.popleft() if prior_ids else None
             if reclaimed is not None:
                 unit["id"] = reclaimed
                 unit["canonical"] = reclaimed

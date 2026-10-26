@@ -9,12 +9,11 @@ of memory files.
 python3 naptime_consolidator.py --watch-dir ./memory_logs --pyramid napmem_pyramid.json --once
 ```
 
-Extraction is `--extraction auto` by default: LLM extraction (one Batches API
-batch per sweep, `claude-haiku-4-5`) when the `anthropic` package is
-installed, heuristic otherwise. Force with `--extraction llm|heuristic`; add
-`--semantic-dedup` to fold paraphrases via the embedding index. Startup logs
-`Extraction mode: llm|heuristic`; any per-file LLM failure logs
-`Heuristic fallback for <file>` and is still ingested.
+Activate the installed project virtual environment first. Extraction defaults
+to `auto`: Anthropic when installed, then Ollama, then heuristics per file.
+Use `--extraction ollama` to avoid Anthropic calls, or `--extraction heuristic`
+with `NAPMEM_EMBED_BACKEND=hashed` for an offline sweep. `--semantic-dedup`
+enables optional paraphrase folding and may contact embedding hosts.
 
 ## Scheduled operation
 
@@ -29,14 +28,15 @@ for macOS-local stores.
 `scripts/run-naptime.sh` is the launchd entry point: one sweep per firing
 over `~/.napmem/memory_logs` into `~/.napmem/napmem_pyramid.json`
 (`NAPMEM_HOME` overrides the data dir), `--semantic-dedup` enabled.
-Credentials resolve from the operator's `ant auth login` OAuth profile — no
-key in the plist or script; without a profile the sweep degrades to the
-heuristic extractor.
+Configure SDK-supported Anthropic credentials only when that backend is
+intended. The wrapper does not load login profiles. Optional scheduler
+locations below are deployment references; inspect them on the target host
+before starting a job.
 
 Agent plist: `~/Library/LaunchAgents/com.mithudso.napmem-consolidator.plist`
 (hourly `StartInterval`, `RunAtLoad`, logs to `~/.napmem/naptime.{log,err}`).
-launchd never starts a second instance of the same label, so overlapping
-sweeps — the one-writer-per-store hazard — cannot occur.
+A single launchd label serializes its own runs. Other labels, manual commands
+and other hosts can still overlap; enforce one writer fleet-wide.
 
 ```bash
 launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.mithudso.napmem-consolidator.plist   # install
@@ -54,8 +54,8 @@ python3 naptime_consolidator.py --watch-dir ./memory_logs --interval 5 --max-tic
 ```
 
 `--max-ticks 720` at `--interval 5` ≈ 1 hour, then clean exit. Re-launch from
-cron/launchd for continuous operation; the loop is safe to restart (restart
-re-ingests all files once — idempotent).
+cron/launchd for continuous operation; the loop is safe to restart (persisted
+mtime/sha256 state skips unchanged files when their source session still exists).
 
 ## Verify it worked
 
@@ -77,3 +77,12 @@ python3 napmem_retrieval_agent.py --stats           # session list should includ
 
 Never run two consolidators against the same `--pyramid` path. Store writes
 are crash-safe (atomic replace) — killing the process cannot corrupt the store.
+
+## Recovery and escalation
+
+If extraction fails, inspect the fallback log and confirm the intended mode.
+If the store cannot save, repair filesystem permissions or free disk space
+before retrying. Keep a backup; do not remove production state to test recovery.
+If SSH fails, the MCP proxy can serve a stale local mirror; verify the age note.
+Escalate repeated validation or write failures to the operator with metadata
+only, never source memory or credentials.

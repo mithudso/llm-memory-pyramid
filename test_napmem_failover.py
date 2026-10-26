@@ -9,6 +9,7 @@ napmem_mcp_server.py reading a throwaway pyramid.
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -38,6 +39,28 @@ for line in sys.stdin:
 # Fake remote that stays alive but never answers tools/call (hung server).
 FAKE_REMOTE_HANGS_ON_CALL = FAKE_REMOTE_DIES_ON_CALL.replace(
     "sys.exit(1)", "import time; time.sleep(600)")
+
+# The production server is deliberately permissive about lifecycle ordering.
+# This backend makes the proxy's handshake replay observable to the test.
+STRICT_FALLBACK = r"""
+import json, sys
+initialized = False
+initializing = False
+for line in sys.stdin:
+    msg = json.loads(line)
+    method = msg.get("method")
+    if method == "initialize":
+        initializing = True
+        print(json.dumps({"jsonrpc":"2.0", "id":msg["id"], "result":{
+            "protocolVersion":"2025-06-18", "capabilities":{},
+            "serverInfo":{"name":"strict-fallback", "version":"0"}}}), flush=True)
+    elif method == "notifications/initialized":
+        initialized = initializing
+    elif method == "tools/call":
+        print(json.dumps({"jsonrpc":"2.0", "id":msg["id"], "result":{
+            "isError": not initialized,
+            "content":[{"type":"text", "text":"ready" if initialized else "missing handshake"}]}}), flush=True)
+"""
 
 
 class CaptureOut:
@@ -89,6 +112,7 @@ class TestFailoverProxy(unittest.TestCase):
 
     def test_mid_session_failover_replays_handshake_and_pending_call(self):
         proxy, out = self._proxy([sys.executable, "-c", FAKE_REMOTE_DIES_ON_CALL])
+        proxy.fallback = [sys.executable, "-c", STRICT_FALLBACK]
         proxy.start(use_primary=True)
         try:
             proxy.on_client_line(self._req(1, "initialize", {"protocolVersion": "2025-06-18"}))
@@ -109,6 +133,68 @@ class TestFailoverProxy(unittest.TestCase):
         self.assertFalse(msgs[1]["result"]["isError"])
         self.assertIn("[napmem fallback]", content[-1]["text"])
         self.assertIn("test snapshot", content[-1]["text"])
+        self.assertEqual(content[0]["text"], "ready")
+
+    def test_invalid_utf8_backend_fails_over_and_logs(self):
+        remote = "import sys,os; sys.stdin.readline(); os.write(1,b'\\xff\\n')"
+        proxy, out = self._proxy([sys.executable, "-c", remote])
+        proxy.start(use_primary=True)
+        try:
+            with self.assertLogs(fo.logger, level="WARNING") as logs:
+                proxy.on_client_line(self._req(1, "initialize"))
+                messages = out.wait_for(1, timeout=3)
+            self.assertEqual(messages[0]["result"]["serverInfo"]["name"], "napmem")
+            self.assertEqual(proxy.mode, "local")
+            self.assertTrue(any("read failed" in message for message in logs.output))
+        finally:
+            proxy.close()
+
+    def test_nonreading_backend_cannot_block_relay_or_watchdog(self):
+        proxy, out = self._proxy([sys.executable, "-c", "import time; time.sleep(600)"])
+        proxy.request_timeout = 0.1
+        with mock.patch.object(fo, "WATCHDOG_TICK_S", 0.02):
+            proxy.start(use_primary=True)
+            remote = proxy.backend.proc
+            sender = threading.Thread(target=proxy.on_client_line, args=(
+                self._req(1, "initialize", {"padding": "x" * 200000}),), daemon=True)
+            try:
+                sender.start()
+                sender.join(timeout=1)
+                self.assertFalse(sender.is_alive(), "Pipe writes blocked the state lock")
+                messages = out.wait_for(1, timeout=3)
+                self.assertEqual(messages[0]["id"], 1)
+                self.assertIn("result", messages[0])
+                self.assertEqual(proxy.mode, "local")
+            finally:
+                # Kill only this test's child, including on an unfixed baseline
+                # where close() would otherwise wait on the sender's state lock.
+                if remote.poll() is None:
+                    remote.kill()
+                sender.join(timeout=3)
+                proxy.close()
+
+    def test_close_reaps_child_and_closes_both_pipes(self):
+        proxy, out = self._proxy(None)
+        proxy.start(use_primary=False)
+        backend = proxy.backend
+        try:
+            proxy.on_client_line(self._req(1, "initialize"))
+            self.assertEqual(out.wait_for(1, timeout=3)[0]["id"], 1)
+        finally:
+            proxy.close()
+        self.assertIsNotNone(backend.proc.poll())
+        self.assertTrue(backend.proc.stdin.closed)
+        self.assertTrue(backend.proc.stdout.closed)
+
+    def test_failed_remote_spawn_uses_local_fallback(self):
+        proxy, out = self._proxy([os.path.join(self.tmp, "nonexistent-executable")])
+        proxy.start(use_primary=True)
+        try:
+            proxy.on_client_line(self._req(1, "initialize"))
+            messages = out.wait_for(1, timeout=3)
+            self.assertEqual(messages[0]["result"]["serverInfo"]["name"], "napmem")
+        finally:
+            proxy.close()
 
     def test_hung_remote_is_killed_and_request_served_locally(self):
         proxy, out = self._proxy([sys.executable, "-c", FAKE_REMOTE_HANGS_ON_CALL])
@@ -220,6 +306,78 @@ class TestMirrorSync(unittest.TestCase):
     def test_missing_embindex_is_not_fatal(self):
         self._write_remote("napmem_pyramid.json", json.dumps({}))
         self.assertTrue(fo.sync_mirror("fake"))
+
+    def test_configured_remote_basename_is_used_for_store_and_cache(self):
+        self._write_remote("custom.json", json.dumps({"memory_records": ["custom"]}))
+        self._write_remote("custom.json.embindex.json", json.dumps({"model": "custom"}))
+        with mock.patch.dict(os.environ, {
+            "NAPMEM_REMOTE_PYRAMID": os.path.join(self.remote, "custom.json"),
+        }):
+            self.assertTrue(fo.sync_mirror("fake"))
+        with open(os.path.join(self.mirror, "napmem_pyramid.json"), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"memory_records": ["custom"]})
+        with open(os.path.join(self.mirror, "napmem_pyramid.json.embindex.json"),
+                  encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"model": "custom"})
+
+    def test_concurrent_sync_never_publishes_another_writers_open_file(self):
+        # Pause A after JSON validation. B then opens its transfer file. With
+        # a shared name, B truncates A's inode and A publishes an empty store.
+        validated = threading.Event()
+        second_open = threading.Event()
+        published = threading.Event()
+        release_second = threading.Event()
+        replace = os.replace
+        results = {}
+        failures = []
+
+        def fake_run(cmd, **kwargs):
+            if "embindex" in cmd[-1]:
+                return subprocess.CompletedProcess(cmd, 1, stderr=b"optional cache missing")
+            if threading.current_thread().name == "mirror-B":
+                second_open.set()
+                if not release_second.wait(timeout=3):
+                    raise RuntimeError("test did not release second transfer")
+            kwargs["stdout"].write(b'{"memory_records":[]}')
+            kwargs["stdout"].flush()
+            return subprocess.CompletedProcess(cmd, 0, stderr=b"")
+
+        def replace_after_second_open(src, dest):
+            if threading.current_thread().name == "mirror-A" and str(dest).endswith("napmem_pyramid.json"):
+                validated.set()
+                if not second_open.wait(timeout=3):
+                    raise RuntimeError("second test transfer did not start")
+                replace(src, dest)
+                published.set()
+            else:
+                replace(src, dest)
+
+        def run_sync():
+            try:
+                results[threading.current_thread().name] = fo.sync_mirror("fake")
+            except Exception as exc:
+                failures.append(exc)
+
+        with mock.patch.object(fo.subprocess, "run", side_effect=fake_run), \
+                mock.patch.object(fo.os, "replace", side_effect=replace_after_second_open):
+            first = threading.Thread(target=run_sync, name="mirror-A")
+            second = threading.Thread(target=run_sync, name="mirror-B")
+            try:
+                first.start()
+                self.assertTrue(validated.wait(timeout=3))
+                second.start()
+                self.assertTrue(published.wait(timeout=3))
+                with open(os.path.join(self.mirror, "napmem_pyramid.json"), encoding="utf-8") as fh:
+                    self.assertEqual(json.load(fh), {"memory_records": []})
+            finally:
+                release_second.set()
+                first.join(timeout=3)
+                if second.ident is not None:
+                    second.join(timeout=3)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(results, {"mirror-A": True, "mirror-B": True})
 
 
 class TestRemoteHostConfig(unittest.TestCase):

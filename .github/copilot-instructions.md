@@ -1,17 +1,38 @@
 ## Default Execution Strategy
 
-Work directly and verify with the test suite. This is a pure-stdlib Python
-project with no build step: edit, then run `python3 -m unittest discover -s . -p "test_*.py"`
-(all 38 tests must pass) before reporting success.
+Read relevant source and repository guidance before editing. Run the required
+tests after each change set. Use commands and paths established in the repo.
+Record requests in `prompts.md`, outcomes and remaining work in `memory.md`,
+and increment applicable version and delta fields.
 
-## Project rules
+## Build, Test, and Validation Commands
 
-- Python 3.10+ standard library only; never add dependencies unprompted.
-- Core invariants (see CLAUDE.md for detail): record IDs are stable across
-  session re-ingestion; store writes are atomic via `save()`; dedup is
-  exact-text with resolvable `duplicate_anchors`; Layers 2–3 are derived from
-  Layer 1 and never edited directly; untrusted text stays inside the sentinel
-  delimiter in extraction prompts.
-- Add or extend `unittest` tests in `test_napmem_pipeline.py` for any behavior
-  change.
-- Log completed work in `memory.md` and the triggering request in `prompts.md`.
+Use the installed virtual environment; setup is in `docs/INSTALLATION.md`.
+
+```bash
+python3 -m unittest discover -s . -p "test_*.py"
+python3 -m compileall -q .
+ruff check .
+python3 scripts/repo_docs.py --check
+```
+
+## High-level Architecture
+
+`memory_pyramid_distiller.py` owns the store. Extractors feed its ingest API;
+reconciliation and dedup preserve identities and provenance before derived
+layers rebuild and the store saves atomically. The consolidator tracks source
+changes. Retrieval and MCP read the pyramid; semantic retrieval also writes a
+disposable embedding cache. The proxy serves a local mirror when SSH fails.
+
+## Key Conventions
+
+- Package support starts at Python 3.11; core code stays stdlib-only.
+- Sanctioned integrations are `ollama-client` and the optional `anthropic` SDK.
+- Preserve stable record IDs and resolvable duplicate anchors.
+- Save stores atomically through the distiller API.
+- Rebuild Layers 2–3 from Layer 1; never edit derived state directly.
+- Keep untrusted content inside sentinel-guarded prompts.
+- Test behavior changes offline with temporary stores and mocked transports.
+- Use metadata-only runtime logs; never log memory content or credentials.
+- Preserve unrelated work and stage explicit paths.
+- Refresh generated maps with `python3 scripts/repo_docs.py` after file changes.

@@ -44,12 +44,17 @@ import argparse
 import json
 import logging
 import os
+import queue
+import select
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from napmem_mcp_server import MAX_LINE_BYTES, bounded_lines
 
 logger = logging.getLogger("napmem_failover")
 
@@ -146,14 +151,15 @@ def sync_mirror(host: str) -> bool:
     The pyramid must parse as a JSON object before it replaces the old one."""
     dest_dir = mirror_dir()
     dest_dir.mkdir(parents=True, exist_ok=True)
-    remote_dir = os.path.dirname(remote_pyramid()) or "."
     ok = True
     for name in MIRROR_FILES:
         dest = dest_dir / name
-        tmp = dest_dir / f".{name}.tmp"
-        src = f"{remote_dir}/{name}"
+        tmp = None
+        src = remote_pyramid() + (".embindex.json" if name == MIRROR_FILES[1] else "")
         try:
-            with open(tmp, "wb") as out:
+            with tempfile.NamedTemporaryFile(dir=dest_dir, prefix=f".{name}.",
+                                             suffix=".tmp", delete=False) as out:
+                tmp = Path(out.name)
                 proc = subprocess.run(ssh_base(host) + ["-C", f'cat "{src}"'],
                                       stdin=subprocess.DEVNULL, stdout=out,
                                       stderr=subprocess.PIPE, timeout=300, check=False)
@@ -169,50 +175,135 @@ def sync_mirror(host: str) -> bool:
         except (OSError, RuntimeError, ValueError, TypeError, subprocess.TimeoutExpired) as exc:
             logger.warning("Mirror of %s failed: %s", name, exc)
             ok = ok and name != MIRROR_FILES[0]  # embindex is optional
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
+            if tmp is not None:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
     return ok
 
 
 class Backend:
-    """One child MCP server process. A reader thread forwards each stdout line
-    to the proxy and reports EOF exactly once."""
+    """Owned child with bounded queued writes and interruptible pipe workers.
+
+    send() only queues bytes; it never blocks while the proxy's state lock is
+    held. The reader owns the one exit callback, including decode/I/O failure.
+    """
 
     def __init__(self, cmd: list[str], env: dict[str, str] | None, gen: int, proxy: "FailoverProxy"):
         self.gen = gen
-        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     env=env, text=True, encoding="utf-8", bufsize=1)
         self._proxy = proxy
-        threading.Thread(target=self._read, daemon=True).start()
+        self._stop = threading.Event()
+        self._close_lock = threading.Lock()
+        self._queue_lock = threading.Lock()
+        self._queued_bytes = 0
+        self._writes = queue.Queue(maxsize=64)
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     env=env, bufsize=0)
+        assert self.proc.stdin is not None and self.proc.stdout is not None
+        os.set_blocking(self.proc.stdin.fileno(), False)
+        os.set_blocking(self.proc.stdout.fileno(), False)
+        self._writer = threading.Thread(target=self._write, daemon=True)
+        self._reader = threading.Thread(target=self._read, daemon=True)
+        self._writer.start()
+        self._reader.start()
 
     def _read(self):
-        assert self.proc.stdout is not None
-        for line in self.proc.stdout:
-            self._proxy.on_backend_line(self.gen, line)
-        self.proc.wait()
-        self._proxy.on_backend_exit(self.gen)
+        pending = bytearray()
+        try:
+            fd = self.proc.stdout.fileno()
+            while not self._stop.is_set():
+                readable, _, _ = select.select([fd], [], [], 0.1)
+                if not readable:
+                    continue
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    if pending:
+                        self._proxy.on_backend_line(self.gen, pending.decode("utf-8"))
+                    break
+                pending.extend(chunk)
+                while True:
+                    end = pending.find(b"\n")
+                    if end < 0:
+                        break
+                    if end + 1 > MAX_LINE_BYTES:
+                        raise ValueError("Backend line exceeds input limit")
+                    line = bytes(pending[:end + 1]).decode("utf-8")
+                    del pending[:end + 1]
+                    self._proxy.on_backend_line(self.gen, line)
+                if len(pending) > MAX_LINE_BYTES:
+                    raise ValueError("Backend line exceeds input limit")
+        except (OSError, ValueError, RecursionError) as exc:
+            if not self._stop.is_set():
+                logger.warning("Backend read failed (%s)", type(exc).__name__)
+        finally:
+            self._shutdown()
+            self._proxy.on_backend_exit(self.gen)
+
+    def _write(self):
+        try:
+            fd = self.proc.stdin.fileno()
+            while not self._stop.is_set():
+                try:
+                    payload = self._writes.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                with self._queue_lock:
+                    self._queued_bytes -= len(payload)
+                remaining = memoryview(payload)
+                deadline = time.monotonic() + max(0.1, self._proxy.request_timeout)
+                while remaining and not self._stop.is_set():
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Backend pipe write timed out")
+                    _, writable, _ = select.select([], [fd], [], 0.1)
+                    if not writable:
+                        continue
+                    try:
+                        written = os.write(fd, remaining)
+                    except BlockingIOError:
+                        continue
+                    remaining = remaining[written:]
+        except (OSError, ValueError) as exc:
+            if not self._stop.is_set():
+                logger.warning("Backend write failed (%s)", type(exc).__name__)
+                try:
+                    self.proc.kill()
+                except OSError:
+                    pass
 
     def send(self, line: str) -> bool:
-        try:
-            assert self.proc.stdin is not None
-            self.proc.stdin.write(line if line.endswith("\n") else line + "\n")
-            self.proc.stdin.flush()
-            return True
-        except (BrokenPipeError, OSError, ValueError):
+        if self._stop.is_set():
             return False
+        payload = (line if line.endswith("\n") else line + "\n").encode("utf-8")
+        with self._queue_lock:
+            if len(payload) > MAX_LINE_BYTES or self._queued_bytes + len(payload) > 2 * MAX_LINE_BYTES:
+                return False
+            try:
+                self._writes.put_nowait(payload)
+            except queue.Full:
+                return False
+            self._queued_bytes += len(payload)
+        return True
+
+    def _shutdown(self):
+        with self._close_lock:
+            self._stop.set()
+            if threading.current_thread() is not self._writer:
+                self._writer.join(timeout=0.5)
+            if self.proc.stdin and not self.proc.stdin.closed:
+                self.proc.stdin.close()
+            try:
+                self.proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=1)
+            if self.proc.stdout and not self.proc.stdout.closed:
+                self.proc.stdout.close()
 
     def close(self):
-        try:
-            if self.proc.stdin:
-                self.proc.stdin.close()
-        except OSError:
-            pass
-        try:
-            self.proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            self.proc.kill()
+        self._shutdown()
+        if threading.current_thread() is not self._reader:
+            self._reader.join(timeout=1)
 
 
 def _id_key(msg_id: Any) -> str:
@@ -250,6 +341,8 @@ class FailoverProxy:
                 self._spawn("remote")
             else:
                 self._spawn("local")
+            if self.backend is None:
+                self._failover()
         threading.Thread(target=self._watchdog, daemon=True).start()
 
     def _watchdog(self):
@@ -267,7 +360,10 @@ class FailoverProxy:
                 logger.warning("Remote request unanswered for %.0fs; treating remote as hung",
                                self.request_timeout)
                 proc = self.backend.proc
-            proc.kill()
+            try:
+                proc.kill()
+            except OSError:
+                pass  # Reader may have already reaped this generation.
 
     def _spawn(self, mode: str):
         self.gen += 1
@@ -312,7 +408,10 @@ class FailoverProxy:
                 self.backend.send(json.dumps({"jsonrpc": "2.0",
                                               "method": "notifications/initialized"}))
         for line, _method, _sent in list(self.pending.values()):
-            self.backend.send(line)
+            if not self.backend.send(line):
+                # Let the reader report one exit and retry/fail the pending set.
+                self.backend.proc.kill()
+                break
 
     def on_backend_exit(self, gen: int):
         with self.lock:
@@ -350,8 +449,17 @@ class FailoverProxy:
             return
         try:
             msg = json.loads(stripped)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):
             msg = None
+        if isinstance(msg, dict) and "id" in msg:
+            msg_id = msg["id"]
+            if isinstance(msg_id, bool) or not isinstance(msg_id, (str, int)):
+                # The backend answers invalid IDs with null, which cannot
+                # clear a pending entry keyed by the original invalid value.
+                self._emit({"jsonrpc": "2.0", "id": None,
+                            "error": {"code": -32600, "message": "Invalid Request"}})
+                return
+        dead = None
         with self.lock:
             if isinstance(msg, dict):
                 method = msg.get("method")
@@ -371,7 +479,8 @@ class FailoverProxy:
                 dead = self.backend
                 self.gen += 1
                 self._failover()
-                dead.close()
+        if dead is not None:
+            dead.close()
 
     def on_backend_line(self, gen: int, line: str):
         stripped = line.strip()
@@ -382,8 +491,8 @@ class FailoverProxy:
                 return
             try:
                 msg = json.loads(stripped)
-            except json.JSONDecodeError:
-                msg = None
+            except (ValueError, RecursionError) as exc:
+                raise ValueError("Invalid backend JSON") from exc
             method = None
             if isinstance(msg, dict) and "id" in msg and "method" not in msg:
                 key = _id_key(msg["id"])
@@ -407,8 +516,12 @@ class FailoverProxy:
     def serve(self, stdin=None):
         stdin = stdin or sys.stdin
         try:
-            for line in stdin:
-                self.on_client_line(line)
+            for line in bounded_lines(stdin):
+                if line is None:
+                    self._emit({"jsonrpc": "2.0", "id": None,
+                                "error": {"code": -32700, "message": "Invalid input line"}})
+                else:
+                    self.on_client_line(line)
         finally:
             self.close()
 

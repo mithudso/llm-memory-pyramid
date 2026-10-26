@@ -89,7 +89,7 @@ def _coerce_array_text(content: str) -> str:
     array-only contract still applies to what the model meant."""
     try:
         data = json.loads(content)
-    except ValueError:
+    except (ValueError, RecursionError):
         return content
     if isinstance(data, dict):
         # A lone unit object (json-mode grammars force a top-level object,
@@ -102,7 +102,7 @@ def _coerce_array_text(content: str) -> str:
     return content
 
 
-THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+THINK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 
 
 def _chat_once(url: str, model: str, prompt: str, client: OllamaClient | None = None) -> str:
@@ -117,7 +117,8 @@ def _chat_once(url: str, model: str, prompt: str, client: OllamaClient | None = 
         options=GEN_OPTIONS, think=False, timeout=PER_FILE_TIMEOUT_S)
     if not isinstance(content, str) or not content.strip():
         raise OllamaExtractionError(f"{url} returned no message content")
-    content = THINK_RE.sub("", content).strip()
+    # Strip only a reasoning preamble, never literal markup inside JSON text.
+    content = THINK_RE.sub("", content, count=1).strip()
     if not content:
         raise OllamaExtractionError(f"{url} returned only a think block")
     return _coerce_array_text(content)
@@ -135,16 +136,28 @@ def extract_ollama(prompts_by_session: dict[str, str],
     clients = {url: _client_for(url) for url, _ in hosts}
     outputs: dict[str, str] = {}
     dead_hosts: set[str] = set()
+    failed_models: set[tuple[str, str]] = set()
     for session_id, prompt in prompts_by_session.items():
         last_err: Exception | None = None
         for url, model in hosts:
-            if url in dead_hosts:
+            if url in dead_hosts or (url, model) in failed_models:
                 continue
             try:
                 outputs[session_id] = _chat_once(url, model, prompt, clients[url])
                 last_err = None
                 break
-            except (OllamaUnavailable, OSError) as exc:
+            except OllamaUnavailable as exc:
+                # The library also raises OllamaUnavailable for permanent
+                # model errors (e.g. 404). Its pool marks down only transport
+                # and transient failures; another model may work on this URL.
+                if clients[url].pool.is_down(url):
+                    logger.warning("Ollama host %s unreachable (%s); benching", url, exc)
+                    dead_hosts.add(url)
+                else:
+                    logger.warning("Ollama model %s/%s unavailable; skipping model", url, model)
+                    failed_models.add((url, model))
+                last_err = exc
+            except OSError as exc:
                 # Connection-level failure: bench the host for this sweep
                 # instead of paying its timeout again for every file.
                 logger.warning("Ollama host %s unreachable (%s); benching", url, exc)

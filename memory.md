@@ -2,6 +2,53 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.7.0 — 2026-10-26
+
+**Active task:** code and bootstrap work complete; GitHub delivery tracked in
+TASK-220. TASK-218 covers standards and TASK-219 covers the code review.
+
+**Delta:** workflow v1.6.0 → v1.7.0; package 0.1.0 → 0.1.1; MCP server
+1.1.0 → 1.1.1. Store schema remains 1.0.0. Added three regression suites.
+
+**Completed on this checkout:**
+- Ran repo-bootstrapper 5.4.1 and code-deep-optimizer 1.16.0 against clean
+  main at 1f3d21d. Reviewed every original Python/shell source; no file cap.
+- Fixed 35 corroborated runtime/test findings: operator-file preservation,
+  prompt CPU/metadata boundaries, stable repeated IDs and refreshed payloads,
+  cache validation/persistence/result bounds, extractor privacy/fallbacks,
+  safe raw-source statistics, mirror atomicity and subprocess/protocol safety.
+- Final local Python 3.12 gate: 111 tests pass. Python 3.14 passed the
+  110-test candidate; the last decoder fix gets the full CI matrix too.
+  Compilation, Ruff, shell syntax and exact static-map checks pass.
+- Two fresh-context audits ran. The second found an Ollama decoder-depth
+  gap. Fixed it and added a red/green two-file fallback regression. CDO exits
+  BLIND-AUDIT-DISSENT under its review cap; do not relabel it CLEAN. No
+  corroborated finding is left unfixed; no third independent gate ran.
+- Updated stale Python/dependency/test/security/operations guidance. Added
+  deterministic static doc generation/checking, safe env template and CI
+  drift gates. Generic dashboard/Node/central error-service standards remain
+  explicit architecture exceptions, not fabricated implementations.
+- Installed only the declared package and pinned ollama-client in an ignored
+  Python 3.12 venv. No inference, embeddings, indexing, live SSH MCP,
+  production store, hook, scheduler or deployment operation ran.
+- Repaired pre-existing CI private-library authentication with a dedicated
+  read-only deploy key id 167768571 on mithudso/ollama-client. Its private key
+  is only in this repo Actions secret OLLAMA_CLIENT_DEPLOY_KEY; local private
+  copies were removed. Pinned dependency, Actions and Ruff revisions.
+- Refreshed the existing hub project metadata and MCP activation. Preserved
+  scheduler issue #29; no scheduler health conclusion was inferred.
+
+**Artifacts and continuation:**
+- Audit: docs/repo-bootstrap-audit-2026-10-26.md.
+- Findings, gate limits and rollback: docs/code-deep-optimizer-2026-10-26.md.
+- Original/per-iteration snapshots and CI access receipt:
+  /Users/mitch/.claude/skill-consolidation/backups/llm-memory-pyramid-20261026T2155/.
+- External static dossier:
+  /Users/mitch/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/.
+- Remaining delivery: commit explicit owned paths, push maintenance branch,
+  wait for GitHub CI, merge verified PR and sync main. TASK-220 records the
+  authoritative publication receipt. Production runtime work is outside scope.
+
 ## v1.6.0 — 2026-09-26
 
 **Active task:** none — local MCP fallback shipped.

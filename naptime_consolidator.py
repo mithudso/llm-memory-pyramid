@@ -9,21 +9,23 @@ to keep the NapMem Pyramid updated without impacting active agent context or
 response latency.
 
 Extraction modes (--extraction):
-  auto      (default) LLM extraction when the `anthropic` package is
-            importable, heuristic otherwise — decided once at startup.
+  auto      (default) Anthropic when importable, then Ollama, then heuristic.
   llm       Require LLM extraction; startup fails without `anthropic`.
+  ollama    Local Ollama extraction, then heuristic; no Anthropic API calls.
   heuristic Always use the built-in keyword-rule extractor.
 
 In LLM mode each sweep's changed files go out as ONE Message Batches API batch
 (50% cost — naptime is idle-time work, latency is irrelevant). Any file whose
-LLM extraction fails falls back to the heuristic extractor for that file, so
-the pyramid never silently misses an update.
+LLM extraction fails tries the remaining configured extractors for that file.
+Store write failures remain fatal to batch ingestion: continuing without a
+transaction rollback could persist a partially mutated in-memory store.
 """
 
 import argparse
 import hashlib
 import json
 import logging
+import math
 import os
 import stat
 import time
@@ -173,10 +175,30 @@ class NaptimeConsolidator:
         try:
             with open(self.state_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            files = data.get("files", {})
-            return files if isinstance(files, dict) else {}
-        except (OSError, ValueError):
+        except FileNotFoundError:
             return {}
+        except (OSError, ValueError) as exc:
+            logger.warning("Discarding unreadable sweep state %s (%s)",
+                           self.state_path, type(exc).__name__)
+            return {}
+        if not isinstance(data, dict) or not isinstance(data.get("files"), dict):
+            logger.warning("Discarding invalid sweep state structure in %s", self.state_path)
+            return {}
+        valid = {}
+        for path, entry in data["files"].items():
+            if not isinstance(entry, dict):
+                continue
+            mtime, digest = entry.get("mtime"), entry.get("sha256")
+            if (isinstance(mtime, (int, float)) and not isinstance(mtime, bool)
+                    and (not isinstance(mtime, float) or math.isfinite(mtime))
+                    and isinstance(digest, str) and len(digest) == 64
+                    and all(char in "0123456789abcdef" for char in digest)):
+                valid[path] = {"mtime": mtime, "sha256": digest}
+        invalid_count = len(data["files"]) - len(valid)
+        if invalid_count:
+            logger.warning("Discarding %d invalid sweep state entries in %s",
+                           invalid_count, self.state_path)
+        return valid
 
     def _save_state(self) -> None:
         # Prune entries for files gone from the watch dir so the state file
@@ -197,10 +219,21 @@ class NaptimeConsolidator:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
         changed = []
         os.makedirs(self.watch_dir, exist_ok=True)
+        stored_sources = {
+            (session["session_id"], os.path.abspath(session["file_path"]))
+            for session in self.distiller.data["raw_conversations"]
+        }
+        store_exists = os.path.exists(self.pyramid_path)
         for fname in sorted(os.listdir(self.watch_dir)):
             if not fname.endswith(".md"):
                 continue
             fpath = os.path.join(self.watch_dir, fname)
+            session_id = _session_id_for(fname)
+            if not store_exists or (session_id, os.path.abspath(fpath)) not in stored_sources:
+                # Sweep state is a cache, never proof that a source still
+                # exists in the pyramid. A replaced store must be rebuilt.
+                self.file_timestamps.pop(fpath, None)
+                self.file_hashes.pop(fpath, None)
             # One bad file (deleted mid-scan, unreadable, undecodable) must not
             # kill the background loop; log it and keep consolidating the rest.
             mtime = None
@@ -229,7 +262,7 @@ class NaptimeConsolidator:
                     # extraction entirely.
                     self.file_hashes[fpath] = {"mtime": mtime, "sha256": digest}
                     continue
-                changed.append((_session_id_for(fname), fpath, content, mtime))
+                changed.append((session_id, fpath, content, mtime))
             except OSError as exc:  # includes PermissionError from the read guard
                 logger.error("Skipping memory file %s: %s", fpath, exc)
                 if mtime is not None:
@@ -255,15 +288,14 @@ class NaptimeConsolidator:
             get_extraction_prompt,
             ingest_extractions,
         )
-        if self._client is None:
-            self._client = anthropic.Anthropic()
-
         prompts = {
             session_id: get_extraction_prompt(content, session_id, os.path.basename(fpath))
             for session_id, fpath, content, _ in changed
         }
         file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
         try:
+            if self._client is None:
+                self._client = anthropic.Anthropic()
             outputs = extract_batch(self._client, prompts, DEFAULT_MODEL)
         # TypeError included deliberately: the SDK raises it at call time when
         # no credential resolves (missing ANTHROPIC_API_KEY and no `ant auth`
