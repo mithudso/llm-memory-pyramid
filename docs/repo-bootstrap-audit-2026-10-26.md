@@ -54,7 +54,17 @@ copied. The code review report contains revocation commands.
 ## Validation and remaining scope
 
 First complete baseline: 66 tests pass. After fixes: 111 tests pass on Python
-3.12; compile, Ruff and shell syntax pass. Python 3.14 also passes the 110-test candidate; the final additional decoder regression is covered locally on 3.12 and in the CI matrix. Generated maps pass exact-content checks. Two independent code reviews ran; the second dissented on one remaining parser boundary. Its fix and a two-file regression are verified, while the optimizer retains BLIND-AUDIT-DISSENT as its bounded exit status. External dossier regeneration and CI delivery are tracked in TASK-220.
+3.12; compile, Ruff and shell syntax pass. Python 3.14 also passes the 110-test candidate; the final additional decoder regression is covered locally on 3.12 and in the CI matrix. Generated maps pass exact-content checks. Two independent code reviews ran; the second dissented on one remaining parser boundary. Its fix and a two-file regression are verified, while the optimizer retains BLIND-AUDIT-DISSENT as its bounded exit status. The external dossier verified 77/77 source hashes, 77 cards and 11 outputs at
+source commit 9d23b3b. PR #15 merged as ee2170da1eff9effea62e47621257a298f299a16
+with all 111 tests green on Python 3.11/3.12/3.14 plus Ruff, static maps and
+shell syntax. Main was synced and the task branch deleted:
+https://github.com/mithudso/llm-memory-pyramid/pull/15
+https://github.com/mithudso/llm-memory-pyramid/actions/runs/40413224889
+
+The post-commit hook starts automatic indexing. Per-command hook overrides
+preserved the indexing pause during commit and sync; persistent Git config
+was unchanged. Registry metadata was updated explicitly. TASK-220 records
+final delivery of these receipts.
 
 No live runtime acceptance, production deployment, global hook reload,
 embedding generation, indexing, model quality qualification or scheduler
