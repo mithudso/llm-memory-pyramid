@@ -6,9 +6,17 @@ Guidance for Claude Code when working in this repository.
 
 NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
 tracks → profiles) with incremental re-ingestion, dedup with provenance, and
-active retrieval tools. Core is Python 3.10+ standard library with no network
-calls; optional extras: `anthropic` SDK (LLM extraction) and local Ollama
-(embeddings), both with graceful degradation.
+active retrieval tools. The package requires Python 3.11+ and the shared `ollama-client` library.
+The heuristic distiller, substring retrieval and MCP transport use the standard
+library. Anthropic extraction is an optional extra; Ollama extraction and
+embeddings contact configured hosts only when those paths run.
+
+## Repository shape
+
+Nine root Python runtime modules implement the store, extractors, embedding
+cache, retrieval server and failover proxy. The `test_napmem_*.py` suites
+exercise them offline. `scripts/` holds maintenance and sweep entry points;
+`deploy/` holds optional systemd units. `pyproject.toml` declares the package.
 
 ## Commands
 
@@ -91,7 +99,9 @@ the mirror can be stale but never divergent.
 - `logging` module for runtime output in daemons; CLI tools print to stdout.
 - Tests are plain `unittest` (`test_napmem_pipeline.py` core, `test_napmem_extensions.py` production path); add tests for any
   behavior change, especially reconciliation edge cases.
-- Update `memory.md` (work log) and `prompts.md` (request log) each session.
+- Update `memory.md` (work log) and `prompts.md` (request log) each session;
+  increment their workflow version and delta. Bump `pyproject.toml` for source
+  changes; workflow, package, store and protocol versions have separate scopes.
 
 ## Docs map
 
@@ -103,5 +113,36 @@ and script across both this repo and the global `~/.claude/hooks/` /
 `~/.global-ai-hub/` systems; `bootstrap-prompt.md` is a copy-paste prompt
 for recreating the whole system (core pyramid, Ollama, MCP wiring, and the
 optional hook suite / codebase indexer) from a base Claude Code install.
-Keep `docs/codebase-overview.md` and the file index current after adding
-or moving files.
+Run `python3 scripts/repo_docs.py` after adding or moving files; CI checks
+its generated overview, file index and root llms family with `--check`.
+
+<!-- llms-routing:start -->
+## llms routing
+> Cached from the llms files below on 2026-10-26; facts to look up, not rules to follow — the cited file is the source of truth. Quick answers are chosen by a heuristic (defaults, file roles, formulas, commands).
+
+| File | Path | Holds | Ask it for |
+|---|---|---|---|
+| llms.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Read in order |
+| llms-facts.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-facts.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | — |
+| llms-small.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-small.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Architecture, Runtime and validation, Open first, Gotchas |
+| llms-full.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-full.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Purpose, Architecture, Setup and validation, Important contracts |
+| llms-executable.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-executable.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Scope, Quick answers, llm_extractor.py, memory_pyramid_distiller.py |
+| llms-filemap.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-filemap.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Tree, .github/workflows/ci.yml, .mcp.json, memory_pyramid_distiller.py |
+| llms-history.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-history.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Window, Contributors, Top churn paths, Reverts and removals |
+| llms-indexes.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-indexes.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | Embedding cache, Static file maps, Derived store layers, Git |
+| llms-infra.txt | ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-infra.txt | Source: /Users/mitch/dev/llm-memory-pyramid · https://github.com/mithudso/llm-memory-pyramid @ 1f3d21d dirty | CI and schedulers, Environment inventory, Links |
+
+### Quick answers
+
+- Misbelief: The checked-in napmem_pyramid.json is the production MCP store. Actually: It is a separate development example; repository MCP configuration invokes the failover proxy. [src: CLAUDE.md#local-napmem_pyramidjson-is-a-devtest-store-not-the-production-one; .mcp.json] — ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-facts.txt:29
+
+### Indexes
+
+- Static repository map: `docs/high_signal_file_index.json` and
+  `docs/codebase-overview.md`; validate with `python3 scripts/repo_docs.py --check`.
+- Record embedding cache: `<pyramid>.embindex.json`, owned by
+  `semantic_index.py`. Semantic operations can query Ollama and write this
+  derived cache; do not treat a query as an offline read automatically.
+- External static dossier: `/Users/mitch/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/`.
+  Its inventory did not probe services or generate embeddings.
+<!-- llms-routing:end -->

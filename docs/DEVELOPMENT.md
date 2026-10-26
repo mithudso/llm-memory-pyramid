@@ -9,8 +9,8 @@ library, installed into the repo venv (`scripts/run-naptime.sh` prefers it).
 ```bash
 git clone https://github.com/mithudso/llm-memory-pyramid.git
 cd llm-memory-pyramid
-python3 -m venv .venv && .venv/bin/pip install -e .   # or: -e ~/dev/libraries/ollama-client
-.venv/bin/python -m unittest discover -s . -p "test_*.py"   # verify: 66 tests, OK
+python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python -m unittest discover -s . -p "test_*.py"   # all discovered tests must pass
 ```
 
 ## Commands
@@ -43,10 +43,10 @@ directly). Core pipeline needs none.
 ## Workflow
 
 1. Branch from `main`.
-2. Make the change; add/extend a `unittest` test in `test_napmem_pipeline.py`.
+2. Make the change; add/extend a `unittest` test in the relevant `test_napmem_*.py` suite.
 3. Run the suite; keep it green.
 4. Update `docs/` if architecture, commands, or components changed.
-5. PR with the template; CI (tests on 3.10/3.12/3.14 + advisory ruff) must pass.
+5. PR with the template; CI (tests on 3.11/3.12/3.14 + Ruff) must pass.
 
 ## Troubleshooting
 

@@ -1,36 +1,38 @@
 # Logging
 
-## Approach
+## Runtime sinks
 
-Stdlib `logging`, module-level loggers. The long-running component
-(`naptime_consolidator.py`) logs; short-lived CLI tools (distiller, retrieval
-agent) print results to stdout and errors to stderr with non-zero exit.
+Runtime modules use stdlib `logging` and module-level loggers. CLI tools print
+results to stdout. MCP reserves stdout for protocol messages and logs to
+stderr. The consolidator configures INFO logs as
+`%(asctime)s [%(name)s] %(levelname)s: %(message)s`. Scheduler redirection is
+in [the runbook](runbooks/run-naptime-consolidator.md).
 
-Format (set in `naptime_consolidator.main()`):
-`%(asctime)s [%(name)s] %(levelname)s: %(message)s`, level INFO.
+| Path | Events |
+|---|---|
+| Consolidator | Selected extraction chain, guarded-read rejection, unreadable file, cache rejection, per-file fallback and sweep counts |
+| Anthropic extractor | Request/batch outcome and usage, fixed validation rejection categories, successful ingest counts |
+| Ollama extractor | Configured model attempt, model/down-host failure, selected fallback |
+| Embedding index | Backend selection, cache discard, embedding failures through caller |
+| MCP server | Startup, malformed request/input-bound warnings, tool failures and pipe closure |
+| Failover proxy | Backend spawn/exit, timeout, local restart, mirror success/failure |
 
-## What gets logged (audit)
+## Sensitive data policy
 
-| Path | Level | Event |
-|---|---|---|
-| Consolidator loop start | INFO | watch dir, interval, tick count |
-| File picked up | INFO | filename + mtime |
-| Sweep summary | INFO | processed count + store path |
-| Unreadable file (`OSError`) | ERROR | path + exception — loop continues |
-| Non-UTF-8 file (`UnicodeDecodeError`) | ERROR | path + exception — loop continues |
-| Distiller missing input | stderr + exit 1 | path |
+Log paths, unit positions, counts, error categories and state transitions.
+Never include memory text, prompt payloads, rejected units, model responses,
+credentials or authentication headers. Rejection reasons use fixed categories
+rather than arbitrary invalid field values. Treat host/path metadata as private
+when sharing logs. Configure external SDK logging with the same care.
 
-No silent failure paths: every `except` branch logs before continuing. Error
-logging is exercised by the test suite (bad-file isolation test).
+Regression tests capture safe rejection/cache/fallback events and assert that
+synthetic sensitive markers stay absent. Transport mocks prevent tests from
+sending memory to configured operator services.
 
-## Sensitive data rules
+## Limits
 
-- Log **paths and metadata only** — never memory-file *content* (memory files
-  may contain personal/user data).
-- No secrets exist in this codebase (no credentials, tokens, or env vars).
-
-## Future
-
-When the LLM extraction path is wired, the request/outcome of each LLM call
-must be logged (without prompt content above DEBUG) and added to
-`docs/external-calls.md`.
+This repository does not implement a centralized JSONL error service, dashboard
+or automatic remediator. Logs describe the local process; deployed systemd or
+launchd log collection is a separate operator concern. Fatal store-write
+failures can propagate from batch ingestion: continuing without rolling back
+mutated in-memory state could hide a failed commit.

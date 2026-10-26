@@ -28,18 +28,19 @@ files.
 `run_loop(poll_interval_sec, max_ticks)`. Per-file errors (OSError, non-UTF-8)
 are logged and skipped — one bad file never kills the loop.
 
-**Extraction modes** (`extraction=` / `--extraction`): `auto` (default — LLM
-when `anthropic` is importable, decided at startup), `llm` (required, errors
-without the package), `heuristic`. In LLM mode each sweep's changed files go
-out as one Message Batches API batch; any session whose extraction fails
-(batch error, invalid JSON, all units rejected) falls back to the heuristic
-extractor for that file, so no update is ever silently dropped.
+**Extraction modes** (`extraction=` / `--extraction`): `auto` tries Anthropic
+when installed, then Ollama, then a per-file heuristic fallback. `llm`
+requires the SDK; `ollama` skips Anthropic entirely; `heuristic` uses no
+model. A persisted mtime/sha256 state file avoids re-extracting unchanged
+sources across `--once` restarts. Invalid state entries are ignored; absent
+source sessions invalidate their watermark. A fatal store-write failure
+propagates from batch ingest so later writes cannot hide a partial commit.
 
 **CLI:** `--watch-dir` (default `./memory_logs`), `--pyramid`, `--interval`,
 `--max-ticks`, `--once`, `--extraction`, `--semantic-dedup`.
 
-**Depends on:** `memory_pyramid_distiller`; `llm_extractor`/`anthropic` only
-in LLM mode (lazy).
+**Depends on:** `memory_pyramid_distiller`; lazy Anthropic and Ollama extractors
+when selected. Ollama paths use the shared `ollama-client` library.
 
 ## `napmem_retrieval_agent.py` — active retrieval tools
 
@@ -112,12 +113,26 @@ call so consolidator updates are visible; tool failures return in-band
 JSON Schema describing the pyramid store shape (layers 0–3, record fields,
 profile category enum).
 
-## `test_napmem_pipeline.py` / `test_napmem_extensions.py` — test suites
+## `ollama_extractor.py` — local chat extraction
 
-19 `unittest` tests total. Pipeline suite (9): extraction, dedup/duplicate
-anchors, re-ingestion ID stability, duplicate promotion, layer rebuild,
-provenance resolution, prompt-guard neutralization. Extensions suite (10):
-extractor parsing/validation/record conversion, LLM-record re-ingest
-stability, hashed-backend cosine properties, semantic search ranking,
-semantic dedup fold (and off-by-default), MCP handshake/tools/errors via
-subprocess. Network-free by design.
+Uses a configured `url=model` chain through `ollama-client`. It shares the
+sentinel prompt and schema validation with the Anthropic extractor. Leading
+reasoning preambles are removed; JSON string content remains intact. Failed
+models can fall through to another model on the same live host.
+
+## `napmem_mcp_failover.py` — stdio proxy
+
+Relays requests over SSH and replays initialization and pending requests to
+the local mirror after remote failure. Mirror refresh copies the configured
+remote store to fixed local names using private temporary files. Backend
+read/write errors trigger controlled cleanup and failover. Tool results from
+the mirror disclose snapshot age. Configuration and CLI flags are documented
+in the module header and [MCP reference](MCP.md).
+
+## Maintenance and tests
+
+`test_napmem_*.py` files use `unittest`, temporary stores and mocked transports.
+See [Testing](TESTING.md) for every suite and its coverage. `scripts/repo_docs.py`
+generates the static file map, high-signal index and root llms files. Its
+`--check` mode verifies exact generated content without importing runtime
+modules or making network calls.

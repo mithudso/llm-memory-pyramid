@@ -40,18 +40,27 @@ python3 llm_extractor.py --input memory_logs/notes.md --semantic-dedup
 python3 -m unittest discover -s . -p "test_*.py"
 ```
 
-Core pipeline is Python 3.10+ standard library only. Optional extras:
-`anthropic` (LLM extraction path) and a local [Ollama](https://ollama.com)
-server (real embeddings — otherwise a stdlib hashed-TF backend is used).
+The package requires Python 3.11+ and the shared `ollama-client` library.
+Install into a virtual environment before running the full suite:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+source .venv/bin/activate
+```
+
+Git access to `mithudso/ollama-client` is required. The heuristic distiller
+and substring retrieval use only the standard library. Install `.[llm]` to
+use Anthropic extraction. Ollama extraction and real embeddings need a
+configured Ollama server; the hashed-TF embedding backend runs offline.
 
 ## MCP server
 
 `napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
 Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
 targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
-`.mcp.json` in this repo runs the server over SSH against the canonical
-production pyramid, not the local example file below — see the note in
-`CLAUDE.md`.
+`.mcp.json` runs the failover proxy: remote SSH is primary and a local mirror
+is the fallback. The local example store is separate; see `CLAUDE.md`.
 
 ## Components
 
@@ -67,13 +76,15 @@ production pyramid, not the local example file below — see the note in
 | `napmem_mcp_failover.py` | MCP proxy registered in `.mcp.json`: remote SSH server, local-mirror fallback when it is offline |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
 | `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
-| `test_napmem_pipeline.py` | Core test suite (unittest; 38 tests across both suites) |
+| `test_napmem_pipeline.py` | Core unittest suite; run discovery for all three suites |
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) · [Components](docs/COMPONENTS.md) · [Development](docs/DEVELOPMENT.md)
 - [Installation](docs/INSTALLATION.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md)
 - [Deployment topology](docs/deployment-topology.md) · [Deploy units](deploy/README.md) · [Security ledger](docs/security-review-ledger.md)
+- [External calls](docs/external-calls.md) · [Logging](docs/logging.md) · [Requirements](docs/requirements.md)
+- [Integrations](docs/integrations-and-assumptions.md) · [Contributing](CONTRIBUTING.md)
 - [Codebase overview](docs/codebase-overview.md) · [Known issues](docs/known-issues.md) · [Onboarding](docs/onboarding.md)
 
 ## License

@@ -16,8 +16,16 @@ inventory with error/retry/logging status: `docs/external-calls.md`.
   mid-batch has its chunk retried elsewhere and cools down for 30 s
   (`OLLAMA_COOLDOWN`). Every host must serve `mxbai-embed-large` — same model
   everywhere keeps the vector cache valid across failover. No host responding
-  → silent fallback to the stdlib hashed-TF backend. Note: a host is only
+  → fallback to the stdlib hashed-TF backend. Note: a host is only
   poolable if its Ollama listens on the LAN (`OLLAMA_HOST=0.0.0.0`).
+
+- **Ollama chat** (`ollama_extractor.py`): `NAPMEM_OLLAMA_CHAT` is a
+  comma-separated `url=model` chain. `--extraction auto` tries it after
+  Anthropic; `--extraction ollama` never calls Anthropic.
+- **SSH and local subprocesses** (`napmem_mcp_failover.py`): the proxy reads
+  remote configuration, relays MCP and refreshes a local mirror. It uses
+  fixed local filenames even when the configured remote store has another
+  basename. Offline tests substitute fake local children and mocked copies.
 
 ## Environment variables
 
@@ -43,5 +51,18 @@ inventory with error/retry/logging status: `docs/external-calls.md`.
 
 ## Environment differences
 
-None known — pure-stdlib code, exercised on macOS (dev) and ubuntu-latest
-(CI), Python 3.10–3.14.
+Package support starts at Python 3.11; CI covers 3.11, 3.12 and 3.14 on
+Ubuntu. Guarded reads use macOS F_GETPATH or Linux procfs and fail closed
+where neither is available. The proxy uses POSIX nonblocking pipe I/O.
+Windows runtime acceptance is not claimed.
+
+## Complete configuration reference
+
+`.env.example` documents all variables read directly by repository programs,
+the wrapper, and CI. It contains placeholders and is not loaded automatically.
+Additional proxy controls are `NAPMEM_REMOTE_HOST`, `NAPMEM_REMOTE_PYRAMID`,
+`NAPMEM_REMOTE_REPO`, `NAPMEM_MIRROR_DIR`, `NAPMEM_MIRROR_MAX_AGE`,
+`NAPMEM_SSH_TIMEOUT`, `NAPMEM_REMOTE_REQUEST_TIMEOUT` and
+`NAPMEM_FALLBACK_OLLAMA`. Wrapper controls are `NAPMEM_HOME`, `NAPMEM_REPO`,
+`NAPMEM_EXTRACTION` and `NAPMEM_ALLOWED_ROOTS`. Never export the entire example
+as a production configuration; choose settings for the operation being run.

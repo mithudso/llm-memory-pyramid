@@ -2,8 +2,10 @@
 
 ## Threat model
 
-No subprocess execution; credentials only via the `anthropic` SDK's standard
-resolution (never read directly). Two attack surfaces:
+The failover proxy starts SSH and local MCP server subprocesses. SSH uses the
+operator's configuration; Anthropic credentials use the SDK's standard
+resolution. Memory sources, model output, persisted caches and protocol
+messages cross trust boundaries. Principal attack surfaces:
 
 1. **Untrusted file content** — memory files are arbitrary text flowing into
    the heuristic parser and LLM extraction prompts.

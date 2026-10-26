@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.env
+.env.*
+!.env.example
+build/
+dist/
+.ruff_cache/
 
 # OS
 .DS_Store
@@ -14,6 +20,7 @@ memory_logs/
 
 # Embedding index cache (derived from the pyramid store)
 *.embindex.json
+*.sweepstate.json
 
 # Session state
 .remember/

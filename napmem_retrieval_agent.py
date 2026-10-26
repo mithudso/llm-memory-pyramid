@@ -16,6 +16,7 @@ Tools provided:
 import argparse
 import json
 import os
+import stat
 from typing import Any
 
 VALID_LAYERS = ("all", "profiles", "tracks", "records")
@@ -77,6 +78,8 @@ class NapMemRetrievalAgent:
         Falls back to substring search when no embedding backend is usable, and
         discloses which path answered in the result's `mode` field.
         """
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+            raise ValueError("top_k must be a positive integer")
         records = self.data.get("memory_records", [])
         try:
             from semantic_index import SemanticIndex  # lazy: optional feature
@@ -155,7 +158,7 @@ class NapMemRetrievalAgent:
         """
         Calculates token savings of using active NapMem retrieval vs dumping raw memory logs.
 
-        The comparison only covers sessions whose raw file is still readable:
+        The comparison only covers readable regular source files:
         counting every distilled record against a partial raw baseline would
         report distillation as *expanding* memory once source files are moved or
         deleted. Missing sessions are disclosed in the result.
@@ -165,8 +168,19 @@ class NapMemRetrievalAgent:
         missing_sessions = []
         for session in self.data.get("raw_conversations", []):
             try:
-                with open(session["file_path"], "r", encoding="utf-8") as f:
-                    raw_text_len += len(f.read().split())
+                # A source can be replaced after ingestion. Open without
+                # blocking so a FIFO cannot stall the MCP statistics tool,
+                # then verify the opened object before reading any bytes.
+                fd = os.open(session["file_path"], os.O_RDONLY | os.O_NONBLOCK)
+                try:
+                    if not stat.S_ISREG(os.fstat(fd).st_mode):
+                        raise OSError("Source is not a regular file")
+                    with os.fdopen(fd, "r", encoding="utf-8") as f:
+                        fd = -1  # the file object owns and closes this descriptor
+                        raw_text_len += len(f.read().split())
+                finally:
+                    if fd >= 0:
+                        os.close(fd)
                 available_sessions.add(session["session_id"])
             except (OSError, UnicodeDecodeError):
                 missing_sessions.append(session["session_id"])

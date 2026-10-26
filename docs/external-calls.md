@@ -2,25 +2,38 @@
 
 ## Inventory
 
-| # | Call | File | Transport | Error handling | Retry | Logged | Tested |
-|---|---|---|---|---|---|---|---|
-| 1 | Anthropic Messages API (`messages.create`) | `llm_extractor.py` (`extract_direct`) | HTTPS via `anthropic` SDK | Typed exception chain (RateLimit → APIStatus → APIConnection) → `ExtractionError`, session skipped | SDK default (2 retries, backoff on 429/5xx) | request outcome + token usage at INFO, failures at ERROR | Parsing/validation layer tested offline; live call not tested in CI (no network) |
-| 2 | Anthropic Message Batches API (`batches.create/retrieve/results`) | `llm_extractor.py` (`extract_batch`) | HTTPS via `anthropic` SDK | Per-item failures logged and omitted; poll timeout raises `ExtractionError` | SDK default + 1h poll deadline | batch id, per-item usage, failures | Same as above |
-| 3 | Ollama embeddings (`/api/embed`, `/api/tags` probe) | `semantic_index.py` (`OllamaBackend`) | HTTP via `ollama-client`; weighted pool from `NAPMEM_OLLAMA_URLS` (default: `OLLAMA_URLS`/`OLLAMA_HOST`/`localhost:11434`; all `mxbai-embed-large`) | Per-host probe failure → next host; all dead → stdlib hashed backend; embed failure → `RuntimeError` → substring fallback in retrieval agent | Host failover + backend fallback | chosen host at INFO, probe failures at DEBUG, embed failures at ERROR via caller | Probe order + dead-host paths tested (mocked); live Ollama not tested in CI |
+Every transport below is optional at runtime. Core heuristic distillation and
+substring retrieval use no external services. File/line locations move; symbol
+names below are stable lookup anchors.
 
-All calls are optional: the core pipeline (heuristic extractor, substring
-search) runs with zero external calls and zero dependencies.
+| Source and trigger | Target/transport | Outcome logging and failure policy | Offline tests / persisted verification |
+|---|---|---|---|
+| `llm_extractor.py:extract_direct`; CLI `--no-batch` | Anthropic Messages API through SDK, HTTPS | Request/usage/error logs; SDK retry policy, errors become `ExtractionError` | Extension parsing/SDK fakes; validated units enter atomic ingest |
+| `llm_extractor.py:extract_batch`; extraction CLI/consolidator | SDK batches create/retrieve/results/cancel, HTTPS | Batch/item logs; SDK retries and bounded polling; per-item extraction failures skip/fallback | Extension batch mocks; output validation before atomic ingest |
+| `semantic_index.py:OllamaBackend.probe/embed`; semantic query/dedup CLI | Configured Ollama tags/embed through `ollama-client`, HTTP or configured HTTPS | Host selection/cache warnings; shared pool failover; auto backend may fall back to hashed, retrieval may fall back to substring | Extension host mocks and cache regressions; validated vectors saved atomically |
+| `ollama_extractor.py:ollama_available/extract_ollama`; consolidator `--extraction ollama`/`auto` | Configured Ollama tags/chat through shared client | Model/host failure logs; dead hosts benched, missing model permits next model; heuristic fallback per file | Extension HTTP/chat fakes; same validated ingest path |
+| `napmem_mcp_failover.py:probe_remote/primary_cmd`; proxy startup/status | SSH probe and remote MCP subprocess | Probe timeout and lifecycle logs; remote loss/request timeout triggers local mirror | Fake child processes; no persisted data from probe/relay |
+| `napmem_mcp_failover.py:sync_mirror`; `--sync-mirror`/background refresh | SSH `cat` of configured pyramid/cache | Transfer outcome/warning; bounded transfer, private temp files and atomic replace; optional cache copy may fail separately | Mocked SSH copy/concurrent-writer tests; pyramid JSON validated before replacement |
+| `napmem_mcp_failover.py:Backend`; local fallback | Local Python MCP subprocess and stdio pipes | Reader/writer/exit logs; bounded restart count and pending-request errors | Local strict fake servers and temporary mirrors; no store writes |
+| `scripts/run-naptime.sh:mirror`; sweep wrapper | Local `readlink`, `ln`, filesystem discovery, Python consolidator child | Refused/colliding path warnings; preserves plain operator files and avoids destination-link traversal | Extracted-function temporary fixtures; guarded read validates opened source before extraction |
 
-## 5-standard contract status
+Runtime text egress depends on selected modes. Full source text may go to
+Anthropic or Ollama chat. Record/query text may go to Ollama embeddings. SSH
+copies memory snapshots and relays tool responses. See [Security](SECURITY.md).
 
-- **CLI trigger** — ✅ all three reachable via `llm_extractor.py` / `semantic_index.py` CLIs.
-- **Centralized error log** — ✅ stdlib `logging`, per `docs/logging.md`.
-- **Auto-remediation map** — ✅ SDK retries + poll deadline (Anthropic); backend fallback chain ollama → hashed → substring (embeddings).
-- **Dashboard card** — ❌ N/A: no dashboard exists in this repo. TODO if one is added.
-- **Datastore verification** — ✅ extractor output schema-validated (`validate_unit`) before any store write; invalid units rejected and logged.
+## Standard adaptation and remaining gaps
+
+The project uses existing CLI/MCP triggers, stdlib logging, shared-client
+retries/fallback and schema/atomic-write checks. It has no generic operation
+registry, persisted attempt-history API, central structured JSONL error sink,
+or dashboard cards. These mdb-tam standards remain unimplemented; the audit
+does not mark them passed. Adding a server or dashboard only to satisfy a
+checklist would change the established architecture.
 
 ## Credentials
 
-`llm_extractor.py` uses the `anthropic` SDK's standard resolution
-(`ANTHROPIC_API_KEY` or an `ant auth login` profile). No credential is read or
-stored by this repo's code directly. Ollama is unauthenticated localhost.
+The optional Anthropic SDK resolves its own supported credentials. This repo
+constructs its client without an `ant auth login` profile adapter. SSH uses the
+operator's SSH configuration. Ollama endpoints can be remote and may use
+plain HTTP; trust and protect that network or select the hashed backend.
+Never commit credentials or memory payloads to the environment template.

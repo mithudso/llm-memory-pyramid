@@ -31,7 +31,7 @@ from napmem_retrieval_agent import VALID_LAYERS, NapMemRetrievalAgent
 
 logger = logging.getLogger(__name__)
 
-SERVER_INFO = {"name": "napmem", "version": "1.1.0"}
+SERVER_INFO = {"name": "napmem", "version": "1.1.1"}
 PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 MAX_LINE_BYTES = 16 * 1024 * 1024  # cap inbound request lines (OOM guard)
@@ -52,7 +52,7 @@ TOOLS: list[dict[str, Any]] = [
                           "description": "Pyramid layer scope (substring mode only)."},
                 "semantic": {"type": "boolean",
                              "description": "Embedding cosine search over records."},
-                "top_k": {"type": "integer", "description": "Result count (semantic mode)."},
+                "top_k": {"type": "integer", "minimum": 1, "description": "Result count (semantic mode)."},
             },
             "required": ["query"],
             "additionalProperties": False,
@@ -87,6 +87,40 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
+def bounded_lines(stdin):
+    """Yield bounded UTF-8 lines, or None after draining an invalid line.
+
+    Native text streams expose their byte buffer, so limits apply before
+    UTF-8 decoding. StringIO fixtures remain bounded by character count too.
+    """
+    stream = getattr(stdin, "buffer", stdin)
+    while True:
+        chunk = stream.readline(MAX_LINE_BYTES + 1)
+        if not chunk:
+            return
+        newline = b"\n" if isinstance(chunk, bytes) else "\n"
+        oversized = len(chunk) > MAX_LINE_BYTES
+        if oversized:
+            while not chunk.endswith(newline):
+                chunk = stream.readline(MAX_LINE_BYTES + 1)
+                if not chunk:
+                    break
+            logger.warning("Dropping oversized request line")
+            yield None
+            continue
+        try:
+            line = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+            if len(line.encode("utf-8")) > MAX_LINE_BYTES:
+                logger.warning("Dropping oversized UTF-8 request line")
+                yield None
+                continue
+        except UnicodeError:
+            logger.warning("Dropping invalid UTF-8 request line")
+            yield None
+            continue
+        yield line
+
+
 class NapMemMCPServer:
     def __init__(self, pyramid_path: str):
         self.pyramid_path = pyramid_path
@@ -96,11 +130,15 @@ class NapMemMCPServer:
         return NapMemRetrievalAgent(pyramid_path=self.pyramid_path)
 
     def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        if name == "search_memory" and arguments.get("semantic"):
+            top_k = arguments.get("top_k", 5)
+            if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+                raise ValueError("top_k must be a positive integer")
         agent = self._agent()
         if name == "search_memory":
             if arguments.get("semantic"):
                 return agent.semantic_search(arguments["query"],
-                                             top_k=int(arguments.get("top_k", 5)))
+                                             top_k=arguments.get("top_k", 5))
             return agent.search_memory_pyramid(arguments["query"],
                                                arguments.get("layer", "all"))
         if name == "inspect_provenance":
@@ -119,14 +157,18 @@ class NapMemMCPServer:
         msg_id = message.get("id")
         is_notification = "id" not in message
 
-        # Structural validation first: a request whose method is not a string
-        # (or whose params is not an object) is Invalid Request per JSON-RPC,
-        # never a crash and never -32601.
-        if not isinstance(method, str):
-            return None if is_notification else self._error(msg_id, -32600, "Invalid Request")
-        params = message.get("params")
+        valid_id = isinstance(msg_id, (str, int)) and not isinstance(msg_id, bool)
+        safe_id = msg_id if valid_id else None
+        if (message.get("jsonrpc") != "2.0" or not isinstance(method, str)
+                or (not is_notification and not valid_id)):
+            return self._error(safe_id, -32600, "Invalid Request")
+        # Notifications are one-way. Never dispatch request-only methods as
+        # notifications: they must not execute tools or emit unmatched replies.
+        if is_notification:
+            return None
+        params = message.get("params", {})
         if not isinstance(params, dict):
-            params = {}
+            return self._error(msg_id, -32602, "Invalid params")
 
         if method == "initialize":
             # Version negotiation: echo the client's version only when we
@@ -186,37 +228,34 @@ class NapMemMCPServer:
         a broken outbound pipe."""
         stdin = stdin or sys.stdin
         stdout = stdout or sys.stdout
-        for line in stdin:
-            if len(line) > MAX_LINE_BYTES:
-                logger.warning("Dropping oversized request line (%d bytes)", len(line))
-                self._write(stdout, self._error(None, -32700, "Parse error: line too large"))
-                continue
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                message = json.loads(line)
-            except json.JSONDecodeError as exc:
-                self._write(stdout, self._error(None, -32700, f"Parse error: {exc}"))
-                continue
-            if not isinstance(message, dict):
-                # Includes JSON-RPC batch arrays — valid JSON-RPC 2.0, but the
-                # MCP stdio transport forbids them: reject, don't crash.
-                self._write(stdout, self._error(None, -32600, "Invalid Request"))
-                continue
-            try:
-                response = self.handle(message)
-            except Exception:
-                logger.exception("Internal error handling request")
-                msg_id = message.get("id")
-                response = self._error(msg_id if not isinstance(msg_id, (dict, list)) else None,
-                                       -32603, "Internal error")
-            if response is not None:
+        try:
+            for line in bounded_lines(stdin):
+                if line is None:
+                    self._write(stdout, self._error(None, -32700, "Parse error: invalid line"))
+                    continue
+                line = line.strip()
+                if not line:
+                    continue
                 try:
+                    message = json.loads(line)
+                except (ValueError, RecursionError) as exc:
+                    logger.warning("Request JSON decoding failed (%s)", type(exc).__name__)
+                    self._write(stdout, self._error(None, -32700, "Parse error"))
+                    continue
+                if not isinstance(message, dict):
+                    self._write(stdout, self._error(None, -32600, "Invalid Request"))
+                    continue
+                try:
+                    response = self.handle(message)
+                except Exception:
+                    logger.exception("Internal error handling request")
+                    msg_id = message.get("id")
+                    valid_id = isinstance(msg_id, (str, int)) and not isinstance(msg_id, bool)
+                    response = self._error(msg_id if valid_id else None, -32603, "Internal error")
+                if response is not None:
                     self._write(stdout, response)
-                except (BrokenPipeError, OSError):
-                    logger.info("Client closed the pipe; shutting down")
-                    return
+        except (BrokenPipeError, OSError):
+            logger.info("Client closed the pipe; shutting down")
 
     @staticmethod
     def _write(stdout, response: dict[str, Any]):

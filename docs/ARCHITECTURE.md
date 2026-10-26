@@ -54,7 +54,8 @@ are never edited directly.
   survive re-ingestion. Enforced by reconcile-before-merge and
   `_next_unit_number()` scanning canonical *and* duplicate IDs.
 - **ADR-3: Exact-text dedup.** Deterministic and cheap; semantic dedup is a
-  known future enhancement (see docs/known-issues.md).
+  available only when explicitly enabled (`--semantic-dedup`); the
+  default exact-text path remains deterministic.
 - **ADR-4: Sentinel-delimited prompts, not markdown fences.** A ``` inside
   hostile source text would terminate a fence early; the sentinel is
   loop-neutralized so it cannot be reconstituted by nesting.

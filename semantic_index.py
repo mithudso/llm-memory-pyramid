@@ -66,10 +66,33 @@ PROBE_TIMEOUT_S = 1.5
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 HASHED_DIM = 512
+MAX_CACHE_DIMENSIONS = 8192
 
 
 def _text_key(text: str) -> str:
-    return hashlib.sha256(text.strip().lower().encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _valid_cached_vector(vector: Any, dimensions: int | None = None) -> bool:
+    """Validate disposable cache data before it reaches cosine scoring."""
+    if (not isinstance(vector, list) or not 1 <= len(vector) <= MAX_CACHE_DIMENSIONS
+            or (dimensions is not None and len(vector) != dimensions)):
+        return False
+    try:
+        return all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                   and math.isfinite(value) for value in vector)
+    except OverflowError:
+        return False
+
+
+def _checked_cosine(left: list[float], right: list[float]) -> float:
+    # Finite coordinates can still overflow the shared helper's arithmetic.
+    # Reject an unusable score so callers take their disclosed fallback rather
+    # than emitting NaN JSON or making a semantic-dedup decision from it.
+    score = cosine(left, right)
+    if not math.isfinite(score):
+        raise ValueError("Embedding similarity is not finite")
+    return score
 
 
 class HashedTfBackend:
@@ -190,6 +213,7 @@ class SemanticIndex:
         self.pyramid_path = pyramid_path
         self.index_path = f"{pyramid_path}.embindex.json"
         self.backend = backend or select_backend()
+        self._cache_dirty = False
         self._cache = self._load()
 
     def _load(self) -> dict[str, Any]:
@@ -207,7 +231,16 @@ class SemanticIndex:
             # A backend/model switch invalidates every cached vector.
             if (isinstance(cache, dict) and cache.get("model") == self.backend.model
                     and isinstance(cache.get("vectors"), dict)):
-                return cache
+                vectors = cache["vectors"]
+                valid = {rid: entry for rid, entry in vectors.items()
+                         if isinstance(entry, dict) and isinstance(entry.get("key"), str)
+                         and _valid_cached_vector(entry.get("vec"))}
+                discarded = len(vectors) - len(valid)
+                if discarded:
+                    logger.warning("Discarding %d invalid embedding cache entries from %s",
+                                   discarded, self.index_path)
+                    self._cache_dirty = True
+                return {"model": self.backend.model, "vectors": valid}
         return {"model": self.backend.model, "vectors": {}}
 
     def save(self):
@@ -229,36 +262,73 @@ class SemanticIndex:
                 pass
             raise
 
-    def _vectors_for(self, records: list[dict[str, Any]]) -> dict[str, list[float]]:
+    def _embed_checked(self, texts: list[str], dimensions: int | None = None):
+        embedded = self.backend.embed(texts)
+        if (not isinstance(embedded, list) or len(embedded) != len(texts)
+                or not all(_valid_cached_vector(vec, dimensions) for vec in embedded)
+                or len({len(vec) for vec in embedded}) != 1):
+            raise ValueError("Embedding backend returned invalid or inconsistent vectors")
+        return embedded
+
+    def _vectors_for(self, records: list[dict[str, Any]],
+                     dimensions: int | None = None) -> dict[str, list[float]]:
         """Returns {record_id: vector}, embedding only cache misses."""
         wanted: dict[str, str] = {r["id"]: _text_key(r["text"]) for r in records}
-        missing = [r for r in records
-                   if self._cache["vectors"].get(r["id"], {}).get("key") != wanted[r["id"]]]
+        cached = self._cache["vectors"]
+        vectors = {rid: entry for rid, entry in cached.items() if rid in wanted}
+        if dimensions is None and isinstance(self.backend, HashedTfBackend):
+            dimensions = HASHED_DIM
+        if dimensions is None and len({len(entry["vec"]) for entry in vectors.values()}) > 1:
+            logger.warning("Discarding embedding cache entries with mixed dimensions from %s",
+                           self.index_path)
+            vectors = {}
+        invalid = [rid for rid, entry in vectors.items()
+                   if not _valid_cached_vector(entry["vec"], dimensions)]
+        if invalid:
+            logger.warning("Discarding %d embedding cache entries with invalid dimensions from %s",
+                           len(invalid), self.index_path)
+            for rid in invalid:
+                del vectors[rid]
+        missing = [r for r in records if vectors.get(r["id"], {}).get("key") != wanted[r["id"]]]
         if missing:
-            embedded = self.backend.embed([r["text"] for r in missing])
+            embedded = self._embed_checked([r["text"] for r in missing], dimensions)
             for rec, vec in zip(missing, embedded):
-                self._cache["vectors"][rec["id"]] = {"key": wanted[rec["id"]], "vec": vec}
-            # Drop vectors for records that no longer exist.
-            live_ids = set(wanted)
-            self._cache["vectors"] = {
-                rid: entry for rid, entry in self._cache["vectors"].items() if rid in live_ids
-            }
+                vectors[rec["id"]] = {"key": wanted[rec["id"]], "vec": vec}
+            # A fresh vector also establishes the dimension for cache-only
+            # callers such as rebuild(), which do not have a query vector.
+            fresh_dimensions = len(embedded[0])
+            stale = [r for r in records
+                     if len(vectors[r["id"]]["vec"]) != fresh_dimensions]
+            if stale:
+                logger.warning("Discarding %d stale-dimension embedding cache entries from %s",
+                               len(stale), self.index_path)
+                refreshed = self._embed_checked([r["text"] for r in stale], fresh_dimensions)
+                for rec, vec in zip(stale, refreshed):
+                    vectors[rec["id"]] = {"key": wanted[rec["id"]], "vec": vec}
+        # Persist deletion-only changes too; an empty rebuild must clear disk.
+        if self._cache_dirty or vectors != cached:
+            self._cache["vectors"] = vectors
             self.save()
-        return {rid: self._cache["vectors"][rid]["vec"] for rid in wanted}
+            self._cache_dirty = False
+        return {rid: vectors[rid]["vec"] for rid in wanted}
 
     def rebuild(self, records: list[dict[str, Any]]):
         self._cache = {"model": self.backend.model, "vectors": {}}
+        self._cache_dirty = True
         self._vectors_for(records)
 
     def search(self, query: str, records: list[dict[str, Any]],
                top_k: int = 5) -> list[dict[str, Any]]:
         """Top-k records by cosine similarity to the query."""
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+            raise ValueError("top_k must be a positive integer")
         if not records:
+            self._vectors_for([])
             return []
-        vectors = self._vectors_for(records)
-        query_vec = self.backend.embed([query])[0]
+        query_vec = self._embed_checked([query])[0]
+        vectors = self._vectors_for(records, len(query_vec))
         scored = sorted(
-            ({"score": round(cosine(query_vec, vectors[r["id"]]), 4), "record": r}
+            ({"score": round(_checked_cosine(query_vec, vectors[r["id"]]), 4), "record": r}
              for r in records),
             key=lambda s: s["score"], reverse=True,
         )
@@ -270,7 +340,7 @@ class SemanticIndex:
         Delegates to nearest_many so single and batched calls can never
         disagree at threshold boundaries (search() rounds for display; the
         dedup decision must not)."""
-        return self.nearest_many([text], records, threshold)[0] if records else None
+        return self.nearest_many([text], records, threshold)[0]
 
     def nearest_many(self, texts: list[str], records: list[dict[str, Any]],
                      threshold: float) -> list[str | None]:
@@ -282,14 +352,15 @@ class SemanticIndex:
         if not texts:
             return []
         if not records:
+            self._vectors_for([])
             return [None] * len(texts)
-        vectors = self._vectors_for(records)
-        query_vecs = self.backend.embed(texts)
+        query_vecs = self._embed_checked(texts)
+        vectors = self._vectors_for(records, len(query_vecs[0]))
         out: list[str | None] = []
         for qv in query_vecs:
             best_id, best_score = None, -math.inf
             for r in records:
-                score = cosine(qv, vectors[r["id"]])
+                score = _checked_cosine(qv, vectors[r["id"]])
                 if score > best_score:
                     best_id, best_score = r["id"], score
             out.append(best_id if best_score >= threshold else None)

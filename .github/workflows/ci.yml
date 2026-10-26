@@ -12,29 +12,48 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install ollama-client (private library; needs a read token secret)
-        run: pip install "ollama-client @ git+https://x-access-token:${LIB_TOKEN}@github.com/mithudso/ollama-client"
+      - name: Install pinned shared client with read-only deploy key
         env:
-          LIB_TOKEN: ${{ secrets.LIBS_READ_TOKEN }}
+          OLLAMA_CLIENT_DEPLOY_KEY: ${{ secrets.OLLAMA_CLIENT_DEPLOY_KEY }}
+        run: |
+          umask 077
+          key_path="$RUNNER_TEMP/ollama-client-key"
+          known_hosts="$RUNNER_TEMP/ollama-client-known-hosts"
+          trap 'rm -f "$key_path" "$known_hosts"' EXIT
+          printf '%s\n' "$OLLAMA_CLIENT_DEPLOY_KEY" > "$key_path"
+          cat > "$known_hosts" <<'HOST_KEYS'
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          HOST_KEYS
+          export GIT_SSH_COMMAND="ssh -i \"$key_path\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=\"$known_hosts\""
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=url.ssh://git@github.com/.insteadOf
+          export GIT_CONFIG_VALUE_0=https://github.com/
+          pip install "ollama-client @ git+https://github.com/mithudso/ollama-client@740aca7cbc5aab4941779f35f1ca17b59fe73c7f"
       - name: Compile check
         run: python -m compileall -q .
       - name: Run tests
         run: python -m unittest discover -v -s . -p "test_*.py"
         env:
           NAPMEM_EMBED_BACKEND: hashed
+      - name: Check static documentation maps
+        run: python scripts/repo_docs.py --check
+      - name: Check wrapper syntax
+        run: bash -n scripts/run-naptime.sh
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
-      - name: Ruff (advisory syntax/style check)
+      - name: Ruff syntax and correctness check
         run: |
-          pip install ruff
+          pip install ruff==0.17.2
           ruff check . --output-format=github

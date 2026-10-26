@@ -5,8 +5,8 @@ are defined; this file carries the shared agent contract.
 
 ## Contract
 
-- Run `python3 -m unittest discover -s . -p "test_*.py"` before claiming any change works; all 38
-  tests must pass.
+- Run `python3 -m unittest discover -s . -p "test_*.py"` before claiming any change works; all
+  discovered tests must pass. Use the installed project virtual environment.
 - Core is stdlib-only; sanctioned extras are `anthropic` (lazy) and the shared `ollama-client` library (Ollama access). Further dependencies need operator approval.
 - Respect the invariants in [CLAUDE.md](CLAUDE.md): stable record IDs across
   re-ingestion, atomic store writes, exact-text dedup with resolvable duplicate
@@ -16,3 +16,5 @@ are defined; this file carries the shared agent contract.
 ## Repo-local agents
 
 None. If one is added, catalog it here with: name, scope, when-to-use, tools.
+
+<!-- llms-routing:pointer --> See `## llms routing` in CLAUDE.md for the llms files and quick answers.

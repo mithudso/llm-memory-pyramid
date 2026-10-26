@@ -4,7 +4,7 @@
 
 `napmem_mcp_server.py` exposes the pyramid to any MCP client over the stdio
 transport (newline-delimited JSON-RPC 2.0, protocol `2025-06-18`). Pure
-stdlib — no MCP SDK dependency. Registered for this repo in `.mcp.json`:
+stdlib transport with no MCP SDK dependency. For direct local development:
 
 ```json
 {"mcpServers": {"napmem": {"command": "python3", "args": ["napmem_mcp_server.py"]}}}
@@ -44,7 +44,8 @@ python3 napmem_mcp_failover.py --status       # host, reachability, mirror age
 python3 napmem_mcp_failover.py --sync-mirror  # refresh the mirror now
 ```
 
-Mirror writes go through tmp + `os.replace`; a pyramid that fails to parse
+Mirror writes use a private temporary file per refresh plus `os.replace`;
+the configured remote basename maps to fixed local mirror filenames. A pyramid that fails to parse
 as a JSON object never replaces the previous snapshot.
 
 ## Tools
@@ -56,8 +57,21 @@ as a JSON object never replaces the previous snapshot.
 | `get_topic_track` | `topic_slug` (req) | Full Layer 2 track with associated records |
 | `memory_stats` | — | Token compression / context-budget savings stats |
 
-Tool failures (unknown record, bad layer, missing store) return in-band MCP
-errors (`isError: true`), not JSON-RPC protocol errors.
+Tool exceptions (bad layer, missing store, invalid semantic result count)
+return in-band `isError: true`. A missing record/topic lookup returns a data
+object containing an `error` field. Semantic `top_k` must be a positive integer.
+
+Requests require `jsonrpc: "2.0"`, a string/integer non-null ID and object
+params when provided. Notifications produce no response and do not execute
+request-only tools. Decoder failures, invalid UTF-8 and oversized lines return
+bounded parse errors; later valid requests remain serviceable. These rules
+follow the supported MCP protocol:
+https://modelcontextprotocol.io/specification/2025-06-18/basic/index
+
+The server reads the pyramid but semantic retrieval can write its disposable
+embedding cache and contact configured Ollama hosts. Use the installed project
+virtual environment for semantic paths. No live MCP installation or production
+connection is asserted by the offline subprocess tests.
 
 ## Manual smoke test
 

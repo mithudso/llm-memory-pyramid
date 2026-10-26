@@ -9,6 +9,7 @@ the MCP test drives the real server binary over a subprocess pipe.
 """
 
 import json
+import io
 import os
 import shutil
 import subprocess
@@ -29,9 +30,19 @@ from semantic_index import HashedTfBackend, OllamaBackend, SemanticIndex, cosine
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Network-free suite: point the Ollama chat chain at the discard port so any
-# accidental live probe refuses instantly instead of reaching a real daemon.
-os.environ.setdefault("NAPMEM_OLLAMA_CHAT", "http://127.0.0.1:9=test-model")
+def setUpModule():
+    # Every transport exercise installs its own fake. Unexpected requests must
+    # fail here, regardless of the operator's configured Ollama endpoints.
+    global _network_guard
+    _network_guard = mock.patch(
+        "urllib.request.urlopen",
+        side_effect=AssertionError("Unexpected network request in extension tests"),
+    )
+    _network_guard.start()
+
+
+def tearDownModule():
+    _network_guard.stop()
 
 
 class TestLLMExtractorParsing(unittest.TestCase):
@@ -59,6 +70,27 @@ class TestLLMExtractorParsing(unittest.TestCase):
         with self.assertRaises(ExtractionError):
             parse_extraction_output(json.dumps({"type": "fact"}))
 
+    def test_decoder_limits_reject_one_session_without_abandoning_later_sessions(self):
+        tmp = tempfile.mkdtemp(prefix="napmem_decode_limits_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        hostile_outputs = ["[" + "9" * 5000 + "]", "[" * 20000 + "]" * 20000]
+        for hostile in hostile_outputs:
+            with self.subTest(size=len(hostile)):
+                distiller = MemoryPyramidDistiller(os.path.join(tmp, "p.json"))
+                with self.assertLogs("llm_extractor", level="ERROR"):
+                    count, ingested = llm_extractor.ingest_extractions(
+                        distiller,
+                        {"bad": hostile, "good": json.dumps([self._unit()])},
+                        {"bad": "bad.md", "good": "good.md"},
+                    )
+                self.assertEqual(count, 1)
+                self.assertEqual(ingested, {"good"})
+                self.assertEqual(
+                    [record["source_anchor"]["session_id"]
+                     for record in distiller.data["memory_records"]],
+                    ["good"],
+                )
+
     def test_units_to_records_validates_and_converts(self):
         good = self._unit()
         bad_type = self._unit(type="opinion")
@@ -74,6 +106,24 @@ class TestLLMExtractorParsing(unittest.TestCase):
         self.assertEqual(rec["source_anchor"]["session_id"], "sess_x")
         self.assertEqual(rec["source_anchor"]["file_path"], "x.md")
         self.assertEqual(rec["topic_slug"], "editor-config")
+
+    def test_rejection_logs_exclude_unit_content_and_invalid_values(self):
+        marker = "SYNTHETIC_PRIVATE_MEMORY"
+        units = [
+            self._unit(type=marker, text=marker),
+            self._unit(salience=marker, text=marker),
+            self._unit(topic_slug={marker: marker}, text=marker),
+        ]
+        records, rejections = units_to_records(units, "s", "sample.md")
+        self.assertEqual(records, [])
+        self.assertEqual(len(rejections), 3)
+        self.assertNotIn(marker, " ".join(rejections))
+        with self.assertLogs("llm_extractor", level="WARNING") as logs:
+            llm_extractor.ingest_extractions(
+                mock.Mock(), {"s": json.dumps(units)}, {"s": "sample.md"}
+            )
+        self.assertNotIn(marker, " ".join(logs.output))
+        self.assertIn("rejected unit", " ".join(logs.output))
 
     def test_batch_custom_ids_stay_short_and_map_back(self):
         """The Batches API caps custom_id at 64 chars; long mirrored-file
@@ -141,8 +191,9 @@ class TestLLMExtractorParsing(unittest.TestCase):
 
 class TestSemanticIndex(unittest.TestCase):
     def setUp(self):
-        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
-        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        patcher = mock.patch.dict(os.environ, {"NAPMEM_EMBED_BACKEND": "hashed"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.tmp = tempfile.mkdtemp(prefix="napmem_sem_")
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.pyramid = os.path.join(self.tmp, "p.json")
@@ -263,6 +314,11 @@ class TestConsolidatorLLMWiring(unittest.TestCase):
         patcher = mock.patch.dict(sys.modules, {"anthropic": _fake_anthropic_module()})
         patcher.start()
         self.addCleanup(patcher.stop)
+        # These cases test the Anthropic -> heuristic branch. Ollama transport
+        # is exercised separately with mocked HTTP responses below.
+        ollama_patcher = mock.patch.object(ollama_extractor, "ollama_available", return_value=False)
+        ollama_patcher.start()
+        self.addCleanup(ollama_patcher.stop)
 
     def _llm_output(self):
         return json.dumps([{
@@ -301,6 +357,19 @@ class TestConsolidatorLLMWiring(unittest.TestCase):
         self.assertEqual(processed, 1)
         texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
         self.assertIn("User prefers tabs over spaces.", texts)
+
+    def test_client_constructor_failure_falls_back_to_heuristic(self):
+        module = _fake_anthropic_module()
+        module.Anthropic = mock.Mock(side_effect=module.AnthropicError("missing credentials"))
+        with mock.patch.dict(sys.modules, {"anthropic": module}), \
+             self.assertLogs("naptime_consolidator", level="ERROR") as logs:
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="auto")
+            self.assertEqual(consolidator.scan_and_consolidate(), 1)
+        self.assertIn("LLM batch extraction failed", " ".join(logs.output))
+        self.assertEqual(
+            [r["text"] for r in consolidator.distiller.data["memory_records"]],
+            ["User prefers tabs over spaces."],
+        )
 
     def test_invalid_llm_output_falls_back_per_file(self):
         with mock.patch.object(llm_extractor, "extract_batch",
@@ -452,9 +521,9 @@ class TestGuardedRead(unittest.TestCase):
 
 class TestOllamaFailover(unittest.TestCase):
     def test_probe_returns_none_when_all_hosts_dead(self):
-        # Ports 1 and 2 refuse connections immediately on loopback.
-        self.assertIsNone(OllamaBackend.probe(
-            urls=["http://127.0.0.1:1", "http://127.0.0.1:2"]))
+        with mock.patch("urllib.request.urlopen", side_effect=OSError("refused")):
+            self.assertIsNone(OllamaBackend.probe(
+                urls=["http://127.0.0.1:1", "http://127.0.0.1:2"]))
 
     def test_embed_rejects_malformed_vectors(self):
         """Crafted responses (non-numeric or ragged vectors) must never reach
@@ -480,8 +549,9 @@ class TestOllamaFailover(unittest.TestCase):
                     backend.embed(texts)
 
     def test_corrupt_cache_discarded_not_fatal(self):
-        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
-        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        patcher = mock.patch.dict(os.environ, {"NAPMEM_EMBED_BACKEND": "hashed"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         tmp = tempfile.mkdtemp(prefix="napmem_cc_")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         pyramid = os.path.join(tmp, "p.json")
@@ -521,8 +591,9 @@ class TestOllamaFailover(unittest.TestCase):
         self.assertEqual([v[0] for v in out], [float(i) for i in range(8)])
 
     def test_nearest_many_matches_singles(self):
-        os.environ["NAPMEM_EMBED_BACKEND"] = "hashed"
-        self.addCleanup(os.environ.pop, "NAPMEM_EMBED_BACKEND", None)
+        patcher = mock.patch.dict(os.environ, {"NAPMEM_EMBED_BACKEND": "hashed"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         tmp = tempfile.mkdtemp(prefix="napmem_nm_")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         index = SemanticIndex(os.path.join(tmp, "p.json"))
@@ -555,6 +626,49 @@ class TestOllamaFailover(unittest.TestCase):
             backend = OllamaBackend.probe(urls=["http://127.0.0.1:1", alive])
         self.assertIsNotNone(backend)
         self.assertEqual(backend.base_url, alive)
+
+
+class TestRetrievalSourceFiles(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX named pipes")
+    def test_stats_skip_fifo_and_other_unreadable_sources_without_blocking(self):
+        tmp = tempfile.mkdtemp(prefix="napmem_stats_sources_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        fifo = os.path.join(tmp, "source.fifo")
+        os.mkfifo(fifo)
+        invalid_utf8 = os.path.join(tmp, "invalid.md")
+        with open(invalid_utf8, "wb") as f:
+            f.write(b"\xff")
+        valid = os.path.join(tmp, "valid.md")
+        with open(valid, "w", encoding="utf-8") as f:
+            f.write("Readable source words.")
+        pyramid = os.path.join(tmp, "p.json")
+        distiller = MemoryPyramidDistiller(pyramid)
+        distiller.data["raw_conversations"] = [
+            {"session_id": "fifo", "file_path": fifo},
+            {"session_id": "directory", "file_path": tmp},
+            {"session_id": "invalid_utf8", "file_path": invalid_utf8},
+            {"session_id": "missing", "file_path": os.path.join(tmp, "absent.md")},
+            {"session_id": "valid", "file_path": valid},
+        ]
+        distiller.save()
+        code = (
+            "import json, sys; from napmem_retrieval_agent import NapMemRetrievalAgent; "
+            "print(json.dumps(NapMemRetrievalAgent(sys.argv[1]).compute_context_budget_savings()))"
+        )
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", code, pyramid], cwd=BASE_DIR,
+                capture_output=True, text=True, timeout=3, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail("Memory statistics blocked on a FIFO source")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stats = json.loads(result.stdout)
+        self.assertEqual(stats["sessions_compared"], ["valid"])
+        self.assertCountEqual(
+            stats["sessions_missing_raw_file"], ["fifo", "directory", "invalid_utf8", "missing"]
+        )
+        self.assertGreater(stats["raw_memory_estimated_tokens"], 0)
 
 
 class TestMCPServer(unittest.TestCase):
@@ -635,7 +749,7 @@ class TestMCPServer(unittest.TestCase):
         ])
         by_id = {r.get("id"): r for r in responses}
         self.assertEqual(by_id[None]["error"]["code"], -32600)         # batch rejected
-        self.assertIn("result", by_id[2])                              # params coerced
+        self.assertEqual(by_id[2]["error"]["code"], -32602)              # invalid params
         self.assertEqual(by_id[3]["error"]["code"], -32602)
         self.assertTrue(by_id[4]["result"]["isError"])                 # in-band tool error
         self.assertEqual(by_id[5]["error"]["code"], -32600)
@@ -727,6 +841,34 @@ class TestOllamaExtraction(unittest.TestCase):
             outputs = extract_ollama({"s": "p"}, [("http://h:1", "m")])
         self.assertEqual(json.loads(outputs["s"]), json.loads(self._unit_array_text()))
 
+    def test_chat_preserves_think_tags_inside_json_strings(self):
+        content = self._unit_array_text("User stores <think>literal XML content</think> in notes.")
+        with mock.patch("urllib.request.urlopen", return_value=self._chat_response(content)):
+            outputs = extract_ollama({"s": "p"}, [("http://h:1", "m")])
+        self.assertEqual(json.loads(outputs["s"]), json.loads(content))
+
+    def test_missing_model_does_not_bench_other_models_on_same_host(self):
+        import urllib.error
+        models = []
+
+        def fake_urlopen(req, timeout=None):
+            model = json.loads(req.data)["model"]
+            models.append(model)
+            if model == "missing":
+                raise urllib.error.HTTPError(
+                    req.full_url, 404, "model absent", {},
+                    io.BytesIO(b'{"error":"model missing"}'),
+                )
+            return self._chat_response(self._unit_array_text())
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            outputs = extract_ollama(
+                {"s1": "p", "s2": "p"},
+                [("http://same:1", "missing"), ("http://same:1", "available")],
+            )
+        self.assertEqual(set(outputs), {"s1", "s2"})
+        self.assertEqual(models, ["missing", "available", "available"])
+
     def test_extract_ollama_omits_sessions_all_hosts_failed(self):
         import urllib.error
         with mock.patch("urllib.request.urlopen",
@@ -765,6 +907,24 @@ class TestConsolidatorOllamaWiring(unittest.TestCase):
         mocked.assert_called_once()
         texts = [r["text"] for r in consolidator.distiller.data["memory_records"]]
         self.assertEqual(texts, ["Ollama says: tabs preferred."])
+
+    def test_deep_ollama_json_falls_back_and_preserves_later_file(self):
+        with open(os.path.join(self.watch, "second.md"), "w", encoding="utf-8") as source:
+            source.write("# Second\n- A second source.\n")
+        client = mock.Mock()
+        client.chat.side_effect = ["[" * 20000 + "]" * 20000, self._ollama_output()]
+        with mock.patch.object(ollama_extractor, "ollama_available", return_value=True), \
+                mock.patch.object(ollama_extractor, "parse_chat_hosts",
+                                  return_value=[("http://offline.invalid:1", "fake")]), \
+                mock.patch.object(ollama_extractor, "_client_for", return_value=client), \
+                self.assertLogs(llm_extractor.logger, level="ERROR"):
+            consolidator = NaptimeConsolidator(self.watch, self.pyramid, extraction="ollama")
+            self.assertEqual(consolidator.scan_and_consolidate(), 2)
+        self.assertEqual(client.chat.call_count, 2)
+        records = consolidator.distiller.data["memory_records"]
+        by_session = {record["source_anchor"]["session_id"]: record["text"] for record in records}
+        self.assertEqual(by_session["sess_notes"], "User prefers tabs over spaces.")
+        self.assertEqual(by_session["sess_second"], "Ollama says: tabs preferred.")
 
     def test_ollama_unreachable_falls_back_to_heuristic(self):
         with mock.patch.object(ollama_extractor, "ollama_available", return_value=False):
@@ -830,6 +990,38 @@ class TestSweepStatePersistence(unittest.TestCase):
         with open(self.state, "w", encoding="utf-8") as f:
             f.write("{corrupt")
         self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+
+    def test_invalid_state_shapes_are_ignored_with_safe_warning(self):
+        marker = "SYNTHETIC_PRIVATE_STATE"
+        for state in (
+            [], {"files": []}, {"files": {self.fpath: marker}},
+            {"files": {self.fpath: {"mtime": marker, "sha256": marker}}},
+        ):
+            with self.subTest(state=type(state).__name__):
+                with open(self.state, "w", encoding="utf-8") as f:
+                    json.dump(state, f)
+                with self.assertLogs("naptime_consolidator", level="WARNING") as logs:
+                    consolidator = self._fresh()
+                self.assertEqual(consolidator.file_hashes, {})
+                self.assertNotIn(marker, " ".join(logs.output))
+                self.assertEqual(consolidator.scan_and_consolidate(), 1)
+
+    def test_missing_store_is_rebuilt_despite_persisted_sweep_state(self):
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+        os.remove(self.pyramid)
+        restored = self._fresh()
+        self.assertEqual(restored.scan_and_consolidate(), 1)
+        self.assertEqual(len(restored.distiller.data["memory_records"]), 1)
+        self.assertTrue(os.path.exists(self.pyramid))
+
+    def test_replaced_empty_store_is_rebuilt_despite_sweep_state(self):
+        self.assertEqual(self._fresh().scan_and_consolidate(), 1)
+        empty = MemoryPyramidDistiller(os.path.join(self.tmp, "empty.json"))
+        empty.pyramid_path = self.pyramid
+        empty.save()
+        restored = self._fresh()
+        self.assertEqual(restored.scan_and_consolidate(), 1)
+        self.assertEqual(len(restored.distiller.data["memory_records"]), 1)
 
     def test_state_prunes_deleted_files(self):
         self._fresh().scan_and_consolidate()
