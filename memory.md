@@ -4,8 +4,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 
 ## v1.7.0 — 2026-10-26
 
-**Active task:** code and bootstrap work complete; GitHub delivery tracked in
-TASK-220. TASK-218 covers standards and TASK-219 covers the code review.
+**Active task:** none — requested source and bootstrap work published.
+TASK-218 covers standards, TASK-219 the code review, and TASK-220 delivery.
 
 **Delta:** workflow v1.6.0 → v1.7.0; package 0.1.0 → 0.1.1; MCP server
 1.1.0 → 1.1.1. Store schema remains 1.0.0. Added three regression suites.
@@ -45,9 +45,19 @@ TASK-220. TASK-218 covers standards and TASK-219 covers the code review.
   /Users/mitch/.claude/skill-consolidation/backups/llm-memory-pyramid-20261026T2155/.
 - External static dossier:
   /Users/mitch/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/.
-- Remaining delivery: commit explicit owned paths, push maintenance branch,
-  wait for GitHub CI, merge verified PR and sync main. TASK-220 records the
-  authoritative publication receipt. Production runtime work is outside scope.
+- Delivery: source commit 9d23b3b published through PR #15 and squash-merged
+  as ee2170da1eff9effea62e47621257a298f299a16. CI passed all 111 tests on
+  Python 3.11/3.12/3.14, Ruff, static maps and shell syntax:
+  https://github.com/mithudso/llm-memory-pyramid/pull/15
+  https://github.com/mithudso/llm-memory-pyramid/actions/runs/40413224889
+- Main was fast-forwarded to the merged tree and the task branch removed.
+  Commit/sync commands suppressed the automatic indexing hook for this run
+  only; persistent Git config was not changed. Registry metadata was recorded
+  explicitly. The external dossier verified 77/77 source hashes at 9d23b3b.
+- Remaining product steps: none. Optimizer exit remains BLIND-AUDIT-DISSENT;
+  no independent CLEAN claim or production runtime acceptance is implied.
+  Production runtime work remains outside scope. TASK-220 holds the final
+  receipt for this documentation closeout too.
 
 ## v1.6.0 — 2026-09-26
 
