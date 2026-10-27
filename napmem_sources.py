@@ -144,8 +144,7 @@ class SourceRegistry:
             if entry is None:
                 candidates = [item for item in data["sources"] if item["path"] not in live
                               and not os.path.exists(item["path"])
-                              and item.get("device") == snapshot["device"] and item.get("inode") == snapshot["inode"]
-                              and item.get("sha256") == snapshot["sha256"]]
+                              and item.get("device") == snapshot["device"] and item.get("inode") == snapshot["inode"]]
                 if len(candidates) == 1:
                     entry = candidates[0]
                     entry["previous_path"] = entry["path"]

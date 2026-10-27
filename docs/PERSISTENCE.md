@@ -29,6 +29,9 @@ generation. Mirrors publish an immutable generation through one atomic pointer.
 Older or failed refreshes preserve the active generation. Snapshot searches
 cannot write caches. Restores validate the manifest, retain newer local privacy
 controls and corrections, and create a new generation without changing IDs.
+Restored assertions retain their original scopes. Current forgotten-text hashes
+also suppress older backup copies made before a scope change. A reader that
+opened a verified snapshot refuses a later manifest-free downgrade.
 
 All persisted JSON and queue files use private permissions. Atomic replacement
 includes file fsync; a directory-sync failure after replacement is reported as

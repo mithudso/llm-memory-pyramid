@@ -27,6 +27,7 @@ VALID_LAYERS = ("all", "profiles", "tracks", "records")
 class NapMemRetrievalAgent:
     def __init__(self, pyramid_path: str = "napmem_pyramid.json"):
         self.pyramid_path = pyramid_path
+        self._snapshot_required = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(pyramid_path)), "manifest.json"))
         self._seen_fingerprint = None
         self.data = self._load_pyramid()
 
@@ -37,10 +38,12 @@ class NapMemRetrievalAgent:
         if raw is None:
             raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please initialize a store first.")
         directory = os.path.dirname(os.path.abspath(self.pyramid_path))
-        if (os.path.basename(self.pyramid_path) == "napmem_pyramid.json"
-                and os.path.exists(os.path.join(directory, "manifest.json"))):
+        if self._snapshot_required:
             from napmem_snapshots import load_snapshot
-            raw = load_snapshot(directory)["data"]
+            snapshot = load_snapshot(directory)
+            if snapshot["verification"]["status"] != "verified":
+                raise ValueError("A previously verified snapshot lost its manifest")
+            raw = snapshot["data"]
         data = migrate_store(raw)
         apply_controls(data)
         build_derived(data)
@@ -50,7 +53,7 @@ class NapMemRetrievalAgent:
     def _refresh(self):
         _, digest = read_snapshot(self.pyramid_path)
         snapshot = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(self.pyramid_path)), "manifest.json"))
-        if digest != self._seen_fingerprint or snapshot:
+        if digest != self._seen_fingerprint or snapshot or self._snapshot_required:
             self.data = self._load_pyramid()
 
     @staticmethod

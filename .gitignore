@@ -21,6 +21,12 @@ memory_logs/
 # Embedding index cache (derived from the pyramid store)
 *.embindex.json
 *.sweepstate.json
+*.json.lock
+*.sources.json
+*.jobs.sqlite3
+*.jobs.sqlite3-journal
+*.metrics.sqlite3
+*.metrics.sqlite3-journal
 
 # Session state
 .remember/

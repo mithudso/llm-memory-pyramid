@@ -385,19 +385,37 @@ class JobQueue:
         return receipts
 
     def retry(self, job_id: str, *, source_content: str, source_path: str | None = None) -> dict[str, Any]:
-        job = self.get(job_id)
-        if job is None or job["state"] not in ("failed", "stale", "cancelled"):
-            raise ValueError("Only failed, stale or cancelled jobs can retry")
-        if job["error_code"] == "PrivacyPurge":
-            raise ValueError("Privacy-purged jobs cannot retry; an allowed source needs a fresh enqueue")
-        if job["attempts"] >= job["max_attempts"]:
-            raise ValueError("Job retry limit reached")
-        if _sha(source_content) != job["source_hash"]:
-            raise ValueError("Retry needs the same source revision; enqueue a changed source")
-        with self._db(create=False) as db:
-            db.execute("""UPDATE jobs SET state='queued',source_text=?,result_text=NULL,result_kind=NULL,
-                       batch_handle=NULL,error_code=NULL,lease_owner=NULL,lease_until=NULL,source_path=?,updated_at=? WHERE id=?""",
-                       (source_content, source_path or job["source_path"], time.time(), job_id))
+        from napmem_controls import source_is_excluded, _quote_line_hashes
+        from napmem_storage import read_snapshot, store_lock
+        with store_lock(self.pyramid_path):
+            snapshot, _ = read_snapshot(self.pyramid_path)
+            with self._db(create=False) as db:
+                if db is None:
+                    raise ValueError("Job does not exist")
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+                job = dict(row) if row is not None else None
+                if job is None or job["state"] not in ("failed", "stale", "cancelled"):
+                    raise ValueError("Only failed, stale or cancelled jobs can retry")
+                if job["error_code"] == "PrivacyPurge":
+                    raise ValueError("Privacy-purged jobs cannot retry; an allowed source needs a fresh enqueue")
+                if job["attempts"] >= job["max_attempts"]:
+                    raise ValueError("Job retry limit reached")
+                if _sha(source_content) != job["source_hash"]:
+                    raise ValueError("Retry needs the same source revision; enqueue a changed source")
+                path = os.path.abspath(source_path or job["source_path"])
+                if snapshot is not None:
+                    if source_is_excluded(snapshot, path, session_id=job["session_id"]):
+                        raise ValueError("Source is excluded or permanently forgotten")
+                    scope = job["scope"] or snapshot.get("source_scopes", {}).get(_sha(job["session_id"]), "legacy")
+                    forbidden = {item["text_sha256"] for item in snapshot.get("controls", {}).get("tombstones", [])
+                                 if item["scope"] == scope}
+                    if forbidden.intersection(_quote_line_hashes(source_content)):
+                        raise ValueError("Source body contains a forgotten claim")
+                db.execute("""UPDATE jobs SET state='queued',source_text=?,result_text=NULL,result_kind=NULL,
+                           batch_handle=NULL,error_code=NULL,lease_owner=NULL,lease_until=NULL,source_path=?,updated_at=? WHERE id=?""",
+                           (source_content, path, time.time(), job_id))
+                db.execute("COMMIT")
         return self.receipt(job_id)
 
     def cancel(self, job_id: str) -> dict[str, Any]:

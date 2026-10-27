@@ -743,16 +743,20 @@ class MemoryPyramidDistiller:
                 values[identity] = max(values.get(identity, 0), value) if key == "session_counters" else value
         redactions = restored.get("evidence_redactions", []) + current.get("evidence_redactions", [])
         restored["evidence_redactions"] = list({repr(sorted(item.items())): item for item in redactions}.values())
+        # Backup assertions retain their original scope. Restore never relabels
+        # old evidence with a later source scope. A current forgotten text also
+        # suppresses older backup copies made before an explicit scope change.
+        forbidden = {item["text_sha256"] for item in new_controls.get("tombstones", [])}
         for record in restored["memory_records"]:
-            occurrences = [(record, record["source_anchor"])]
-            occurrences.extend((anchor.setdefault("assertion", {}), anchor)
+            occurrences = [record]
+            occurrences.extend({**record, **anchor.get("assertion", {})}
                                for anchor in record.get("duplicate_anchors", {}).values())
-            for assertion, anchor in occurrences:
-                session = anchor.get("session_id", "")
-                scope = restored["source_scopes"].get(hashlib.sha256(session.encode()).hexdigest())
-                if scope and assertion.get("scope") != scope:
-                    assertion["scope"] = scope
-                    assertion["review_status"] = "unreviewed"
+            for assertion in occurrences:
+                text_hash = hashlib.sha256(assertion["text"].lower().strip().encode()).hexdigest()
+                if text_hash in forbidden:
+                    policy = {"scope": assertion["scope"], "text_sha256": text_hash}
+                    if policy not in merged["tombstones"]:
+                        merged["tombstones"].append(policy)
         restored["generation"] = current["generation"]
         restored["deletion_receipts"] = copy.deepcopy(current.get("deletion_receipts", []))
         self.data = restored

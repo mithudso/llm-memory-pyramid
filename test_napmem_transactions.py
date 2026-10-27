@@ -53,6 +53,49 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(texts, {"Use Emacs"})
         self.assertIn(identity, {r["id"] for r in store.data["memory_records"]})
 
+    def test_restore_does_not_rescope_and_resurrect_forgotten_claim(self):
+        from napmem_snapshots import export_snapshot
+        store = MemoryPyramidDistiller(self.path)
+        store.ingest_session("a", "A", "a.md", "Secret preference", scope="project:a")
+        backup = str(Path(self.tmp.name) / "backup")
+        export_snapshot(self.path, backup)
+        store.control("forget", record_id=store.data["memory_records"][0]["id"])
+        store.ingest_session("a", "A", "a.md", "Public preference", scope="project:b")
+        store.restore_snapshot(backup)
+        self.assertNotIn("Secret preference", str(store.data["memory_records"]))
+
+    def test_missing_manifest_cannot_downgrade_a_verified_reader(self):
+        from napmem_snapshots import export_snapshot
+        store = MemoryPyramidDistiller(self.path)
+        store.ingest_session("a", "A", "a.md", "Preference")
+        backup = Path(self.tmp.name) / "backup"
+        export_snapshot(self.path, backup)
+        agent = NapMemRetrievalAgent(str(backup / "napmem_pyramid.json"))
+        (backup / "manifest.json").unlink()
+        with self.assertRaisesRegex(ValueError, "lost its manifest"):
+            agent.query("Preference")
+
+    def test_retry_purge_interleaving_cannot_restore_payload(self):
+        from contextlib import contextmanager
+        from napmem_jobs import JobQueue
+        queue = JobQueue(self.path)
+        job = queue.enqueue(session_id="a", source_path="a.md", source_content="Private source")
+        queue.cancel(job["id"])
+        original = queue._db
+        injected = False
+        @contextmanager
+        def interleaved(**kwargs):
+            nonlocal injected
+            with original(**kwargs) as db:
+                yield db
+            if not injected:
+                injected = True
+                queue.purge(session_ids=["a"])
+        with patch.object(queue, "_db", interleaved):
+            queue.retry(job["id"], source_content="Private source")
+        self.assertEqual(queue.get(job["id"])["state"], "cancelled")
+        self.assertIsNone(queue.get(job["id"], include_payload=True)["source_text"])
+
     def test_forget_purges_only_affected_jobs_and_blocks_stale_cache_writer(self):
         from napmem_jobs import JobQueue
         from semantic_index import SemanticIndex, HashedTfBackend

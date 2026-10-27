@@ -47,6 +47,7 @@ class TestSourceRegistry(unittest.TestCase):
         first = self.registry.observe(read_source(str(old)), scope="project:a")
         self.registry.mark_committed(first["session_id"], first["sha256"])
         old.rename(new)
+        new.write_text("updated immutable snapshot")
         renamed = self.registry.observe(read_source(str(new)), live_paths=[str(new)])
         self.assertEqual(renamed["session_id"], first["session_id"])
         self.assertEqual(renamed["committed_sha256"], first["sha256"])
