@@ -33,6 +33,7 @@ import re
 from typing import Any
 
 from ollama_client import OllamaClient, OllamaPool, cosine, parse_urls, urls_from_env
+from napmem_storage import StoreConflict, atomic_write, file_fingerprint, store_lock
 
 logger = logging.getLogger(__name__)
 
@@ -209,9 +210,12 @@ def select_backend():
 class SemanticIndex:
     """Persistent embedding index over a pyramid store's Layer 1 records."""
 
-    def __init__(self, pyramid_path: str, backend=None):
+    def __init__(self, pyramid_path: str, backend=None, *, cache_writable=True):
         self.pyramid_path = pyramid_path
         self.index_path = f"{pyramid_path}.embindex.json"
+        self._store_fingerprint = file_fingerprint(pyramid_path)
+        self.cache_writable = (cache_writable and os.environ.get("NAPMEM_CACHE_READ_ONLY") != "1"
+                               and not os.path.isfile(os.path.join(os.path.dirname(os.path.abspath(pyramid_path)), "manifest.json")))
         self.backend = backend or select_backend()
         self._cache_dirty = False
         self._cache = self._load()
@@ -244,23 +248,13 @@ class SemanticIndex:
         return {"model": self.backend.model, "vectors": {}}
 
     def save(self):
-        # Per-PID tmp name: the index is written by both the consolidator and
-        # any concurrent retrieval query; a shared tmp path lets one process's
-        # os.replace consume the other's file (observed crash). Last writer
-        # wins on the index itself — it is a rebuildable cache.
-        tmp_path = f"{self.index_path}.{os.getpid()}.tmp"
-        try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(self._cache, f, allow_nan=False)
-            os.replace(tmp_path, self.index_path)
-        except (OSError, ValueError):
-            # Never leave a partial tmp behind: PIDs recycle, and a stale
-            # partial could later be replaced over a good index.
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
+        if not self.cache_writable:
+            return
+        with store_lock(self.pyramid_path):
+            if file_fingerprint(self.pyramid_path) != self._store_fingerprint:
+                raise StoreConflict("Canonical store changed; discard the stale embedding index")
+            atomic_write(self.index_path, self._cache,
+                         expected_fingerprint=file_fingerprint(self.index_path))
 
     def _embed_checked(self, texts: list[str], dimensions: int | None = None):
         embedded = self.backend.embed(texts)

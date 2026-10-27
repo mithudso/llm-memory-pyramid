@@ -18,13 +18,17 @@ rebuilds Layers 2-3 from the surviving records.
 import argparse
 import copy
 import hashlib
-import json
 import os
 import re
 import sys
 from collections import deque
+from contextlib import contextmanager
+from functools import wraps
+import threading
 from datetime import UTC, datetime
 from typing import Any
+
+from napmem_storage import StoreConflict, atomic_write, read_snapshot, store_lock
 
 from napmem_model import (
     CONTEXT_FIELDS, apply_supersession, build_derived, migrate_store, normalize_record,
@@ -54,10 +58,25 @@ def _assertion_key(record):
 def _text_identity(record):
     return (_assertion_key(record), record["text"].lower().strip())
 
+def _write_operation(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        if method.__name__ == "control" and kwargs.get("dry_run", False):
+            self.refresh()
+            return method(self, *args, **kwargs)
+        with self.transaction():
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class MemoryPyramidDistiller:
     def __init__(self, pyramid_path: str = "napmem_pyramid.json",
                  semantic_dedup: bool = False, semantic_threshold: float = 0.92):
-        self.pyramid_path = pyramid_path
+        self.pyramid_path = os.path.realpath(os.path.abspath(os.fspath(pyramid_path)))
+        self._transaction_owner = None
+        self._seen_fingerprint = None
+        self._seen_generation = 0
+        self._persisted_data = None
         self.data = self._load_pyramid()
         # Semantic dedup is opt-in: it folds near-duplicate paraphrases into
         # canonicals using the embedding index (see semantic_index.py). Off by
@@ -74,43 +93,82 @@ class MemoryPyramidDistiller:
 
     def _load_pyramid(self) -> dict[str, Any]:
         from napmem_controls import apply_controls
-        if os.path.exists(self.pyramid_path):
-            with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                data = migrate_store(json.load(f))
-                apply_controls(data)
-                build_derived(data)
-                return data
-        return migrate_store({
-            "version": "1.0.0",
-            "updated_at": _utcnow(),
-            "user_profiles": [],
-            "topic_tracks": [],
-            "memory_records": [],
-            "raw_conversations": []
-        })
+        raw, digest = read_snapshot(self.pyramid_path)
+        if raw is None:
+            raw = {"version": "1.0.0", "updated_at": _utcnow(),
+                   "user_profiles": [], "topic_tracks": [],
+                   "memory_records": [], "raw_conversations": []}
+        data = migrate_store(raw)
+        apply_controls(data)
+        build_derived(data)
+        self._seen_fingerprint = digest
+        self._seen_generation = data["generation"]
+        self._persisted_data = copy.deepcopy(data)
+        return data
+
+    def refresh(self):
+        """Reload external commits without silently discarding caller-owned edits."""
+        _, digest = read_snapshot(self.pyramid_path)
+        if digest != self._seen_fingerprint:
+            if self.data != self._persisted_data:
+                raise StoreConflict("Uncommitted in-memory changes conflict with a newer store snapshot")
+            self.data = self._load_pyramid()
+            self._semantic_index = None
+        return self
+
+    @contextmanager
+    def transaction(self):
+        """Serialize the complete read/reconcile/control/commit lifecycle."""
+        owner = threading.get_ident()
+        if self._transaction_owner == owner:
+            yield self
+            return
+        with store_lock(self.pyramid_path):
+            self.refresh()
+            previous = copy.deepcopy(self.data)
+            original_fingerprint = self._seen_fingerprint
+            self._transaction_owner = owner
+            self._semantic_index = None
+            try:
+                yield self
+            except Exception:
+                # A caller can fail after an inner commit (for example queue
+                # acknowledgment). Keep that commit; it cannot be rolled back
+                # by assigning an old Python dictionary.
+                if self._seen_fingerprint == original_fingerprint:
+                    self.data = previous
+                else:
+                    self.data = copy.deepcopy(self._persisted_data)
+                raise
+            finally:
+                self._transaction_owner = None
 
     def save(self):
-        previous_generation = self.data.get("generation", 0)
-        self.data["generation"] = previous_generation + 1
-        self.data["updated_at"] = _utcnow()
-        # Atomic + durable write: per-PID tmp so a concurrent CLI run cannot
-        # interleave into the daemon's tmp file (whichever replace runs last
-        # wins wholesale, never a corrupt mix); fsync before replace so a
-        # power loss cannot make the rename durable ahead of the data.
-        tmp_path = f"{self.pyramid_path}.{os.getpid()}.tmp"
-        try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_path, self.pyramid_path)
-        except OSError:
-            self.data["generation"] = previous_generation
+        """Commit once with fingerprint and generation preconditions."""
+        with store_lock(self.pyramid_path):
+            generation = self.data.get("generation")
+            if (isinstance(generation, bool) or not isinstance(generation, int)
+                    or generation != self._seen_generation):
+                raise StoreConflict("In-memory generation changed outside the persistence layer")
+            _, current = read_snapshot(self.pyramid_path)
+            if current != self._seen_fingerprint:
+                raise StoreConflict("Store changed since load; direct stale saves are rejected")
+            before_generation = self.data["generation"]
+            before_updated = self.data.get("updated_at")
+            self.data["generation"] = before_generation + 1
+            self.data["updated_at"] = _utcnow()
             try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
+                digest = atomic_write(self.pyramid_path, self.data,
+                                      expected_fingerprint=self._seen_fingerprint)
+            except Exception:
+                self.data["generation"] = before_generation
+                self.data["updated_at"] = before_updated
+                raise
+            self._seen_fingerprint = digest
+            self._seen_generation = self.data["generation"]
+            self._persisted_data = copy.deepcopy(self.data)
+            if self._semantic_index is not None:
+                self._semantic_index._store_fingerprint = digest
 
     def extract_atomic_units(self, content: str, session_id: str, file_path: str) -> list[dict[str, Any]]:
         """
@@ -432,12 +490,32 @@ class MemoryPyramidDistiller:
         """Returns the next free rec_<session>_NNN suffix, scanning canonical and
         duplicate IDs alike so no surviving reference can collide."""
         prefix = f"rec_{session_id}_"
-        max_n = 0
+        counters = self.data.get("session_counters", {})
+        if not isinstance(counters, dict):
+            raise ValueError("session_counters must be an object")
+        key = hashlib.sha256(session_id.encode()).hexdigest()
+        max_n = counters.get(key, 0)
+        if isinstance(max_n, bool) or not isinstance(max_n, int) or max_n < 0:
+            raise ValueError("session counter must be a nonnegative integer")
         for rec in self.data["memory_records"]:
             for rid in [rec["id"], *rec.get("duplicates", [])]:
                 if rid.startswith(prefix) and rid[len(prefix):].isdigit():
                     max_n = max(max_n, int(rid[len(prefix):]))
         return max_n + 1
+
+    def _remember_record_ids(self, records):
+        counters = self.data.setdefault("session_counters", {})
+        if not isinstance(counters, dict):
+            raise ValueError("session_counters must be an object")
+        for record in records:
+            for rid in [record["id"], *record.get("duplicates", [])]:
+                match = re.fullmatch(r"rec_(.+)_(\d{1,12})", rid)
+                if match:
+                    key = hashlib.sha256(match[1].encode()).hexdigest()
+                    prior = counters.get(key, 0)
+                    if isinstance(prior, bool) or not isinstance(prior, int) or prior < 0:
+                        raise ValueError("session counter must be a nonnegative integer")
+                    counters[key] = max(prior, int(match[2]))
 
     def rebuild_higher_layers(self):
         """Rebuild only supported, scoped and current derived assertions."""
@@ -457,6 +535,7 @@ class MemoryPyramidDistiller:
                                            source_content=content,
                                            extraction_info=extraction_info or {"method": "heuristic"})
 
+    @_write_operation
     def ingest_session_records(self, session_id: str, title: str, file_path: str,
                                new_records: list[dict[str, Any]], *,
                                scope: str | None = None,
@@ -522,10 +601,12 @@ class MemoryPyramidDistiller:
         self.data["raw_conversations"].append(raw_entry)
 
         # Phase 3: Reconcile prior generation, then deduplicate the remainder
+        self._remember_record_ids(self.data["memory_records"])
         remaining_records = self._reconcile_session_records(session_id, new_records)
         for record in remaining_records:
             record.pop("_context_updates", None)
         self.deduplicate_and_merge(remaining_records)
+        self._remember_record_ids(self.data["memory_records"])
         apply_controls(self.data)
 
         # Phase 4: Rebuild Pyramid Layers 2 and 3
@@ -534,6 +615,7 @@ class MemoryPyramidDistiller:
         self.save()
         return len(new_records)
 
+    @_write_operation
     def control(self, action: str, *, record_id: str | None = None, value=None,
                 source: str | None = None, at: str | None = None, dry_run: bool = False,
                 expected_generation: int | None = None,
@@ -545,10 +627,12 @@ class MemoryPyramidDistiller:
             return preview_action(self.data, action, **arguments)
         previous = copy.deepcopy(self.data)
         cache_state = "retained"
+        job_state = {"coverage": "not_requested"}
         try:
             receipt = apply_action(self.data, action, **arguments,
                                    expected_generation=expected_generation,
                                    preview_token=preview_token)
+            self._remember_record_ids(previous["memory_records"])
             source_scopes = self.data.setdefault("source_scopes", {})
             if not isinstance(source_scopes, dict):
                 raise ValueError("source_scopes must be an object")
@@ -575,11 +659,38 @@ class MemoryPyramidDistiller:
                 except OSError as exc:
                     cache_state = "pending:" + type(exc).__name__
             if action in ("forget", "forget_session", "exclude"):
+                from napmem_jobs import JobQueue
+                sessions, paths = set(), set()
+                affected = set(receipt["affected_ids"])
+                for record in previous["memory_records"]:
+                    occurrences = [(record["id"], record["source_anchor"])]
+                    occurrences.extend(record.get("duplicate_anchors", {}).items())
+                    for identity, anchor in occurrences:
+                        session, path = anchor.get("session_id"), anchor.get("file_path")
+                        selected = (identity in affected if action == "forget" else
+                                    session == (source or "").removeprefix("session:") or path == source)
+                        if selected:
+                            if session:
+                                sessions.add(session)
+                            if path:
+                                paths.add(path)
+                # Exclusion can select a source whose only copy is still queued.
+                if source:
+                    sessions.add(source.removeprefix("session:"))
+                    paths.add(source)
+                try:
+                    job_state = JobQueue(self.pyramid_path).purge(session_ids=sessions, source_paths=paths)
+                except (OSError, ValueError) as exc:
+                    job_state = {"coverage": "pending:" + type(exc).__name__}
+                except Exception as exc:
+                    # Queue failure must not prevent canonical deletion. Persist
+                    # the partial coverage without recording sensitive errors.
+                    job_state = {"coverage": "pending:" + type(exc).__name__}
                 receipts = self.data.setdefault("deletion_receipts", [])
                 if not isinstance(receipts, list):
                     raise ValueError("deletion_receipts must be a list")
                 receipts.append({"change_id": receipt["change_id"], "action": action,
-                                 "cache": cache_state, "mirrors": "pending_acknowledgment",
+                                 "cache": cache_state, "jobs": job_state, "mirrors": "pending_acknowledgment",
                                  "originals_exports_backups": "operator_managed"})
                 self.data["deletion_receipts"] = receipts[-1000:]
             self.save()
@@ -588,7 +699,7 @@ class MemoryPyramidDistiller:
             raise
         self._semantic_index = None
         receipt.update(generation=self.data["generation"], persistence="committed",
-                       cache=cache_state, embedding_cache=cache_state,
+                       cache=cache_state, embedding_cache=cache_state, jobs=job_state,
                        canonical_deletion_complete=(action in ("forget", "forget_session")
                                                     and not cache_state.startswith("pending:")),
                        completion_scope="canonical_store_and_adjacent_embedding_cache")
@@ -597,6 +708,64 @@ class MemoryPyramidDistiller:
                                        "forget_session": "selected_session_occurrences",
                                        "exclude": "selected_source_occurrences"}[action]
         return receipt
+
+    @_write_operation
+    def restore_snapshot(self, directory: str) -> dict[str, Any]:
+        """Restore validated data while preserving all current operator controls.
+
+        A backup cannot erase a newer forget or source exclusion. The restore
+        creates a new local generation and never rolls its counter backward.
+        """
+        from napmem_snapshots import load_snapshot
+        from napmem_controls import apply_controls
+        restored = copy.deepcopy(load_snapshot(directory)["data"])
+        current = self.data
+        old_controls, new_controls = restored.get("controls", {}), current.get("controls", {})
+        merged = copy.deepcopy(old_controls)
+        for key in ("overrides", "corrections", "excluded_sources"):
+            merged.setdefault(key, {}).update(copy.deepcopy(new_controls.get(key, {})))
+        assertions = {item["id"]: item for item in old_controls.get("assertions", [])}
+        assertions.update({item["id"]: item for item in new_controls.get("assertions", [])})
+        merged["assertions"] = list(assertions.values())
+        tombstones = old_controls.get("tombstones", []) + new_controls.get("tombstones", [])
+        merged["tombstones"] = list({repr(sorted(item.items())): item for item in tombstones}.values())
+        # A permanent forgotten-source marker wins over either reversible flag.
+        for controls in (old_controls, new_controls):
+            for key, value in controls.get("excluded_sources", {}).items():
+                if value == "forgotten":
+                    merged["excluded_sources"][key] = value
+        merged["journal"] = (old_controls.get("journal", []) + new_controls.get("journal", []))[-1000:]
+        if merged:
+            restored["controls"] = merged
+        for key in ("source_scopes", "session_counters"):
+            values = restored.setdefault(key, {})
+            for identity, value in current.get(key, {}).items():
+                values[identity] = max(values.get(identity, 0), value) if key == "session_counters" else value
+        redactions = restored.get("evidence_redactions", []) + current.get("evidence_redactions", [])
+        restored["evidence_redactions"] = list({repr(sorted(item.items())): item for item in redactions}.values())
+        for record in restored["memory_records"]:
+            occurrences = [(record, record["source_anchor"])]
+            occurrences.extend((anchor.setdefault("assertion", {}), anchor)
+                               for anchor in record.get("duplicate_anchors", {}).values())
+            for assertion, anchor in occurrences:
+                session = anchor.get("session_id", "")
+                scope = restored["source_scopes"].get(hashlib.sha256(session.encode()).hexdigest())
+                if scope and assertion.get("scope") != scope:
+                    assertion["scope"] = scope
+                    assertion["review_status"] = "unreviewed"
+        restored["generation"] = current["generation"]
+        restored["deletion_receipts"] = copy.deepcopy(current.get("deletion_receipts", []))
+        self.data = restored
+        apply_controls(self.data)
+        self.rebuild_higher_layers()
+        self._semantic_index = None
+        try:
+            os.unlink(self.pyramid_path + ".embindex.json")
+        except FileNotFoundError:
+            pass
+        self.save()
+        return {"restored": True, "generation": self.data["generation"],
+                "privacy_controls": "preserved", "records": len(self.data["memory_records"])}
 
     def render_markdown_summary(self) -> str:
         """

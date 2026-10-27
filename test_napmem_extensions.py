@@ -993,10 +993,10 @@ class TestSweepStatePersistence(unittest.TestCase):
 
     def test_invalid_state_shapes_are_ignored_with_safe_warning(self):
         marker = "SYNTHETIC_PRIVATE_STATE"
-        for state in (
+        for index, state in enumerate((
             [], {"files": []}, {"files": {self.fpath: marker}},
             {"files": {self.fpath: {"mtime": marker, "sha256": marker}}},
-        ):
+        )):
             with self.subTest(state=type(state).__name__):
                 with open(self.state, "w", encoding="utf-8") as f:
                     json.dump(state, f)
@@ -1004,7 +1004,8 @@ class TestSweepStatePersistence(unittest.TestCase):
                     consolidator = self._fresh()
                 self.assertEqual(consolidator.file_hashes, {})
                 self.assertNotIn(marker, " ".join(logs.output))
-                self.assertEqual(consolidator.scan_and_consolidate(), 1)
+                # The durable registry, unlike the legacy sweep cache, remains valid.
+                self.assertEqual(consolidator.scan_and_consolidate(), int(index == 0))
 
     def test_missing_store_is_rebuilt_despite_persisted_sweep_state(self):
         self.assertEqual(self._fresh().scan_and_consolidate(), 1)
@@ -1016,8 +1017,10 @@ class TestSweepStatePersistence(unittest.TestCase):
 
     def test_replaced_empty_store_is_rebuilt_despite_sweep_state(self):
         self.assertEqual(self._fresh().scan_and_consolidate(), 1)
-        empty = MemoryPyramidDistiller(os.path.join(self.tmp, "empty.json"))
-        empty.pyramid_path = self.pyramid
+        empty = MemoryPyramidDistiller(self.pyramid)
+        empty.data["memory_records"] = []
+        empty.data["raw_conversations"] = []
+        empty.rebuild_higher_layers()
         empty.save()
         restored = self._fresh()
         self.assertEqual(restored.scan_and_consolidate(), 1)

@@ -27,10 +27,10 @@ import json
 import logging
 import math
 import os
-import stat
 import time
 
 from memory_pyramid_distiller import MemoryPyramidDistiller
+from napmem_sources import MAX_SOURCE_BYTES, SourceRegistry, read_source
 
 logger = logging.getLogger(__name__)
 
@@ -82,33 +82,7 @@ def _read_file_guarded(path: str, allowed_roots: list[str]) -> str:
     + fstat), not on the pre-open path, so it cannot be raced by swapping the
     file into a symlink between validation and read (TOCTOU).
     """
-    # O_NONBLOCK: opening a FIFO planted in the watch dir would otherwise
-    # block forever BEFORE the S_ISREG refusal can run (hostile sync peers
-    # can deliver FIFOs — rsync -a syncs them). Harmless for regular files,
-    # which never return EAGAIN on read.
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-    try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode):
-            raise PermissionError(f"{path}: not a regular file")
-        if st.st_nlink > 1:
-            # A hard link inside a root can alias an out-of-root inode while
-            # the fd path still reports the in-root name — refuse aliased files.
-            raise PermissionError(f"{path}: refusing multi-linked file (nlink={st.st_nlink})")
-        real = _fd_true_path(fd)
-        if real is None:
-            # No kernel-reported fd path (no F_GETPATH, no procfs): a realpath
-            # fallback would reintroduce the race — fail closed instead.
-            raise PermissionError(f"{path}: cannot verify opened file's true path")
-        if not any(real == root or real.startswith(root + os.sep)
-                   for root in allowed_roots):
-            raise PermissionError(f"{path}: resolves outside allowed roots ({real})")
-        with os.fdopen(fd, "r", encoding="utf-8") as f:
-            fd = -1  # ownership transferred to the file object
-            return f.read()
-    finally:
-        if fd >= 0:
-            os.close(fd)
+    return read_source(path, allowed_roots, fd_path_resolver=_fd_true_path)["content"]
 
 
 def _resolve_allowed_roots(watch_dir: str) -> list[str]:
@@ -129,11 +103,15 @@ def _resolve_allowed_roots(watch_dir: str) -> list[str]:
 class NaptimeConsolidator:
     def __init__(self, watch_dir: str, pyramid_path: str = "napmem_pyramid.json",
                  extraction: str = "auto", semantic_dedup: bool = False,
-                 state_path: str | None = None):
+                 state_path: str | None = None, async_batches: bool = False):
         if extraction not in EXTRACTION_MODES:
             raise ValueError(f"extraction must be one of {EXTRACTION_MODES}")
         self.watch_dir = watch_dir
         self.pyramid_path = pyramid_path
+        if async_batches and extraction == "ollama":
+            raise ValueError("Durable async jobs currently support Anthropic and heuristic extraction")
+        self.async_batches = async_batches
+        self.source_registry = SourceRegistry(pyramid_path)
         self.distiller = MemoryPyramidDistiller(pyramid_path=pyramid_path,
                                                 semantic_dedup=semantic_dedup)
         self.file_timestamps: dict[str, float] = {}
@@ -206,75 +184,116 @@ class NaptimeConsolidator:
         try:
             live = {fp: st for fp, st in self.file_hashes.items()
                     if os.path.exists(fp)}
-            tmp = self.state_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"files": live}, f)
-            os.replace(tmp, self.state_path)
+            from napmem_storage import atomic_write, read_snapshot, store_lock
+            with store_lock(self.state_path):
+                previous, expected = read_snapshot(self.state_path)
+                merged = previous.get("files", {}) if isinstance(previous, dict) else {}
+                if not isinstance(merged, dict):
+                    merged = {}
+                merged.update(live)
+                merged = {path: entry for path, entry in merged.items() if os.path.exists(path)}
+                atomic_write(self.state_path, {"files": merged}, expected_fingerprint=expected)
             self.file_hashes = live
-        except OSError as exc:
-            logger.warning("Could not persist sweep state to %s: %s",
-                           self.state_path, exc)
+        except (OSError, ValueError) as exc:
+            logger.warning("Could not persist disposable sweep state to %s (%s)",
+                           self.state_path, type(exc).__name__)
 
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
         changed = []
         os.makedirs(self.watch_dir, exist_ok=True)
-        stored_sources = {
-            (session["session_id"], os.path.abspath(session["file_path"]))
-            for session in self.distiller.data["raw_conversations"]
-        }
+        with self.distiller.transaction():
+            sources = list(self.distiller.data["raw_conversations"])
+        stored_sources = {(session["session_id"], os.path.abspath(session["file_path"])) for session in sources}
         store_exists = os.path.exists(self.pyramid_path)
-        for fname in sorted(os.listdir(self.watch_dir)):
-            if not fname.endswith(".md"):
-                continue
-            fpath = os.path.join(self.watch_dir, fname)
-            session_id = _session_id_for(fname)
+        paths = sorted(os.path.abspath(os.path.join(root, name))
+                       for root, _, names in os.walk(self.watch_dir) for name in names if name.endswith(".md"))
+        metadata = []
+        for fpath in paths:
+            known = self.source_registry.lookup(path=fpath)
+            session_id = known["session_id"] if known else self.source_registry.resolve_session_id(
+                fpath, legacy_sources=sources)
             from napmem_controls import source_is_excluded
             if source_is_excluded(self.distiller.data, fpath, session_id=session_id):
                 continue
-            if not store_exists or (session_id, os.path.abspath(fpath)) not in stored_sources:
-                # Sweep state is a cache, never proof that a source still
-                # exists in the pyramid. A replaced store must be rebuilt.
-                self.file_timestamps.pop(fpath, None)
-                self.file_hashes.pop(fpath, None)
-            # One bad file (deleted mid-scan, unreadable, undecodable) must not
-            # kill the background loop; log it and keep consolidating the rest.
             mtime = None
             try:
                 mtime = os.path.getmtime(fpath)
-                # Any mtime CHANGE counts as modified: a strictly-newer check
-                # silently skips files restored with an older timestamp
-                # (backup restore, rsync -t, git checkout).
-                if fpath in self.file_timestamps and mtime == self.file_timestamps[fpath]:
+                snapshot = read_source(fpath, self.allowed_roots, max_bytes=MAX_SOURCE_BYTES,
+                                       fd_path_resolver=_fd_true_path)
+                content, digest = snapshot["content"], snapshot["sha256"]
+                entry = self.source_registry.observe(snapshot, live_paths=paths, legacy_sources=sources)
+                session_id = entry["session_id"]
+                retained_scope = self.distiller.data.get("source_scopes", {}).get(
+                    hashlib.sha256(session_id.encode("utf-8")).hexdigest())
+                if retained_scope and entry.get("scope") != retained_scope:
+                    entry = self.source_registry.observe(snapshot, scope=retained_scope,
+                                                         live_paths=paths, legacy_sources=sources)
+                if source_is_excluded(self.distiller.data, fpath, session_id=session_id):
                     continue
-                prior = self.file_hashes.get(fpath)
-                if prior and prior.get("mtime") == mtime:
-                    continue  # persistent fast-path: unchanged since last sweep
-                if self._refused.get(fpath) == mtime:
-                    continue  # already refused at this mtime; logged once
-                if self.allowed_roots:
-                    content = _read_file_guarded(fpath, self.allowed_roots)
-                else:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        content = f.read()
+                metadata.append(entry)
                 self._refused.pop(fpath, None)
-                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
-                if prior and prior.get("sha256") == digest:
-                    # Touched but content-identical (mirror relink, Syncthing,
-                    # timestamp restore): record the new mtime, skip the
-                    # extraction entirely.
+                prior = self.file_hashes.get(fpath)
+                source_present = any(session["session_id"] == session_id for session in sources)
+                if store_exists and source_present and (entry.get("committed_sha256") == digest
+                        or ((session_id, fpath) in stored_sources and prior and prior.get("sha256") == digest)):
                     self.file_hashes[fpath] = {"mtime": mtime, "sha256": digest}
+                    self.source_registry.mark_committed(session_id, digest)
                     continue
                 changed.append((session_id, fpath, content, mtime))
-            except OSError as exc:  # includes PermissionError from the read guard
-                logger.error("Skipping memory file %s: %s", fpath, exc)
+            except (OSError, ValueError) as exc:
+                if self._refused.get(fpath) != mtime:
+                    logger.error("Skipping memory file %s: %s", fpath, exc)
                 if mtime is not None:
                     self._refused[fpath] = mtime
             except UnicodeDecodeError as exc:
                 logger.error("Skipping non-UTF-8 memory file %s: %s", fpath, exc)
                 if mtime is not None:
                     self._refused[fpath] = mtime
+        metadata.extend(self.source_registry.mark_missing(paths, root=self.watch_dir))
+        self._sync_source_metadata(metadata)
         return changed
+
+    def _sync_source_metadata(self, entries):
+        if not entries:
+            return
+        with self.distiller.transaction():
+            changed = False
+            for entry in entries:
+                session_id = entry["session_id"]
+                for raw in self.distiller.data["raw_conversations"]:
+                    if raw["session_id"] == session_id:
+                        for field, value in (("file_path", entry["path"]), ("source_state", entry["status"])):
+                            if raw.get(field) != value:
+                                raw[field] = value
+                                changed = True
+                for record in self.distiller.data["memory_records"]:
+                    anchors = [record["source_anchor"], *record.get("duplicate_anchors", {}).values()]
+                    for anchor in anchors:
+                        if anchor.get("session_id") == session_id and anchor.get("file_path") != entry["path"]:
+                            anchor["file_path"] = entry["path"]
+                            changed = True
+                    if record["source_anchor"].get("session_id") == session_id and record.get("source_state") != entry["status"]:
+                        record["source_state"] = entry["status"]
+                        changed = True
+            if changed:
+                self.distiller.save()
+
+    def _current_outputs(self, outputs, changed):
+        """Fence asynchronous model output against current source and controls."""
+        from napmem_controls import source_is_excluded
+        captured = {sid: hashlib.sha256(content.encode("utf-8")).hexdigest()
+                    for sid, _, content, _ in changed}
+        current = {}
+        for session_id in outputs:
+            try:
+                snapshot = self.source_registry.read_current(session_id, allowed_roots=self.allowed_roots)
+                if (snapshot is not None and snapshot["sha256"] == captured.get(session_id)
+                        and not source_is_excluded(self.distiller.data, snapshot["path"], session_id=session_id)):
+                    current[session_id] = snapshot
+            except (OSError, ValueError):
+                pass
+        return current
 
     def _extract_llm(self, changed: list[tuple[str, str, str, float]]) -> set[str]:
         """
@@ -295,7 +314,6 @@ class NaptimeConsolidator:
             session_id: get_extraction_prompt(content, session_id, os.path.basename(fpath))
             for session_id, fpath, content, _ in changed
         }
-        file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
         try:
             if self._client is None:
                 self._client = anthropic.Anthropic()
@@ -308,10 +326,13 @@ class NaptimeConsolidator:
             return set()
         from llm_extraction_prompts import PROMPT_VERSION
         source_contents = {sid: content for sid, _, content, _ in changed}
-        _, ingested = ingest_extractions(
-            self.distiller, outputs, file_paths, source_contents=source_contents,
-            extraction_info={"method": "anthropic_batch", "model": DEFAULT_MODEL,
-                             "prompt_version": PROMPT_VERSION})
+        with self.distiller.transaction():
+            current = self._current_outputs(outputs, changed)
+            _, ingested = ingest_extractions(
+                self.distiller, {sid: output for sid, output in outputs.items() if sid in current},
+                {sid: snapshot["path"] for sid, snapshot in current.items()}, source_contents=source_contents,
+                extraction_info={"method": "anthropic_batch", "model": DEFAULT_MODEL,
+                                 "prompt_version": PROMPT_VERSION})
         return ingested
 
     def _extract_ollama(self, changed: list[tuple[str, str, str, float]]) -> set[str]:
@@ -343,7 +364,6 @@ class NaptimeConsolidator:
             session_id: get_extraction_prompt(content, session_id, os.path.basename(fpath))
             for session_id, fpath, content, _ in changed
         }
-        file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
         extraction_info = {}
         try:
             outputs = extract_ollama(prompts, hosts, extraction_info=extraction_info)
@@ -351,9 +371,12 @@ class NaptimeConsolidator:
             logger.error("Ollama extraction failed (%s); falling back to heuristic", exc)
             return set()
         source_contents = {sid: content for sid, _, content, _ in changed}
-        _, ingested = ingest_extractions(self.distiller, outputs, file_paths,
-                                         source_contents=source_contents,
-                                         extraction_info=extraction_info)
+        with self.distiller.transaction():
+            current = self._current_outputs(outputs, changed)
+            _, ingested = ingest_extractions(
+                self.distiller, {sid: output for sid, output in outputs.items() if sid in current},
+                {sid: snapshot["path"] for sid, snapshot in current.items()},
+                source_contents=source_contents, extraction_info=extraction_info)
         return ingested
 
     def scan_and_consolidate(self) -> int:
@@ -363,6 +386,8 @@ class NaptimeConsolidator:
         Returns count of processed files.
         """
         changed = self._collect_changed()
+        if self.async_batches:
+            return self._durable_sweep(changed)
         if not changed:
             self._save_state()  # touched-but-unchanged mtimes still need persisting
             return 0
@@ -375,6 +400,7 @@ class NaptimeConsolidator:
             if remaining:
                 llm_done |= self._extract_ollama(remaining)
 
+        processed = 0
         for session_id, fpath, content, mtime in changed:
             # Per-file guard: one failing ingest (store write error, malformed
             # content) must not kill the daemon or abandon the rest of the
@@ -385,23 +411,72 @@ class NaptimeConsolidator:
                 else:
                     if self.use_llm or self.use_ollama:
                         logger.warning("Heuristic fallback for %s", os.path.basename(fpath))
-                    self.distiller.ingest_session(
-                        session_id=session_id,
-                        title=f"Memory File {os.path.basename(fpath)}",
-                        file_path=fpath,
-                        content=content,
-                    )
+                    with self.distiller.transaction():
+                        current = self._current_outputs({session_id: None}, [(session_id, fpath, content, mtime)])
+                        if session_id not in current:
+                            logger.warning("Source changed, disappeared or was excluded; deferring %s", session_id)
+                            continue
+                        self.distiller.ingest_session(
+                            session_id=session_id,
+                            title=f"Memory File {os.path.basename(fpath)}",
+                            file_path=current[session_id]["path"],
+                            content=content,
+                        )
                 self.file_timestamps[fpath] = mtime
                 self.file_hashes[fpath] = {
                     "mtime": mtime,
                     "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
                 }
+                self.source_registry.mark_committed(session_id, self.file_hashes[fpath]["sha256"])
+                processed += 1
             except Exception:
                 logger.exception("Ingest failed for %s; will retry next sweep", fpath)
 
         self._save_state()
-        logger.info("Consolidated %d memory file(s) into %s", len(changed), self.pyramid_path)
-        return len(changed)
+        logger.info("Consolidated %d memory file(s) into %s", processed, self.pyramid_path)
+        return processed
+
+    def _durable_sweep(self, changed):
+        from napmem_jobs import JobQueue
+        from llm_extractor import DEFAULT_MODEL
+        from llm_extraction_prompts import PROMPT_VERSION
+        queue = JobQueue(self.pyramid_path)
+        backend = "anthropic" if self.use_llm else "heuristic"
+        if queue.list("submitted"):
+            if self._client is None:
+                from llm_extractor import _make_client
+                self._client = _make_client()
+            queue.collect(self._client)
+        receipts = queue.commit_ready(
+            self.distiller, source_reader=lambda job: self.source_registry.read_current(
+                job["session_id"], allowed_roots=self.allowed_roots))
+        for receipt in receipts:
+            if receipt["state"] == "committed":
+                self.source_registry.mark_committed(receipt["session_id"], receipt["source_hash"])
+        touched = {receipt["session_id"] for receipt in receipts if receipt["state"] == "committed"}
+        for session_id, path, content, _ in changed:
+            entry = self.source_registry.lookup(session_id=session_id)
+            job = queue.enqueue(session_id=session_id, source_path=path, source_content=content,
+                                scope=entry.get("scope"), backend=backend,
+                                model=DEFAULT_MODEL if backend == "anthropic" else None,
+                                prompt_version=PROMPT_VERSION, allowed_roots=self.allowed_roots)
+            if job["enqueued"]:
+                touched.add(session_id)
+        if backend == "heuristic":
+            queue.run(self.distiller)
+            receipts = queue.commit_ready(self.distiller, source_reader=lambda job: self.source_registry.read_current(
+                job["session_id"], allowed_roots=self.allowed_roots))
+            for receipt in receipts:
+                if receipt["state"] == "committed":
+                    touched.add(receipt["session_id"])
+                    self.source_registry.mark_committed(receipt["session_id"], receipt["source_hash"])
+        elif queue.list("queued"):
+            if self._client is None:
+                from llm_extractor import _make_client
+                self._client = _make_client()
+            queue.submit(self._client)
+        self._save_state()
+        return len(touched)
 
     def run_loop(self, poll_interval_sec: int = 5, max_ticks: int = 1):
         """
@@ -431,12 +506,15 @@ def main():
                              "spend), heuristic, or auto (llm -> ollama -> heuristic).")
     parser.add_argument("--semantic-dedup", action="store_true",
                         help="Fold semantic near-duplicates via the embedding index.")
+    parser.add_argument("--async-batches", action="store_true",
+                        help="Persist jobs; submit cloud batches now and collect/commit in later sweeps.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
     consolidator = NaptimeConsolidator(watch_dir=args.watch_dir, pyramid_path=args.pyramid,
                                        extraction=args.extraction,
-                                       semantic_dedup=args.semantic_dedup)
+                                       semantic_dedup=args.semantic_dedup,
+                                       async_batches=args.async_batches)
     max_ticks = 1 if args.once else args.max_ticks
     consolidator.run_loop(poll_interval_sec=args.interval, max_ticks=max_ticks)
 

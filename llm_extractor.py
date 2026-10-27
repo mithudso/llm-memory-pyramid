@@ -246,6 +246,38 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
     return outputs
 
 
+def submit_batch(client, prompts_by_session: dict[str, str], model: str) -> dict[str, Any]:
+    """Submit once and return a serializable handle without polling or sleeping."""
+    if not prompts_by_session:
+        raise ValueError("A batch needs at least one extraction prompt")
+    mapping = {f"req_{index:05d}": session for index, session in enumerate(prompts_by_session)}
+    requests = [{"custom_id": key, "params": _build_request_params(prompts_by_session[session], model)}
+                for key, session in mapping.items()]
+    batch = client.messages.batches.create(requests=requests)
+    return {"batch_id": batch.id, "id_to_session": mapping,
+            "processing_status": batch.processing_status}
+
+
+def collect_batch(client, handle: dict[str, Any]) -> dict[str, Any]:
+    """Check a persisted batch handle once; incomplete batches remain submitted."""
+    batch = client.messages.batches.retrieve(handle["batch_id"])
+    if batch.processing_status != "ended":
+        return {"ready": False, "outputs": {}, "failed_sessions": [],
+                "processing_status": batch.processing_status}
+    mapping = handle["id_to_session"]
+    outputs, failed = {}, []
+    for result in client.messages.batches.results(handle["batch_id"]):
+        session = mapping.get(result.custom_id)
+        if session is None:
+            continue
+        if result.result.type == "succeeded":
+            outputs[session] = "".join(block.text for block in result.result.message.content if block.type == "text")
+        else:
+            failed.append(session)
+    failed.extend(session for session in mapping.values() if session not in outputs and session not in failed)
+    return {"ready": True, "outputs": outputs, "failed_sessions": failed, "processing_status": "ended"}
+
+
 def _extraction_metadata(info: dict[str, Any] | None,
                          sessions: list[str]) -> dict[str, dict[str, str] | None]:
     """Accept shared or per-session provenance supplied by the caller."""

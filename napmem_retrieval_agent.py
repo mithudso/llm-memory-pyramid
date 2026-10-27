@@ -20,24 +20,38 @@ import stat
 from typing import Any
 
 from napmem_model import migrate_store
+from napmem_storage import read_snapshot
 
 VALID_LAYERS = ("all", "profiles", "tracks", "records")
 
 class NapMemRetrievalAgent:
     def __init__(self, pyramid_path: str = "napmem_pyramid.json"):
         self.pyramid_path = pyramid_path
+        self._seen_fingerprint = None
         self.data = self._load_pyramid()
 
     def _load_pyramid(self) -> dict[str, Any]:
         from napmem_controls import apply_controls
         from napmem_model import build_derived
-        if os.path.exists(self.pyramid_path):
-            with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                data = migrate_store(json.load(f))
-                apply_controls(data)
-                build_derived(data)
-                return data
-        raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please run memory_pyramid_distiller.py first.")
+        raw, digest = read_snapshot(self.pyramid_path)
+        if raw is None:
+            raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please initialize a store first.")
+        directory = os.path.dirname(os.path.abspath(self.pyramid_path))
+        if (os.path.basename(self.pyramid_path) == "napmem_pyramid.json"
+                and os.path.exists(os.path.join(directory, "manifest.json"))):
+            from napmem_snapshots import load_snapshot
+            raw = load_snapshot(directory)["data"]
+        data = migrate_store(raw)
+        apply_controls(data)
+        build_derived(data)
+        self._seen_fingerprint = digest
+        return data
+
+    def _refresh(self):
+        _, digest = read_snapshot(self.pyramid_path)
+        snapshot = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(self.pyramid_path)), "manifest.json"))
+        if digest != self._seen_fingerprint or snapshot:
+            self.data = self._load_pyramid()
 
     @staticmethod
     def _bounded(payload, max_bytes=16384, max_tokens=2048):
@@ -49,6 +63,7 @@ class NapMemRetrievalAgent:
               max_tokens: int | None = 2048, backend=None) -> dict[str, Any]:
         """Shared, scoped evidence contract. Defaults never contact a service."""
         from napmem_search import search
+        self._refresh()
         result = search(self.data, query, scope=scope, as_of=as_of, top_k=top_k,
                         mode=mode, max_bytes=max_bytes, max_tokens=max_tokens,
                         backend=backend)
@@ -79,6 +94,7 @@ class NapMemRetrievalAgent:
             raise ValueError("query must be a nonempty string of at most 2048 characters")
         if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
             raise ValueError("top_k must be a positive integer no greater than 100")
+        self._refresh()
         records = eligible_records(self.data, scope, as_of)
         eligible_ids = {r["id"] for r in records}
         lower = query.casefold()
@@ -126,6 +142,7 @@ class NapMemRetrievalAgent:
         if not isinstance(query, str) or not query.strip() or len(query) > 2048:
             raise ValueError("query must be a nonempty string of at most 2048 characters")
         at = parse_time(as_of).isoformat() if as_of is not None else datetime.now(UTC).isoformat()
+        self._refresh()
         records = eligible_records(self.data, scope, at)
         try:
             from semantic_index import SemanticIndex
@@ -151,6 +168,7 @@ class NapMemRetrievalAgent:
         from napmem_model import normalize_record, visible
         if not isinstance(record_id, str) or not record_id or len(record_id) > 512:
             raise ValueError("record_id must be a nonempty string of at most 512 characters")
+        self._refresh()
         record = next((r for r in self.data.get("memory_records", [])
                        if record_id == r["id"] or record_id in r.get("duplicates", [])), None)
         if record is None or record.get("instruction_bearing") or record.get("source_excluded"):
@@ -199,6 +217,7 @@ class NapMemRetrievalAgent:
             raise ValueError("topic_slug must be a nonempty string of at most 256 characters")
         if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
             raise ValueError("top_k must be a positive integer no greater than 100")
+        self._refresh()
         records = [r for r in eligible_records(self.data, scope, as_of)
                    if r["topic_slug"] == topic_slug]
         if not records:
@@ -218,6 +237,7 @@ class NapMemRetrievalAgent:
         report distillation as *expanding* memory once source files are moved or
         deleted. Missing sessions are disclosed in the result.
         """
+        self._refresh()
         raw_text_len = 0
         available_sessions = set()
         missing_sessions = []

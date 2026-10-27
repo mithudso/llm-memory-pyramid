@@ -51,7 +51,12 @@ class ProvenanceIntegrationTests(unittest.TestCase):
     def test_inspection_does_not_reopen_a_stored_path_without_explicit_verification(self):
         row = self.ingest()
         agent = NapMemRetrievalAgent(self.path)
-        with patch("napmem_evidence.os.open", side_effect=AssertionError("implicit read")):
+        import os
+        original = os.open
+        def canonical_only(path, *args, **kwargs):
+            self.assertEqual(os.fspath(path), self.path)
+            return original(path, *args, **kwargs)
+        with patch("napmem_evidence.os.open", side_effect=canonical_only):
             result = agent.inspect_provenance(row["id"], scope="project:a")
         self.assertEqual(result["verification"]["status"], "not_rechecked")
         self.assertEqual(result["verification"]["binding_status"], "verified")
