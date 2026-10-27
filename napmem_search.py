@@ -362,11 +362,12 @@ def search(data: dict[str, Any], query: str, *, scope: str | None = None,
             score = vector[idx]
         else:
             score = (1 / (60 + lexical_rank[idx]) if lexical[idx] > 0 else 0) + (1 / (60 + vector_rank[idx]) if vector[idx] > 0 else 0)
-        score += 2 * exact_ids[idx] + .05 * exact_texts[idx]
+        score += 2 * exact_ids[idx] + .05 * exact_texts[idx] + .01 * bool(record.get("pinned"))
         match = deepcopy(record)
         match.update(score=round(score, 8),
                      ranking={"bm25": round(lexical[idx], 6), "cosine": round(vector[idx], 6),
-                              "exact_id": exact_ids[idx], "exact_text": exact_texts[idx], "matched_terms": matched[idx]},
+                              "exact_id": exact_ids[idx], "exact_text": exact_texts[idx],
+                              "pinned": bool(record.get("pinned")), "matched_terms": matched[idx]},
                      provenance_status=record.get("evidence", {}).get("status", "unverified"))
         ranked.append(match)
     ranked.sort(key=lambda item: (-item["score"], item["id"]))

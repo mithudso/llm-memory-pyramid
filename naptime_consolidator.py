@@ -229,6 +229,9 @@ class NaptimeConsolidator:
                 continue
             fpath = os.path.join(self.watch_dir, fname)
             session_id = _session_id_for(fname)
+            from napmem_controls import source_is_excluded
+            if source_is_excluded(self.distiller.data, fpath, session_id=session_id):
+                continue
             if not store_exists or (session_id, os.path.abspath(fpath)) not in stored_sources:
                 # Sweep state is a cache, never proof that a source still
                 # exists in the pyramid. A replaced store must be rebuilt.

@@ -27,6 +27,11 @@
       "summary": "JSON configuration, schema, index or example data"
     },
     {
+      "path": "napmem_controls.py",
+      "signal": "high",
+      "summary": "Pure operator controls that persist across extraction replay and alias promotion."
+    },
+    {
       "path": "napmem_eval.py",
       "signal": "high",
       "summary": "Offline evidence-retrieval evaluation, independent of answer generation."
@@ -85,6 +90,16 @@
       "path": "semantic_index.py",
       "signal": "high",
       "summary": "Semantic Embedding Index for the NapMem Pyramid"
+    },
+    {
+      "path": "test_napmem_controls.py",
+      "signal": "high",
+      "summary": "Pure replay, deletion-family and operator-preview tests."
+    },
+    {
+      "path": "test_napmem_controls_integration.py",
+      "signal": "high",
+      "summary": "Operator controls remain effective across ingestion, cache and reload boundaries."
     },
     {
       "path": "test_napmem_eval.py",

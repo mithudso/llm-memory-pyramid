@@ -29,9 +29,14 @@ class NapMemRetrievalAgent:
         self.data = self._load_pyramid()
 
     def _load_pyramid(self) -> dict[str, Any]:
+        from napmem_controls import apply_controls
+        from napmem_model import build_derived
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                return migrate_store(json.load(f))
+                data = migrate_store(json.load(f))
+                apply_controls(data)
+                build_derived(data)
+                return data
         raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please run memory_pyramid_distiller.py first.")
 
     @staticmethod

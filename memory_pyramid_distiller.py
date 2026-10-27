@@ -17,6 +17,7 @@ rebuilds Layers 2-3 from the surviving records.
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -72,9 +73,13 @@ class MemoryPyramidDistiller:
         return self._semantic_index
 
     def _load_pyramid(self) -> dict[str, Any]:
+        from napmem_controls import apply_controls
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                return migrate_store(json.load(f))
+                data = migrate_store(json.load(f))
+                apply_controls(data)
+                build_derived(data)
+                return data
         return migrate_store({
             "version": "1.0.0",
             "updated_at": _utcnow(),
@@ -85,6 +90,8 @@ class MemoryPyramidDistiller:
         })
 
     def save(self):
+        previous_generation = self.data.get("generation", 0)
+        self.data["generation"] = previous_generation + 1
         self.data["updated_at"] = _utcnow()
         # Atomic + durable write: per-PID tmp so a concurrent CLI run cannot
         # interleave into the daemon's tmp file (whichever replace runs last
@@ -98,6 +105,7 @@ class MemoryPyramidDistiller:
                 os.fsync(f.fileno())
             os.replace(tmp_path, self.pyramid_path)
         except OSError:
+            self.data["generation"] = previous_generation
             try:
                 os.unlink(tmp_path)
             except OSError:
@@ -294,6 +302,8 @@ class MemoryPyramidDistiller:
         kept: list[dict[str, Any]] = []
         referenced = {rid for record in self.data["memory_records"]
                       for rid in record.get("supersedes", [])}
+        for correction in self.data.get("controls", {}).get("corrections", {}).values():
+            referenced.update(correction.get("original_ids", []))
         for rec in self.data["memory_records"]:
             anchors = rec.get("duplicate_anchors", {})
             for duplicate_id in rec.get("duplicates", []):
@@ -447,11 +457,17 @@ class MemoryPyramidDistiller:
         rebuild -> save pipeline. Records must already carry
         rec_<session_id>_NNN ids and complete source anchors.
         """
+        from napmem_controls import apply_controls, filter_incoming
+        apply_controls(self.data)
         prior_source = next((s for s in self.data["raw_conversations"]
                              if s["session_id"] == session_id), {})
+        source_scopes = self.data.setdefault("source_scopes", {})
+        if not isinstance(source_scopes, dict):
+            raise ValueError("source_scopes must be an object")
+        source_key = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
         if (scope is None and "scope" not in (metadata or {})
                 and not any("scope" in record for record in new_records)):
-            scope = prior_source.get("scope")
+            scope = prior_source.get("scope") or source_scopes.get(source_key)
         normalized = []
         for record in new_records:
             item = normalize_record(record, scope=scope, metadata=metadata)
@@ -461,14 +477,18 @@ class MemoryPyramidDistiller:
                 provided.add("scope")
             item["_context_updates"] = sorted(provided)
             normalized.append(item)
-        new_records = normalized
+        new_records = filter_incoming(self.data, normalized)
+        resolved_scopes = {record["scope"] for record in normalized}
+        resolved_scope = (next(iter(resolved_scopes)) if len(resolved_scopes) == 1
+                          else scope or (metadata or {}).get("scope", "legacy"))
+        source_scopes[source_key] = resolved_scope
         # Register Layer 0 raw conversation
         raw_entry = {
             "session_id": session_id,
             "title": title,
             "timestamp": _utcnow(),
             "file_path": file_path,
-            "scope": scope or (metadata or {}).get("scope", "legacy"),
+            "scope": resolved_scope,
         }
         # Re-ingest semantics: replace the Layer 0 entry and reconcile the
         # session's previously distilled Layer 1 records against the fresh
@@ -484,12 +504,77 @@ class MemoryPyramidDistiller:
         for record in remaining_records:
             record.pop("_context_updates", None)
         self.deduplicate_and_merge(remaining_records)
+        apply_controls(self.data)
 
         # Phase 4: Rebuild Pyramid Layers 2 and 3
         self.rebuild_higher_layers()
 
         self.save()
         return len(new_records)
+
+    def control(self, action: str, *, record_id: str | None = None, value=None,
+                source: str | None = None, at: str | None = None, dry_run: bool = False,
+                expected_generation: int | None = None,
+                preview_token: str | None = None) -> dict[str, Any]:
+        """Apply an operator action; retrieval MCP never exposes this mutation API."""
+        from napmem_controls import apply_action, preview_action
+        arguments = dict(record_id=record_id, value=value, source=source, at=at)
+        if dry_run:
+            return preview_action(self.data, action, **arguments)
+        previous = copy.deepcopy(self.data)
+        cache_state = "retained"
+        try:
+            receipt = apply_action(self.data, action, **arguments,
+                                   expected_generation=expected_generation,
+                                   preview_token=preview_token)
+            source_scopes = self.data.setdefault("source_scopes", {})
+            if not isinstance(source_scopes, dict):
+                raise ValueError("source_scopes must be an object")
+            # Hash-only routing survives removal of raw source metadata, so
+            # implicit replay cannot evade a scope-specific content tombstone.
+            for record in previous["memory_records"]:
+                anchors = [(record["source_anchor"], record.get("scope", "legacy"))]
+                anchors.extend((anchor, anchor.get("assertion", {}).get("scope", "legacy"))
+                               for anchor in record.get("duplicate_anchors", {}).values())
+                for anchor, item_scope in anchors:
+                    session = anchor.get("session_id")
+                    if session:
+                        key = hashlib.sha256(session.encode("utf-8")).hexdigest()
+                        source_scopes.setdefault(key, item_scope)
+            self.rebuild_higher_layers()
+            if action in ("correct", "reject", "exclude", "forget", "forget_session"):
+                self._semantic_index = None
+                cache_state = "absent"
+                try:
+                    os.unlink(self.pyramid_path + ".embindex.json")
+                    cache_state = "removed"
+                except FileNotFoundError:
+                    pass
+                except OSError as exc:
+                    cache_state = "pending:" + type(exc).__name__
+            if action in ("forget", "forget_session", "exclude"):
+                receipts = self.data.setdefault("deletion_receipts", [])
+                if not isinstance(receipts, list):
+                    raise ValueError("deletion_receipts must be a list")
+                receipts.append({"change_id": receipt["change_id"], "action": action,
+                                 "cache": cache_state, "mirrors": "pending_acknowledgment",
+                                 "originals_exports_backups": "operator_managed"})
+                self.data["deletion_receipts"] = receipts[-1000:]
+            self.save()
+        except Exception:
+            self.data = previous
+            raise
+        self._semantic_index = None
+        receipt.update(generation=self.data["generation"], persistence="committed",
+                       cache=cache_state, embedding_cache=cache_state,
+                       canonical_deletion_complete=(action in ("forget", "forget_session")
+                                                    and not cache_state.startswith("pending:")),
+                       completion_scope="canonical_store_and_adjacent_embedding_cache")
+        if action in ("forget", "forget_session", "exclude"):
+            receipt["target_scope"] = {"forget": "claim_and_correction_family",
+                                       "forget_session": "selected_session_occurrences",
+                                       "exclude": "selected_source_occurrences"}[action]
+        return receipt
 
     def render_markdown_summary(self) -> str:
         """

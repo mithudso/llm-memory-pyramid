@@ -34,6 +34,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `deploy/napmem-consolidator.timer` | OnCalendar (not monotonic OnUnitActiveSec) so Persistent=true actually |
 | `docs/ARCHITECTURE.md` | Architecture |
 | `docs/COMPONENTS.md` | Components |
+| `docs/CONTROLS.md` | Operator memory controls |
 | `docs/DEVELOPMENT.md` | Development |
 | `docs/INSTALLATION.md` | Installation |
 | `docs/MCP.md` | MCP |
@@ -71,6 +72,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `memory.md` | memory.md — operator work log |
 | `memory_pyramid_distiller.py` | Memory Pyramid Distiller (NapMem + Document Distiller Integration) |
 | `memory_pyramid_schema.json` | JSON configuration, schema, index or example data |
+| `napmem_controls.py` | Pure operator controls that persist across extraction replay and alias promotion. |
 | `napmem_eval.py` | Offline evidence-retrieval evaluation, independent of answer generation. |
 | `napmem_mcp_failover.py` | NapMem MCP failover proxy (stdio) |
 | `napmem_mcp_server.py` | NapMem MCP Server (stdio) |
@@ -87,6 +89,8 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `scripts/run-naptime.sh` | Naptime consolidator wrapper — portable (macOS launchd + Linux systemd). |
 | `semantic_index.py` | Semantic Embedding Index for the NapMem Pyramid |
 | `tasks/plan.md` | Implementation plan: trusted NapMem memory |
+| `test_napmem_controls.py` | Pure replay, deletion-family and operator-preview tests. |
+| `test_napmem_controls_integration.py` | Operator controls remain effective across ingestion, cache and reload boundaries. |
 | `test_napmem_eval.py` | Deterministic, network-free evidence scorer and benchmark contract tests. |
 | `test_napmem_extensions.py` | Tests for the production-path extensions: LLM extractor parsing/validation, |
 | `test_napmem_failover.py` | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |

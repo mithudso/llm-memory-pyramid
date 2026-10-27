@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–3 passed; next is TASK-239,
-durable user controls.
+TASK-236–TASK-245 track the ten stages. Stages 1–4 passed; next is TASK-240,
+verified source evidence.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -41,6 +41,14 @@ offline benchmark author and independent read-only compatibility review.
   text. Restored the seam and added no-network regression tests; all later
   test commands force NAPMEM_EMBED_BACKEND=hashed. No production data was
   accessed or service configuration changed. Concrete lesson: KNOW-250.
+- Stage 4: concrete generation/snapshot-bound previews, correction/pin/expiry/
+  review/exclusion/forget controls, source replay suppression, content-free
+  bounded journal and persistent deletion receipts implemented. Forgetting
+  purges the local embedding cache; failures remain explicitly pending.
+  Permanent session suppression differs from reversible exclusion; whole
+  claim forgetting removes correction/alias families. Fixed implicit replay
+  scope loss with pseudonymous routing (KNOW-251). All 219 tests/Ruff/compile
+  pass. Canonical receipts do not claim external original/backup/mirror deletion.
 
 **Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
 altering runtime behavior. Then proceed through scoped time-aware model,

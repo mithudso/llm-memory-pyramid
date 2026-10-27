@@ -115,7 +115,7 @@ embeddings contact configured hosts only when those paths run.
 
 ## Repository shape
 
-Nine root Python runtime modules implement the store, extractors, embedding
+Root Python runtime modules implement the store, extractors, embedding
 cache, retrieval server and failover proxy. The `test_napmem_*.py` suites
 exercise them offline. `scripts/` holds maintenance and sweep entry points;
 `deploy/` holds optional systemd units. `pyproject.toml` declares the package.
@@ -195,6 +195,10 @@ the mirror can be stale but never divergent.
 - A high-salience fact or task does not establish a durable profile. Persistent
   profile kinds require explicit approval; unresolved subject conflicts are
   withheld. Never emit a fabricated numeric confidence.
+- Operator controls live outside derived layers. Apply them before source
+  reconciliation and after extraction. Keep hash-only replay suppression and
+  source scope routing when forgetting raw metadata. Retrieval MCP stays
+  read-only; deletion receipts must distinguish local completion from replicas.
 
 ## Conventions
 

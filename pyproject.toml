@@ -25,6 +25,7 @@ select = ["E4", "E7", "E9", "F"]
 py-modules = [
     "napmem_model",
     "napmem_search",
+    "napmem_controls",
     "napmem_eval",
     "semantic_index",
     "ollama_extractor",

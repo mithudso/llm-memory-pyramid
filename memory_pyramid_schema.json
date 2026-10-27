@@ -363,6 +363,21 @@
         "type": "object"
       },
       "description": "Potential unresolved assertion conflicts, never inferred resolutions."
+    },
+    "source_scopes": {
+      "type": "object",
+      "description": "Pseudonymous source identity to scope routing, retained to enforce replay suppression after raw metadata removal.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "deletion_receipts": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object"
+      },
+      "description": "Content-free cache/replica deletion state. External originals, exports and backups have separate retention."
     }
   },
   "required": [

@@ -17,6 +17,7 @@
 - [llm_extractor.py](llm_extractor.py): LLM Extraction Pipeline (production path for the NapMem distiller)
 - [memory_pyramid_distiller.py](memory_pyramid_distiller.py): Memory Pyramid Distiller (NapMem + Document Distiller Integration)
 - [memory_pyramid_schema.json](memory_pyramid_schema.json): JSON configuration, schema, index or example data
+- [napmem_controls.py](napmem_controls.py): Pure operator controls that persist across extraction replay and alias promotion.
 - [napmem_eval.py](napmem_eval.py): Offline evidence-retrieval evaluation, independent of answer generation.
 - [napmem_mcp_failover.py](napmem_mcp_failover.py): NapMem MCP failover proxy (stdio)
 - [napmem_mcp_server.py](napmem_mcp_server.py): NapMem MCP Server (stdio)
@@ -29,6 +30,8 @@
 - [scripts/repo_docs.py](scripts/repo_docs.py): Generate static repository maps, or check their exact content without writes.
 - [scripts/run-naptime.sh](scripts/run-naptime.sh): Naptime consolidator wrapper — portable (macOS launchd + Linux systemd).
 - [semantic_index.py](semantic_index.py): Semantic Embedding Index for the NapMem Pyramid
+- [test_napmem_controls.py](test_napmem_controls.py): Pure replay, deletion-family and operator-preview tests.
+- [test_napmem_controls_integration.py](test_napmem_controls_integration.py): Operator controls remain effective across ingestion, cache and reload boundaries.
 - [test_napmem_eval.py](test_napmem_eval.py): Deterministic, network-free evidence scorer and benchmark contract tests.
 - [test_napmem_extensions.py](test_napmem_extensions.py): Tests for the production-path extensions: LLM extractor parsing/validation,
 - [test_napmem_failover.py](test_napmem_failover.py): Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy.
