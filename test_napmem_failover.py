@@ -9,7 +9,6 @@ napmem_mcp_server.py reading a throwaway pyramid.
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import threading
@@ -133,7 +132,8 @@ class TestFailoverProxy(unittest.TestCase):
         self.assertFalse(msgs[1]["result"]["isError"])
         self.assertIn("[napmem fallback]", content[-1]["text"])
         self.assertIn("test snapshot", content[-1]["text"])
-        self.assertEqual(content[0]["text"], "ready")
+        self.assertEqual(json.loads(content[0]["text"])["legacy_text"], "ready")
+        self.assertEqual(json.loads(content[0]["text"]), msgs[1]["result"]["structuredContent"])
 
     def test_invalid_utf8_backend_fails_over_and_logs(self):
         remote = "import sys,os; sys.stdin.readline(); os.write(1,b'\\xff\\n')"
@@ -255,10 +255,7 @@ class TestFailoverProxy(unittest.TestCase):
 
 
 class TestMirrorSync(unittest.TestCase):
-    """sync_mirror with ssh replaced by a local 'cat' stand-in."""
-
-    FAKE_SSH = ("import re, sys; p = re.search(r'cat \"(.+)\"', sys.argv[-1]).group(1); "
-                "sys.stdout.buffer.write(open(p, 'rb').read())")
+    """Run the real exporter through a local subprocess, without any host contact."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -270,8 +267,9 @@ class TestMirrorSync(unittest.TestCase):
             "NAPMEM_MIRROR_DIR": self.mirror,
         })
         self.env.start()
-        self.ssh = mock.patch.object(fo, "ssh_base",
-                                     lambda host: [sys.executable, "-c", self.FAKE_SSH])
+        self.ssh = mock.patch.object(fo, "remote_snapshot_cmd", lambda host: [
+            sys.executable, str(fo.HERE / "napmem_snapshots.py"), "export-archive",
+            "--pyramid", fo.remote_pyramid()])
         self.ssh.start()
 
     def tearDown(self):
@@ -284,13 +282,16 @@ class TestMirrorSync(unittest.TestCase):
             fh.write(text)
 
     def test_sync_copies_pyramid_and_embindex(self):
-        self._write_remote("napmem_pyramid.json", json.dumps({"layer_1": []}))
-        self._write_remote("napmem_pyramid.json.embindex.json", json.dumps({"model": "m"}))
+        self._write_remote("napmem_pyramid.json", json.dumps({"memory_records": [], "generation": 5}))
+        self._write_remote("napmem_pyramid.json.embindex.json", json.dumps({"model": "m", "vectors": {}}))
         self.assertTrue(fo.sync_mirror("fake"))
-        with open(os.path.join(self.mirror, "napmem_pyramid.json"), encoding="utf-8") as fh:
-            self.assertEqual(json.load(fh), {"layer_1": []})
-        self.assertTrue(os.path.exists(os.path.join(self.mirror,
-                                                    "napmem_pyramid.json.embindex.json")))
+        with open(fo.mirror_pyramid(), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"memory_records": [], "generation": 5})
+        self.assertTrue(fo.mirror_pyramid().with_name(fo.MIRROR_FILES[1]).exists())
+        self.assertIn(str(fo.mirror_pyramid()), fo.fallback_cmd())
+        description = fo.describe_mirror_snapshot()
+        self.assertIn("generation 5 (verified)", description)
+        self.assertIn("record-text-hashes-only", description)
 
     def test_corrupt_remote_pyramid_keeps_old_mirror(self):
         os.makedirs(self.mirror)
@@ -301,56 +302,70 @@ class TestMirrorSync(unittest.TestCase):
         self.assertFalse(fo.sync_mirror("fake"))
         with open(good, encoding="utf-8") as fh:
             self.assertEqual(json.load(fh), {"layer_1": ["old"]})
-        self.assertFalse([n for n in os.listdir(self.mirror) if n.endswith(".tmp")])
+        self.assertFalse([n for n in os.listdir(self.mirror) if n.startswith(".refresh-")])
 
     def test_missing_embindex_is_not_fatal(self):
         self._write_remote("napmem_pyramid.json", json.dumps({}))
         self.assertTrue(fo.sync_mirror("fake"))
+        self.assertFalse(fo.mirror_pyramid().with_name(fo.MIRROR_FILES[1]).exists())
+        self.assertIn("cache absent", fo.describe_mirror_snapshot())
+
+    def test_new_generation_without_cache_cannot_retain_previous_cache(self):
+        self._write_remote("napmem_pyramid.json", json.dumps({"generation": 1}))
+        self._write_remote("napmem_pyramid.json.embindex.json", json.dumps({"model": "m", "vectors": {}}))
+        self.assertTrue(fo.sync_mirror("fake"))
+        old_path = fo.mirror_pyramid()
+        os.unlink(os.path.join(self.remote, fo.MIRROR_FILES[1]))
+        self._write_remote("napmem_pyramid.json", json.dumps({"generation": 2}))
+        self.assertTrue(fo.sync_mirror("fake"))
+        self.assertNotEqual(fo.mirror_pyramid(), old_path)
+        self.assertTrue(old_path.with_name(fo.MIRROR_FILES[1]).exists())
+        self.assertFalse(fo.mirror_pyramid().with_name(fo.MIRROR_FILES[1]).exists())
 
     def test_configured_remote_basename_is_used_for_store_and_cache(self):
-        self._write_remote("custom.json", json.dumps({"memory_records": ["custom"]}))
-        self._write_remote("custom.json.embindex.json", json.dumps({"model": "custom"}))
+        self._write_remote("custom.json", json.dumps({"memory_records": [], "generation": 3}))
+        self._write_remote("custom.json.embindex.json", json.dumps({"model": "custom", "vectors": {}}))
         with mock.patch.dict(os.environ, {
             "NAPMEM_REMOTE_PYRAMID": os.path.join(self.remote, "custom.json"),
         }):
             self.assertTrue(fo.sync_mirror("fake"))
-        with open(os.path.join(self.mirror, "napmem_pyramid.json"), encoding="utf-8") as fh:
-            self.assertEqual(json.load(fh), {"memory_records": ["custom"]})
-        with open(os.path.join(self.mirror, "napmem_pyramid.json.embindex.json"),
-                  encoding="utf-8") as fh:
-            self.assertEqual(json.load(fh), {"model": "custom"})
+        with open(fo.mirror_pyramid(), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"memory_records": [], "generation": 3})
+        with open(fo.mirror_pyramid().with_name(fo.MIRROR_FILES[1]), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"model": "custom", "vectors": {}})
 
     def test_concurrent_sync_never_publishes_another_writers_open_file(self):
-        # Pause A after JSON validation. B then opens its transfer file. With
-        # a shared name, B truncates A's inode and A publishes an empty store.
+        # A publishes while B has an open, incomplete transfer. Each transfer
+        # must own its staging directory, and the pointer must select only A.
+        self._write_remote("napmem_pyramid.json", json.dumps({"memory_records": []}))
         validated = threading.Event()
         second_open = threading.Event()
         published = threading.Event()
         release_second = threading.Event()
-        replace = os.replace
+        publish = fo.publish_snapshot
+        path_open = fo.Path.open
         results = {}
         failures = []
 
-        def fake_run(cmd, **kwargs):
-            if "embindex" in cmd[-1]:
-                return subprocess.CompletedProcess(cmd, 1, stderr=b"optional cache missing")
-            if threading.current_thread().name == "mirror-B":
+        def open_transfer(path, *args, **kwargs):
+            stream = path_open(path, *args, **kwargs)
+            if (threading.current_thread().name == "mirror-B" and path.name == "snapshot.tar"
+                    and args and args[0] == "xb"):
                 second_open.set()
                 if not release_second.wait(timeout=3):
+                    stream.close()
                     raise RuntimeError("test did not release second transfer")
-            kwargs["stdout"].write(b'{"memory_records":[]}')
-            kwargs["stdout"].flush()
-            return subprocess.CompletedProcess(cmd, 0, stderr=b"")
+            return stream
 
-        def replace_after_second_open(src, dest):
-            if threading.current_thread().name == "mirror-A" and str(dest).endswith("napmem_pyramid.json"):
+        def publish_after_second_open(src, dest):
+            if threading.current_thread().name == "mirror-A":
                 validated.set()
                 if not second_open.wait(timeout=3):
                     raise RuntimeError("second test transfer did not start")
-                replace(src, dest)
+                result = publish(src, dest)
                 published.set()
-            else:
-                replace(src, dest)
+                return result
+            return publish(src, dest)
 
         def run_sync():
             try:
@@ -358,8 +373,8 @@ class TestMirrorSync(unittest.TestCase):
             except Exception as exc:
                 failures.append(exc)
 
-        with mock.patch.object(fo.subprocess, "run", side_effect=fake_run), \
-                mock.patch.object(fo.os, "replace", side_effect=replace_after_second_open):
+        with mock.patch.object(fo.Path, "open", open_transfer), \
+                mock.patch.object(fo, "publish_snapshot", side_effect=publish_after_second_open):
             first = threading.Thread(target=run_sync, name="mirror-A")
             second = threading.Thread(target=run_sync, name="mirror-B")
             try:
@@ -367,7 +382,7 @@ class TestMirrorSync(unittest.TestCase):
                 self.assertTrue(validated.wait(timeout=3))
                 second.start()
                 self.assertTrue(published.wait(timeout=3))
-                with open(os.path.join(self.mirror, "napmem_pyramid.json"), encoding="utf-8") as fh:
+                with open(fo.mirror_pyramid(), encoding="utf-8") as fh:
                     self.assertEqual(json.load(fh), {"memory_records": []})
             finally:
                 release_second.set()
@@ -379,8 +394,67 @@ class TestMirrorSync(unittest.TestCase):
         self.assertEqual(failures, [])
         self.assertEqual(results, {"mirror-A": True, "mirror-B": True})
 
+    def test_failed_publication_preserves_previous_active_generation(self):
+        self._write_remote("napmem_pyramid.json", json.dumps({"generation": 1}))
+        self.assertTrue(fo.sync_mirror("fake"))
+        previous = fo.mirror_pyramid()
+        with mock.patch("napmem_storage.atomic_write", side_effect=OSError("synthetic pointer failure")):
+            self.assertFalse(fo.sync_mirror("fake"))
+        self.assertEqual(fo.mirror_pyramid(), previous)
+        self.assertFalse(list(fo.Path(self.mirror).glob(".refresh-*")))
+
+    def test_bounded_transfer_and_invalid_archive_keep_previous_generation(self):
+        self._write_remote("napmem_pyramid.json", json.dumps({"generation": 1}))
+        self.assertTrue(fo.sync_mirror("fake"))
+        previous = fo.mirror_pyramid()
+        command = [sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x'*10000)"]
+        with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command), \
+                mock.patch.object(fo, "MAX_ARCHIVE_BYTES", 32):
+            self.assertFalse(fo.sync_mirror("fake"))
+        command = [sys.executable, "-c", "print('invalid tar')"]
+        with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command):
+            self.assertFalse(fo.sync_mirror("fake"))
+        self.assertEqual(fo.mirror_pyramid(), previous)
+
+    def test_transfer_timeout_and_bounded_error_output(self):
+        destination = fo.Path(self.tmp) / "received.tar"
+        command = [sys.executable, "-c", "import time;time.sleep(10)"]
+        with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command):
+            with self.assertRaises(TimeoutError):
+                fo._receive_snapshot("fake", destination, timeout=.05)
+        destination.unlink()
+        command = [sys.executable, "-c", "import sys;sys.stderr.write('x'*100000);sys.exit(1)"]
+        with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command):
+            with self.assertRaises(RuntimeError) as failure:
+                fo._receive_snapshot("fake", destination)
+        self.assertLessEqual(len(str(failure.exception)), 16384)
+
+    def test_legacy_flat_mirror_notes_generation_is_unverified(self):
+        os.makedirs(self.mirror)
+        with open(os.path.join(self.mirror, fo.MIRROR_FILES[0]), "w", encoding="utf-8") as stream:
+            json.dump({"memory_records": []}, stream)
+        self.assertEqual(fo.mirror_pyramid(), fo.Path(self.mirror) / fo.MIRROR_FILES[0])
+        self.assertIn("generation 0 (unverified)", fo.describe_mirror_snapshot())
+        self.assertIn("legacy-unverified", fo.describe_mirror_snapshot())
+
 
 class TestRemoteHostConfig(unittest.TestCase):
+    def test_fallback_environment_keeps_snapshot_cache_read_only(self):
+        with mock.patch.dict(os.environ, {"NAPMEM_CACHE_READ_ONLY": "0", "NAPMEM_FALLBACK_OLLAMA": "http://offline.invalid"}):
+            env = fo.fallback_env()
+        self.assertEqual(env["NAPMEM_CACHE_READ_ONLY"], "1")
+        self.assertEqual(env["NAPMEM_OLLAMA_URL"], "http://offline.invalid")
+
+    def test_refresh_requests_one_authoritative_export_with_quoted_paths(self):
+        with mock.patch.object(fo, "ssh_base", return_value=["fake-ssh", "fake-host"]), \
+                mock.patch.dict(os.environ, {"NAPMEM_REMOTE_REPO": "$HOME/a repo", "NAPMEM_REMOTE_PYRAMID": "$HOME/a store.json"}):
+            command = fo.remote_snapshot_cmd("fake-host")
+        self.assertEqual(command[:3], ["fake-ssh", "-C", "fake-host"])
+        self.assertIn("export-archive", command[-1])
+        self.assertIn("napmem_snapshots", command[-1])
+        self.assertIn("'$HOME/a store.json'", command[-1])
+        self.assertNotIn("cat ", command[-1])
+
     def test_env_wins_then_host_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             host_file = os.path.join(tmp, "remote_host")

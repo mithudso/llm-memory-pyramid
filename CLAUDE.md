@@ -13,7 +13,7 @@ embeddings contact configured hosts only when those paths run.
 
 ## Repository shape
 
-Nine root Python runtime modules implement the store, extractors, embedding
+Root Python runtime modules implement the store, extractors, embedding
 cache, retrieval server and failover proxy. The `test_napmem_*.py` suites
 exercise them offline. `scripts/` holds maintenance and sweep entry points;
 `deploy/` holds optional systemd units. `pyproject.toml` declares the package.
@@ -86,6 +86,21 @@ the mirror can be stale but never divergent.
   sentinel delimiter with loop-neutralization (`_neutralize_sentinel`); never
   interpolate raw text or metadata outside the guarded region.
 - Layers 2–3 are derived state — always rebuilt from Layer 1, never edited.
+- Store version 2 adds assertion scope, valid time, review state and evidence.
+  Reads migrate version 1 in memory; ingestion persists version 2. Legacy
+  records retain scope `legacy` and unknown validity. Named project retrieval
+  must filter before ranking and exclude legacy assertions.
+- A high-salience fact or task does not establish a durable profile. Persistent
+  profile kinds require explicit approval; unresolved subject conflicts are
+  withheld. Never emit a fabricated numeric confidence.
+- Source binding uses the original extraction input, not a later path reread.
+  Verified quotation provenance does not prove a paraphrase. Profile evidence
+  must be supported; source re-verification requires explicit allowed roots.
+  Preserve hash/range evidence redactions when forgetting overlapping quotes.
+- Operator controls live outside derived layers. Apply them before source
+  reconciliation and after extraction. Keep hash-only replay suppression and
+  source scope routing when forgetting raw metadata. Retrieval MCP stays
+  read-only; deletion receipts must distinguish local completion from replicas.
 
 ## Conventions
 

@@ -89,3 +89,11 @@ Versioned record of user requests, in order. Newest last.
     roadmap with acceptance criteria. Proposed features are not implemented.
 
 **Delta:** v1.7.0 → v1.8.0; one triggering request and product assessment added.
+
+## v2.0.0 — 2026-10-27
+
+18. "Implement all of the improvements in the recommended order"
+    — implement all ten stages from docs/product-roadmap-2026-10-27.md;
+    validate each stage, preserve offline boundaries, commit and publish.
+
+**Delta:** v1.8.0 → v2.0.0; roadmap implementation explicitly authorized.

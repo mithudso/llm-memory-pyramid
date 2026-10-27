@@ -3,8 +3,8 @@
 ## Setup
 
 Python 3.11+. The core pipeline is standard library only; Ollama access
-(`semantic_index.py`, `ollama_extractor.py`) uses the shared `ollama-client`
-library, installed into the repo venv (`scripts/run-naptime.sh` prefers it).
+(`semantic_index.py`, `ollama_extractor.py`) optionally uses the shared
+`ollama-client` library through the `ollama` extra. Core installation is offline.
 
 ```bash
 git clone https://github.com/mithudso/llm-memory-pyramid.git
@@ -53,7 +53,7 @@ directly). Core pipeline needs none.
 - **`FileNotFoundError: Pyramid file ... not found`** — retrieval agent needs
   an existing store; run the distiller first.
 - **Records seem duplicated after editing a memory file** — check the session
-  id: re-ingest replacement only happens for the *same* `session_id`
-  (`sess_<basename>` by default). Renamed files create new sessions.
+  ID. The CLI and consolidator registry preserve identity across recognized
+  renames; legacy direct module calls still use basename-derived IDs.
 - **Consolidator skips a file** — non-`.md` extensions are ignored; unreadable
   or non-UTF-8 files are logged and skipped.

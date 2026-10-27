@@ -28,7 +28,16 @@ import logging
 import os
 import re
 
-from ollama_client import OllamaClient, OllamaPool, OllamaUnavailable
+try:
+    from ollama_client import OllamaClient, OllamaPool, OllamaUnavailable
+except ImportError:
+    # The offline runtime has no dependency on the optional shared transport.
+    OllamaClient = OllamaPool = None
+
+    class OllamaUnavailable(RuntimeError):
+        """Unavailable optional transport; no network fallback is implemented here."""
+
+from llm_extraction_prompts import PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +49,10 @@ DEFAULT_CHAT_HOSTS = "http://localhost:11434=qwen3.5:35b"
 GEN_OPTIONS = {"temperature": 0, "num_ctx": 16384, "num_predict": 8192}
 PER_FILE_TIMEOUT_S = 300
 PROBE_TIMEOUT_S = 3
+OLLAMA_INSTALL_MESSAGE = (
+    "Ollama extraction requires the optional shared ollama-client package. "
+    "Install it with: python -m pip install 'llm-memory-pyramid[ollama]'"
+)
 
 
 class OllamaExtractionError(Exception):
@@ -67,11 +80,15 @@ def parse_chat_hosts(raw: str | None = None) -> list[tuple[str, str]]:
 
 def _client_for(url: str) -> OllamaClient:
     """Single-host client: no failover or retry here, the host chain is the failover."""
+    if OllamaClient is None or OllamaPool is None:
+        raise OllamaExtractionError(OLLAMA_INSTALL_MESSAGE)
     return OllamaClient(OllamaPool([url], retries=0))
 
 
 def ollama_available(hosts: list[tuple[str, str]] | None = None) -> bool:
     """True when at least one configured host answers and lists its model."""
+    if OllamaClient is None or OllamaPool is None:
+        return False
     for url, model in hosts or parse_chat_hosts():
         try:
             names = _client_for(url).list_models(url, timeout=PROBE_TIMEOUT_S)
@@ -125,13 +142,22 @@ def _chat_once(url: str, model: str, prompt: str, client: OllamaClient | None = 
 
 
 def extract_ollama(prompts_by_session: dict[str, str],
-                   hosts: list[tuple[str, str]] | None = None) -> dict[str, str]:
+                   hosts: list[tuple[str, str]] | None = None, *,
+                   extraction_info: dict[str, dict[str, str]] | None = None) -> dict[str, str]:
     """
     Runs each session's extraction prompt through the host chain.
     Returns {session_id: raw_output_text} for the sessions that produced a
     response; sessions where every host failed are omitted so the caller can
     route them to the heuristic fallback (same contract as extract_batch).
+    An optional output collector receives the actual successful model for
+    each session. Failed sessions have no entry; configured fallback candidates
+    are never reported as if they produced an extraction.
     """
+    if extraction_info is not None:
+        if not isinstance(extraction_info, dict):
+            raise ValueError("extraction_info collector must be an object")
+        for session_id in prompts_by_session:
+            extraction_info.pop(session_id, None)
     hosts = hosts or parse_chat_hosts()
     clients = {url: _client_for(url) for url, _ in hosts}
     outputs: dict[str, str] = {}
@@ -144,6 +170,9 @@ def extract_ollama(prompts_by_session: dict[str, str],
                 continue
             try:
                 outputs[session_id] = _chat_once(url, model, prompt, clients[url])
+                if extraction_info is not None:
+                    extraction_info[session_id] = {
+                        "method": "ollama", "model": model, "prompt_version": PROMPT_VERSION}
                 last_err = None
                 break
             except OllamaUnavailable as exc:

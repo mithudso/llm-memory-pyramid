@@ -2,6 +2,148 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v2.1.0 — 2026-10-27
+
+**Delta:** v2.0.0 → v2.1.0; all ten roadmap stages implemented and accepted.
+
+**Delivery:** https://github.com/mithudso/llm-memory-pyramid/pull/18
+Feature head f0e316b passed all five CI jobs: Python 3.11/3.12/3.14,
+Ruff and a fresh offline install. Local discovery passes 486 tests. Independent
+adversarial review reports no remaining medium-or-higher findings within its
+reviewed scope; 130 focused tests reproduce the fixes. Final installed-wheel
+acceptance passes 61 actual CLI invocations and 15 MCP responses, with 23 module
+hashes matched and zero runtime network/subprocess attempts under guards.
+Full receipts: docs/IMPLEMENTATION.md and
+docs/acceptance-offline-2026-10-27.md (v1.1.0; stage-7 receipt preserved).
+
+**Remaining steps:** no product implementation remains. If PR 18 is not yet
+merged, push this documentation receipt, wait for CI, squash merge, delete the
+feature branch and synchronize main. If it is merged, verify clean synced main;
+the PR and Stele EPIC-235 hold the final delivery state. Do not run production
+migrations, inference, indexing, hooks or scheduler setup while resuming.
+
+Package 0.2.0, store 2.0.0, MCP server 1.2.0. Fixed-corpus Recall@5 .86,
+MRR .8733 and abstention .76 are regression measurements, not production or
+new blind accuracy. Production stores/services were not migrated or restarted.
+The stage-3 synthetic embedding call remains disclosed below and in the receipt.
+
+## v2.0.0 — 2026-10-27
+
+**Active task:** implement all ten roadmap improvements in order, EPIC-235.
+TASK-236–TASK-245 track the ten stages. All ten feature stages are implemented;
+TASK-245 awaits final CI/delivery receipts before completion; final installed
+acceptance passed and is preserved in the v2.1.0 entry above.
+
+**Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
+added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
+will change with the corresponding implemented features.
+
+**Completed:** read current source, instructions and prior assessment; checked
+clean main 0790dc7 with no open owned PRs; created the tracked stages and
+tasks/plan.md; captured implementation constraints in KNOW-246. Started an
+offline benchmark author and independent read-only compatibility review.
+- Stage 10: strict typed MCP schemas and structured/text equivalence, pre-load
+  argument validation, whole-wire budgets and preserved request correlation.
+  Snapshot fallback reports actual generation/age. Four bounded source adapters
+  and portable export share exclusions, source identity and untrusted imports.
+  CLI exposes configured MCP, adapters, inspector and quality controls. End-to-end
+  CLI/MCP correction/replay/forget/restore loop passes. Final local suite 486/486,
+  Ruff/compile/shell checks and independent 130-test fix verification pass.
+  Final fixed-corpus regression is unchanged (Recall@5 .86, MRR .8733,
+  abstention .76); it is explicitly not a fresh blind evaluation.
+  Remaining: final installed-wheel receipt, generated maps, CI and merge/sync.
+- Stage 9: strict opt-in local metrics, hashed candidate feedback, retention,
+  extraction stage rates and measured JSON bytes implemented. Status combines
+  source/queue freshness, retrieval fallback/quality, mirror and deletion state
+  without source reads or probes. Forgetting purges matching local feedback.
+  Existing hooks can submit measured outcomes without new hook installation.
+  Metrics 30/30, integrated CLI 25/25 and full 481-test suite pass. Subsequent
+  client integration also passes 484 full tests. Inherited job scopes now persist
+  so project status includes their backlog. No thresholds are auto-tuned.
+- Stage 8: eight scoped terminal inspector views, evidence/age/review state,
+  durable correction previews, historical timeline and project handoff added.
+  Bounded pagination retains complete assertions and source diffs retain whole
+  hunks. Inspection is read-only and shares managed snapshot validation.
+  All 31 inspector tests and 54 focused inspector/CLI tests pass; full suite
+  411 passed before one final CLI workflow test. Stele remains task authority.
+- Stage 7 implementation: portable `napmem` command and TOML/env/CLI precedence;
+  offline defaults, read-only doctor, explicit online integrations and source
+  boundaries. Private shared client moved to optional `ollama` extra without
+  copying its transport. Packaged synthetic evaluation fixture. CLI/config 22
+  focused tests and complete 375-test suite passed. Independent fresh wheel
+  acceptance passed outside the checkout without either optional client: 20
+  console invocations plus identity/guard checks, zero runtime network attempts.
+  The demo revealed a preference word-form mismatch; generic normalization and
+  regression tests fix it without relaxing short-query qualifier coverage.
+  A final wheel will be checked again after stages 8–10 add their modules.
+- Stage 6: whole-operation single-host locks, atomic generation/fingerprint
+  commits, stale-save rejection and long-lived reader refresh implemented.
+  Stable source registry handles rename, missing files and same-mtime edits.
+  Leased durable extraction jobs separate submit/collect/commit and reject stale
+  results; canonical applied-job markers survive acknowledgment crashes.
+  Forget/exclude purges matching local job payloads and discloses remote gaps.
+  Checksummed immutable mirror generations and privacy-preserving restore
+  implemented. Stale cache writers cannot recreate deleted vectors. Full suite
+  341 passed, then 15 focused transaction/privacy tests passed (four added).
+  No production stores, services, indexing or snapshot transfers were changed.
+- Independent review follow-up: an older backup plus a later session scope
+  could revive forgotten text; restore now retains historical scopes and also
+  suppresses older copies of the forgotten record family. Independently scoped
+  copies retain their own lifecycle. Retry validation
+  and payload update now share one SQLite transaction, so PrivacyPurge wins.
+  Rename identity survives edits on the same inode. A verified reader refuses
+  to downgrade when its manifest disappears. All 47 focused persistence tests
+  pass, including deterministic purge/retry interleaving.
+- Stage 1: 200 synthetic queries, 83 records and 20 scenario families with
+  fixed 100/100 dev/held-out split. Original substring and hashed-TF reports
+  captured before runtime changes. Held-out Recall@5: 0.3067 / 0.9200;
+  hashed-TF has 297 scope violations and zero correct abstentions. These are
+  fixture results, not production accuracy. Scorer tests 17/17 and full
+  suite 128/128 pass. Reproduction gates report no baseline regressions.
+- Stage 2: store v2 migration and scoped temporal assertions implemented.
+  Legacy scope remains unknown; metadata/IDs survive no-op replay and alias
+  promotion. Explicit updates retain history; approval gates persistent
+  profiles and unresolved conflicts withhold traits. Removed constant 0.95
+  confidence. All 159 tests, Ruff and compile checks pass. The prior profile
+  risk KNOW-234 is now an implemented fix; production stores remain untouched.
+- Stage 3: offline BM25/sparse hybrid and optional injected embeddings,
+  pre-ranking scope/time/safety filters, abstention and compact payload budgets
+  implemented with scoped legacy adapters. All 189 tests/Ruff/compile pass.
+  Initial held-out result retained; a short-query qualifier-loss bug was
+  fixed generically. Regression report has Recall@5 0.86, MRR 0.8733,
+  abstention 0.76, all 13 protected/all 11 current-fact cases passing and zero
+  scope/lifecycle/marked-instruction leakage. It reuses an inspected split,
+  so it is a regression receipt, not a fresh blind qualification.
+- Validation incident: a focused test bypassed its SemanticIndex constructor
+  mock and contacted the configured embedding backend with synthetic fixture
+  text. Restored the seam and added no-network regression tests; all later
+  test commands force NAPMEM_EMBED_BACKEND=hashed. No production data was
+  accessed or service configuration changed. Concrete lesson: KNOW-250.
+- Stage 4: concrete generation/snapshot-bound previews, correction/pin/expiry/
+  review/exclusion/forget controls, source replay suppression, content-free
+  bounded journal and persistent deletion receipts implemented. Forgetting
+  purges the local embedding cache; failures remain explicitly pending.
+  Permanent session suppression differs from reversible exclusion; whole
+  claim forgetting removes correction/alias families. Fixed implicit replay
+  scope loss with pseudonymous routing (KNOW-251). All 219 tests/Ruff/compile
+  pass. Canonical receipts do not claim external original/backup/mirror deletion.
+- Stage 5: exact source revision/quotation binding and explicit bounded
+  re-verification implemented. Anthropic/Ollama ingestion carries original
+  input and actual extractor/model/prompt provenance. Quotes and paraphrase
+  support remain distinct; mismatching supplied quotes stay unverified.
+  Profiles now require reviewed supported evidence. Shared evidence quotes
+  are redacted through persistent hash/range policies when forgetting a claim;
+  replay cannot restore those literal passages. All 280 tests and Ruff pass.
+
+**Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
+altering runtime behavior. Then proceed through scoped time-aware model,
+hybrid retrieval, controls, evidence, safe persistence/jobs, CLI/config,
+inspector, metrics and typed MCP/adapters. Each stage must pass focused tests;
+full integration gates and publication remain required. Do not stop after an
+early stage merely because its work is tracked. Use the installed .venv.
+Production stores, inference, embeddings, indexing, hooks and schedulers stay
+untouched. Git commit hooks start indexing; suppress them per command only.
+
 ## v1.8.0 — 2026-10-27
 
 **Active task:** none — product assessment complete. TASK-230 covers evidence,

@@ -124,10 +124,23 @@ models can fall through to another model on the same live host.
 
 Relays requests over SSH and replays initialization and pending requests to
 the local mirror after remote failure. Mirror refresh copies the configured
-remote store to fixed local names using private temporary files. Backend
+remote snapshot into a validated immutable generation with fixed member names
+and one atomic publication pointer. Backend
 read/write errors trigger controlled cleanup and failover. Tool results from
 the mirror disclose snapshot age. Configuration and CLI flags are documented
 in the module header and [MCP reference](MCP.md).
+
+## Trusted-memory modules
+
+`napmem_model`, `napmem_search`, `napmem_controls` and `napmem_evidence` define
+scoped temporal assertions, bounded retrieval, persistent operator controls and
+literal source binding. `napmem_storage` owns complete writer locks/CAS commits;
+`napmem_sources`, `napmem_jobs` and `napmem_snapshots` own source identity,
+resumable extraction and verified mirror generations. `napmem_cli` and
+`napmem_config` provide the offline entrypoint. `napmem_inspector`,
+`napmem_metrics`, `napmem_adapters` and `napmem_eval` add review, measured status,
+bounded import/export and synthetic quality regression. Dedicated guides explain
+each contract; the generated source index catalogs every public module.
 
 ## Maintenance and tests
 

@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-Python 3.11+ and Git access to the shared `mithudso/ollama-client` repository.
-CI tests Python 3.11, 3.12 and 3.14. Core distillation and substring retrieval
-use the standard library. The package includes `ollama-client` for Ollama paths.
+Python 3.11+. CI tests Python 3.11, 3.12 and 3.14. The default installation has
+no runtime dependencies. Offline ingestion, retrieval, diagnostics, jobs and
+snapshots require no private Git access, API credentials or model server.
 
 ## Install
 
@@ -20,14 +20,16 @@ For Anthropic extraction, install the optional SDK with
 `.venv/bin/python -m pip install -e '.[llm]'`. Configure credentials supported
 by that SDK. This repo constructs its client without a custom login-profile
 adapter. An Ollama server is needed only for chat extraction or real
-embeddings; installation and offline tests do not start or query one.
+embeddings. Install `.[ollama]` to enable the pinned shared client; that optional
+extra requires access to its private repository. Installation and offline tests
+do not start or query a model server. See [CLI configuration](CLI.md).
 
 ## Verify
 
 ```bash
 NAPMEM_EMBED_BACKEND=hashed python3 -m unittest discover -s . -p "test_*.py"
-python3 memory_pyramid_distiller.py --input sample_agent_memory.md --pyramid /tmp/verify_pyramid.json
-python3 napmem_retrieval_agent.py --pyramid /tmp/verify_pyramid.json --stats
+napmem --pyramid /tmp/napmem-verification/store.json demo
+napmem --pyramid /tmp/napmem-verification/store.json doctor
 ```
 
 Expect all discovered tests to pass, then a summary of the temporary store.
@@ -43,8 +45,10 @@ NAPMEM_EMBED_BACKEND=hashed .venv/bin/python -m unittest discover -s . -p "test_
 ```
 
 The package version lives in `pyproject.toml`. It is separate from the store
-format (`1.0.0`), MCP server version and workflow-log version. Store migrations,
-if needed, will be documented here.
+format (`2.0.0`), MCP server version and workflow-log version. Existing stores
+migrate in memory on load; the next authorized write persists v2. IDs remain
+stable, unknown scope stays `legacy`, and missing evidence stays unverified.
+Migration does not start a service or modify a production store by itself.
 
 ## Uninstall
 

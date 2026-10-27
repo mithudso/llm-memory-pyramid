@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+from copy import deepcopy
 import json
 import logging
 import os
@@ -27,7 +28,7 @@ import sys
 import time
 from typing import Any
 
-from llm_extraction_prompts import get_extraction_prompt
+from llm_extraction_prompts import PROMPT_VERSION, get_extraction_prompt
 from memory_pyramid_distiller import (
     SALIENCE_LEVELS,
     UNIT_TYPES,
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MODEL = "claude-haiku-4-5"
 MAX_OUTPUT_TOKENS = 16000
 MAX_INPUT_CHARS = 600_000  # ~150k tokens; keeps requests under model/batch caps
+MAX_EXTRACTION_METADATA_CHARS = 256
 BATCH_POLL_INTERVAL_SEC = 15
 BATCH_TIMEOUT_SEC = 3600
 
@@ -91,6 +93,12 @@ def validate_unit(unit: Any) -> str | None:
             or not isinstance(anchor.get("heading"), str) or not anchor["heading"].strip()
             or not isinstance(anchor.get("line_range"), str) or not anchor["line_range"].strip()):
         return "missing or non-string source_anchor.heading/.line_range"
+    for container in (unit, anchor):
+        if "source_quote" in container and not isinstance(container["source_quote"], str):
+            return "invalid non-string source_quote"
+    if ("source_quote" in unit and "source_quote" in anchor
+            and unit["source_quote"] != anchor["source_quote"]):
+        return "conflicting source_quote fields"
     slug = unit.get("topic_slug")
     if slug is not None and (not isinstance(slug, str) or not slug.strip()):
         return "invalid topic_slug"
@@ -114,7 +122,7 @@ def units_to_records(units: list[dict[str, Any]], session_id: str,
             continue
         anchor = unit["source_anchor"]
         unit_id = f"rec_{session_id}_{len(records) + 1:03d}"
-        records.append({
+        record = {
             "id": unit_id,
             "type": unit["type"],
             "text": unit["text"].strip(),
@@ -129,7 +137,14 @@ def units_to_records(units: list[dict[str, Any]], session_id: str,
                 "line_range": anchor["line_range"],
             },
             "created_at": _utcnow(),
-        })
+        }
+        # Only the requested literal quotation crosses the model boundary.
+        # Supplied approval, authority and evidence-status fields are ignored.
+        if "source_quote" in unit:
+            record["source_anchor"]["source_quote"] = unit["source_quote"]
+        elif "source_quote" in anchor:
+            record["source_anchor"]["source_quote"] = anchor["source_quote"]
+        records.append(record)
     return records, rejections
 
 
@@ -231,9 +246,61 @@ def extract_batch(client, prompts_by_session: dict[str, str], model: str) -> dic
     return outputs
 
 
+def submit_batch(client, prompts_by_session: dict[str, str], model: str) -> dict[str, Any]:
+    """Submit once and return a serializable handle without polling or sleeping."""
+    if not prompts_by_session:
+        raise ValueError("A batch needs at least one extraction prompt")
+    mapping = {f"req_{index:05d}": session for index, session in enumerate(prompts_by_session)}
+    requests = [{"custom_id": key, "params": _build_request_params(prompts_by_session[session], model)}
+                for key, session in mapping.items()]
+    batch = client.messages.batches.create(requests=requests)
+    return {"batch_id": batch.id, "id_to_session": mapping,
+            "processing_status": batch.processing_status}
+
+
+def collect_batch(client, handle: dict[str, Any]) -> dict[str, Any]:
+    """Check a persisted batch handle once; incomplete batches remain submitted."""
+    batch = client.messages.batches.retrieve(handle["batch_id"])
+    if batch.processing_status != "ended":
+        return {"ready": False, "outputs": {}, "failed_sessions": [],
+                "processing_status": batch.processing_status}
+    mapping = handle["id_to_session"]
+    outputs, failed = {}, []
+    for result in client.messages.batches.results(handle["batch_id"]):
+        session = mapping.get(result.custom_id)
+        if session is None:
+            continue
+        if result.result.type == "succeeded":
+            outputs[session] = "".join(block.text for block in result.result.message.content if block.type == "text")
+        else:
+            failed.append(session)
+    failed.extend(session for session in mapping.values() if session not in outputs and session not in failed)
+    return {"ready": True, "outputs": outputs, "failed_sessions": failed, "processing_status": "ended"}
+
+
+def _extraction_metadata(info: dict[str, Any] | None,
+                         sessions: list[str]) -> dict[str, dict[str, str] | None]:
+    """Accept shared or per-session provenance supplied by the caller."""
+    if info is None:
+        return {session: None for session in sessions}
+    if not isinstance(info, dict):
+        raise ValueError("extraction_info must be an object")
+    allowed = {"method", "model", "prompt_version"}
+    per_session = bool(info) and all(isinstance(value, dict) for value in info.values())
+    values = info.values() if per_session else [info]
+    for value in values:
+        if (set(value) - allowed or any(not isinstance(item, str) or not item.strip()
+                                        or len(item) > MAX_EXTRACTION_METADATA_CHARS
+                                        for item in value.values())):
+            raise ValueError("extraction_info supports bounded method/model/prompt_version strings only")
+    return {session: deepcopy(info.get(session)) if per_session else deepcopy(info) for session in sessions}
+
+
 def ingest_extractions(distiller: MemoryPyramidDistiller,
                        outputs_by_session: dict[str, str],
-                       file_paths: dict[str, str]) -> tuple[int, set[str]]:
+                       file_paths: dict[str, str], *,
+                       source_contents: dict[str, str] | None = None,
+                       extraction_info: dict[str, Any] | None = None) -> tuple[int, set[str]]:
     """
     Parses, validates, and ingests each session's extraction output.
     Returns (total_units_ingested, session_ids_actually_ingested) — sessions
@@ -241,7 +308,17 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
     callers can route them to a fallback extractor.
     Store write failures propagate. Without transaction rollback, continuing
     could persist a failed session's partially mutated in-memory state.
+    source_contents must contain the exact text used to construct each prompt.
+    A missing entry stays unknown. This function never rereads file_paths.
+    extraction_info may describe the shared method/model/prompt_version or map
+    session IDs to those objects when the model differs between sessions.
     """
+    if source_contents is not None and (not isinstance(source_contents, dict)
+                                       or any(not isinstance(content, str) for content in source_contents.values())):
+        raise ValueError("source_contents must map session IDs to original text strings")
+    metadata = _extraction_metadata(extraction_info, list(outputs_by_session))
+    from napmem_metrics import record_if_enabled
+    metric_path = getattr(distiller, "pyramid_path", None)
     total = 0
     ingested: set[str] = set()
     for session_id, raw_text in outputs_by_session.items():
@@ -249,16 +326,23 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
         try:
             units = parse_extraction_output(raw_text)
         except ExtractionError as exc:
+            if metric_path is not None:
+                record_if_enabled(metric_path, "extraction", stage="validation", success=False)
             logger.error("Session %s: %s — skipped", session_id, exc)
             continue
         records, rejections = units_to_records(units, session_id, file_path)
+        if metric_path is not None:
+            record_if_enabled(metric_path, "extraction", stage="validation",
+                              success=bool(records), rejected_units=len(rejections), output_bytes=len(raw_text.encode()))
         for reason in rejections:
             logger.warning("Session %s: rejected unit (%s)", session_id, reason)
         if not records:
             logger.error("Session %s: no valid units extracted — skipped", session_id)
             continue
         count = distiller.ingest_session_records(
-            session_id, f"LLM-extracted {os.path.basename(file_path)}", file_path, records
+            session_id, f"LLM-extracted {os.path.basename(file_path)}", file_path, records,
+            source_content=source_contents.get(session_id) if source_contents is not None else None,
+            extraction_info=metadata[session_id],
         )
         logger.info("Session %s: ingested %d unit(s) (%d rejected)",
                     session_id, count, len(rejections))
@@ -287,6 +371,7 @@ def main():
 
     prompts: dict[str, str] = {}
     file_paths: dict[str, str] = {}
+    source_contents: dict[str, str] = {}
     for path in args.input:
         if not os.path.exists(path):
             print(f"Error: input file not found: {path}", file=sys.stderr)
@@ -307,6 +392,7 @@ def main():
             continue
         prompts[session_id] = get_extraction_prompt(content, session_id, os.path.basename(path))
         file_paths[session_id] = path
+        source_contents[session_id] = content
 
     if args.dry_run:
         for session_id, prompt in prompts.items():
@@ -334,7 +420,10 @@ def main():
 
     distiller = MemoryPyramidDistiller(pyramid_path=args.pyramid,
                                        semantic_dedup=args.semantic_dedup)
-    total, ingested = ingest_extractions(distiller, outputs, file_paths)
+    total, ingested = ingest_extractions(
+        distiller, outputs, file_paths, source_contents=source_contents,
+        extraction_info={"method": "anthropic_direct" if args.no_batch else "anthropic_batch",
+                         "model": args.model, "prompt_version": PROMPT_VERSION})
     print(f"Ingested {total} LLM-extracted unit(s) from {len(ingested)} session(s) "
           f"into {args.pyramid}")
 

@@ -46,15 +46,25 @@ import logging
 import os
 import queue
 import select
+import selectors
+import shlex
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from napmem_mcp_server import MAX_LINE_BYTES, bounded_lines
+from napmem_mcp_server import (
+    MAX_LINE_BYTES, bounded_lines, bounded_tool_result, limit_wire_response,
+    budget_request_error, response_budget_fits_id, tool_budgets, valid_request_id, wire_json,
+)
+from napmem_snapshots import (
+    MAX_ARCHIVE_BYTES, STORE_FILE, load_snapshot, publish_snapshot,
+    resolve_snapshot_directory, unpack_snapshot,
+)
 
 logger = logging.getLogger("napmem_failover")
 
@@ -88,7 +98,7 @@ def mirror_dir() -> Path:
 
 
 def mirror_pyramid() -> Path:
-    return mirror_dir() / MIRROR_FILES[0]
+    return resolve_snapshot_directory(mirror_dir()) / STORE_FILE
 
 
 def ssh_base(host: str) -> list[str]:
@@ -107,7 +117,10 @@ def primary_cmd(host: str) -> list[str]:
 
 
 def fallback_cmd() -> list[str]:
-    return [sys.executable, str(LOCAL_SERVER), "--pyramid", str(mirror_pyramid())]
+    path = mirror_pyramid()
+    if path.exists():
+        load_snapshot(path.parent)
+    return [sys.executable, str(LOCAL_SERVER), "--pyramid", str(path)]
 
 
 def fallback_env() -> dict[str, str]:
@@ -115,6 +128,7 @@ def fallback_env() -> dict[str, str]:
     # Remote fleet hosts are likely down too when we are on the fallback;
     # embed on this box only. Same model as remote keeps the mirrored cache valid.
     env["NAPMEM_OLLAMA_URL"] = os.environ.get("NAPMEM_FALLBACK_OLLAMA", "http://127.0.0.1:11434")
+    env["NAPMEM_CACHE_READ_ONLY"] = "1"
     return env
 
 
@@ -128,10 +142,10 @@ def probe_remote(host: str) -> bool:
     return proc.returncode == 0
 
 
-def mirror_age_s() -> float | None:
+def mirror_age_s(pyramid: Path | None = None) -> float | None:
     try:
-        return time.time() - mirror_pyramid().stat().st_mtime
-    except OSError:
+        return time.time() - (pyramid or mirror_pyramid()).stat().st_mtime
+    except (OSError, ValueError):
         return None
 
 
@@ -145,42 +159,89 @@ def describe_age(age: float | None) -> str:
     return f"snapshot is {age / 86400:.1f} days old"
 
 
+def describe_mirror_snapshot(pyramid: Path | None = None) -> str:
+    age = describe_age(mirror_age_s(pyramid))
+    try:
+        checked = load_snapshot(pyramid.parent if pyramid else mirror_dir())
+    except FileNotFoundError:
+        return age + "; generation unavailable; verification unavailable"
+    except (OSError, ValueError, TypeError):
+        return age + "; generation unavailable; verification failed"
+    verification = checked["verification"]
+    return (f"{age}; generation {checked['manifest']['generation']} "
+            f"({verification['generation']}); verification {verification['status']}; "
+            f"cache {verification['cache']}")
+
+
+def remote_snapshot_cmd(host: str) -> list[str]:
+    """Ask the remote exporter to hold its canonical lock while binding a snapshot."""
+    repo = os.environ.get("NAPMEM_REMOTE_REPO", "$HOME/dev/llm-memory-pyramid")
+    runner = ("import os,runpy,sys; "
+              "sys.path.insert(0,os.path.expanduser(os.path.expandvars(sys.argv.pop(1)))); "
+              "runpy.run_module('napmem_snapshots',run_name='__main__')")
+    command = shlex.join(["python3", "-c", runner, repo, "export-archive", "--pyramid", remote_pyramid()])
+    base = ssh_base(host)
+    return base[:-1] + ["-C", base[-1], command]
+
+
+def _receive_snapshot(host: str, destination: Path, *, timeout: float = 300) -> None:
+    """Stream bounded stdout/stderr without letting a stalled child hold the proxy."""
+    proc = subprocess.Popen(remote_snapshot_cmd(host), stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None and proc.stderr is not None
+    deadline, total, errors = time.monotonic() + timeout, 0, bytearray()
+    try:
+        with destination.open("xb") as output, selectors.DefaultSelector() as selector:
+            for stream in (proc.stdout, proc.stderr):
+                os.set_blocking(stream.fileno(), False)
+                selector.register(stream, selectors.EVENT_READ)
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Snapshot transfer timed out")
+                for key, _ in selector.select(min(.2, remaining)):
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                    elif key.fileobj is proc.stdout:
+                        total += len(chunk)
+                        if total > MAX_ARCHIVE_BYTES:
+                            raise ValueError("Snapshot transfer exceeds size limit")
+                        output.write(chunk)
+                    elif len(errors) < 16384:
+                        errors.extend(chunk[:16384 - len(errors)])
+            output.flush()
+            os.fsync(output.fileno())
+        if proc.wait(timeout=max(.1, deadline - time.monotonic())) != 0:
+            raise RuntimeError(errors.decode("utf-8", "replace").strip() or "Remote snapshot export failed")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
+        proc.stdout.close()
+        proc.stderr.close()
+
+
 def sync_mirror(host: str) -> bool:
-    """Copy the canonical pyramid (+ embedding cache) to the mirror dir.
-    Each file lands via tmp + os.replace, so a reader never sees a torn file.
-    The pyramid must parse as a JSON object before it replaces the old one."""
+    """Transfer one locked export, validate it, then publish one generation pointer.
+
+    Concurrent transfers use separate private directories. Only publication is
+    serialized; a failed refresh leaves the previous complete generation active.
+    """
     dest_dir = mirror_dir()
     dest_dir.mkdir(parents=True, exist_ok=True)
-    ok = True
-    for name in MIRROR_FILES:
-        dest = dest_dir / name
-        tmp = None
-        src = remote_pyramid() + (".embindex.json" if name == MIRROR_FILES[1] else "")
-        try:
-            with tempfile.NamedTemporaryFile(dir=dest_dir, prefix=f".{name}.",
-                                             suffix=".tmp", delete=False) as out:
-                tmp = Path(out.name)
-                proc = subprocess.run(ssh_base(host) + ["-C", f'cat "{src}"'],
-                                      stdin=subprocess.DEVNULL, stdout=out,
-                                      stderr=subprocess.PIPE, timeout=300, check=False)
-            if proc.returncode != 0:
-                raise RuntimeError(proc.stderr.decode("utf-8", "replace").strip()
-                                   or f"ssh exit {proc.returncode}")
-            if name == MIRROR_FILES[0]:
-                with open(tmp, encoding="utf-8") as fh:
-                    if not isinstance(json.load(fh), dict):
-                        raise TypeError("pyramid is not a JSON object")
-            os.replace(tmp, dest)
-            logger.info("Mirrored %s (%d bytes)", name, dest.stat().st_size)
-        except (OSError, RuntimeError, ValueError, TypeError, subprocess.TimeoutExpired) as exc:
-            logger.warning("Mirror of %s failed: %s", name, exc)
-            ok = ok and name != MIRROR_FILES[0]  # embindex is optional
-            if tmp is not None:
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
-    return ok
+    try:
+        with tempfile.TemporaryDirectory(dir=dest_dir, prefix=".refresh-") as temporary:
+            archive = Path(temporary) / "snapshot.tar"
+            _receive_snapshot(host, archive)
+            staging = Path(temporary) / "snapshot"
+            unpack_snapshot(archive, staging)
+            manifest = publish_snapshot(staging, dest_dir)
+        logger.info("Mirrored complete generation %s", manifest["generation"])
+        return True
+    except (OSError, RuntimeError, ValueError, TypeError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
+        logger.warning("Mirror snapshot refresh failed: %s", exc)
+        return False
 
 
 class Backend:
@@ -311,14 +372,15 @@ def _id_key(msg_id: Any) -> str:
 
 
 class FailoverProxy:
-    def __init__(self, primary: list[str] | None, fallback: list[str],
+    def __init__(self, primary: list[str] | None, fallback: list[str] | Callable[[], list[str]],
                  fallback_env: dict[str, str] | None = None, stdout=None,
                  note_fn=None):
         self.primary = primary
         self.fallback = fallback
         self.fallback_env = fallback_env
         self.stdout = stdout or sys.stdout
-        self.note_fn = note_fn or (lambda: describe_age(mirror_age_s()))
+        self._local_pyramid: Path | None = None
+        self.note_fn = note_fn or (lambda: describe_mirror_snapshot(self._local_pyramid))
         self.lock = threading.RLock()
         self.out_lock = threading.Lock()
         self.pending: dict[str, tuple[str, str, float]] = {}  # id -> (line, method, sent_at)
@@ -369,6 +431,14 @@ class FailoverProxy:
         self.gen += 1
         self.mode = mode
         cmd, env = (self.primary, None) if mode == "remote" else (self.fallback, self.fallback_env)
+        try:
+            cmd = cmd() if callable(cmd) else cmd
+        except (OSError, ValueError) as exc:
+            logger.error("Cannot resolve %s backend snapshot: %s", mode, exc)
+            self.backend = None
+            return
+        if mode == "local" and "--pyramid" in cmd:
+            self._local_pyramid = Path(cmd[cmd.index("--pyramid") + 1])
         logger.info("Starting %s backend: %s", mode, " ".join(cmd[:2]) + " ...")
         try:
             self.backend = Backend(cmd, env, self.gen, self)
@@ -428,10 +498,16 @@ class FailoverProxy:
     # --- relay -------------------------------------------------------------
 
     def _emit(self, obj_or_line):
-        line = obj_or_line if isinstance(obj_or_line, str) else json.dumps(obj_or_line)
+        obj = json.loads(obj_or_line) if isinstance(obj_or_line, str) else obj_or_line
+        line = wire_json(limit_wire_response(obj))
         with self.out_lock:
-            self.stdout.write(line if line.endswith("\n") else line + "\n")
-            self.stdout.flush()
+            binary = getattr(self.stdout, "buffer", None)
+            if binary is not None:
+                binary.write(line.encode("utf-8"))
+                binary.flush()
+            else:
+                self.stdout.write(line)
+                self.stdout.flush()
 
     def _fail_pending(self, message: str):
         for key, (line, _m, _s) in list(self.pending.items()):
@@ -453,12 +529,19 @@ class FailoverProxy:
             msg = None
         if isinstance(msg, dict) and "id" in msg:
             msg_id = msg["id"]
-            if isinstance(msg_id, bool) or not isinstance(msg_id, (str, int)):
+            if not valid_request_id(msg_id):
                 # The backend answers invalid IDs with null, which cannot
                 # clear a pending entry keyed by the original invalid value.
                 self._emit({"jsonrpc": "2.0", "id": None,
                             "error": {"code": -32600, "message": "Invalid Request"}})
                 return
+            if msg.get("method") == "tools/call":
+                params = msg.get("params", {})
+                arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
+                maximum, tokens = tool_budgets(arguments if isinstance(arguments, dict) else {})
+                if not response_budget_fits_id(msg_id, maximum, tokens):
+                    self._emit(budget_request_error(msg_id))
+                    return
         dead = None
         with self.lock:
             if isinstance(msg, dict):
@@ -494,6 +577,7 @@ class FailoverProxy:
             except (ValueError, RecursionError) as exc:
                 raise ValueError("Invalid backend JSON") from exc
             method = None
+            request = None
             if isinstance(msg, dict) and "id" in msg and "method" not in msg:
                 key = _id_key(msg["id"])
                 if key in self.replay_ids:
@@ -501,17 +585,70 @@ class FailoverProxy:
                     return
                 entry = self.pending.pop(key, None)
                 method = entry[1] if entry else None
-            if (self.mode == "local" and method == "tools/call" and isinstance(msg, dict)
-                    and isinstance(msg.get("result"), dict)
-                    and isinstance(msg["result"].get("content"), list)):
-                msg["result"]["content"].append({
-                    "type": "text",
-                    "text": ("[napmem fallback] Remote napmem server is unreachable; this "
-                             f"answer came from the local mirror ({self.note_fn()})."),
-                })
+                request = json.loads(entry[0]) if entry else None
+            if method == "tools/call" and isinstance(msg, dict):
+                params = request.get("params", {}) if isinstance(request, dict) else {}
+                arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
+                maximum, tokens = tool_budgets(arguments if isinstance(arguments, dict) else {})
+                result = msg.get("result")
+                if isinstance(result, dict) and isinstance(result.get("content"), list):
+                    payload = result.get("structuredContent")
+                    if not isinstance(payload, dict):
+                        first = result["content"][0] if result["content"] else {}
+                        text = first.get("text", "") if isinstance(first, dict) else ""
+                        try:
+                            payload = json.loads(text)
+                        except (ValueError, TypeError):
+                            payload = {"legacy_text": text}
+                        if not isinstance(payload, dict):
+                            payload = {"legacy_value": payload}
+                    extras = result["content"][1:]
+                    failed = result.get("isError") is True or "error" in payload
+                    if failed:
+                        # Older backends may expose exception text in content.
+                        # The proxy preserves failure status, never that body.
+                        supplied = payload.get("error", {})
+                        code = supplied.get("code") if isinstance(supplied, dict) else None
+                        messages = {"INVALID_TOOL_ARGUMENTS": "Unknown tool or invalid tool arguments",
+                                    "MEMORY_UNAVAILABLE": "Requested memory is unavailable"}
+                        code = code if code in messages else "TOOL_FAILED"
+                        payload = {"error": {"code": code, "message": messages.get(code, "Memory tool could not complete")}}
+                        extras = []
+                    if self.mode == "local":
+                        payload = dict(payload)
+                        age = mirror_age_s(self._local_pyramid) if self._local_pyramid else None
+                        metadata = {"mode": "local_mirror", "snapshot_age_seconds": age,
+                                    "generation": None, "verification": "unavailable"}
+                        try:
+                            if self._local_pyramid is None:
+                                raise ValueError("Custom backend has no mirror snapshot path")
+                            snapshot = load_snapshot(self._local_pyramid.parent)
+                            metadata.update(generation=snapshot["manifest"]["generation"],
+                                            verification=snapshot["verification"]["status"],
+                                            generation_verification=snapshot["verification"]["generation"])
+                        except (OSError, ValueError, TypeError):
+                            pass
+                        payload["fallback"] = metadata
+                        note = str(self.note_fn())[:1024]
+                        extras = [*extras, {"type": "text", "text": (
+                            "[napmem fallback] Remote napmem server is unreachable; this "
+                            f"answer came from the local mirror ({note}).")}]
+                    msg = bounded_tool_result(msg["id"], payload, max_bytes=maximum, max_tokens=tokens,
+                                              extra_content=extras, is_error=failed)
+                else:
+                    if isinstance(msg.get("error"), dict):
+                        code = msg["error"].get("code")
+                        if isinstance(code, bool) or not isinstance(code, int) or not -(2**31) <= code < 2**31:
+                            code = -32603
+                        messages = {-32700: "Parse error", -32600: "Invalid Request", -32601: "Method not found",
+                                    -32602: "Invalid params", -32603: "Internal error",
+                                    -32001: "Response budget too small for metadata"}
+                        msg = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {
+                            "code": code, "message": messages.get(code, "Backend request failed")}}
+                    msg = limit_wire_response(msg, max_bytes=maximum, max_tokens=tokens)
                 self._emit(msg)
                 return
-        self._emit(stripped)
+        self._emit(msg)
 
     def serve(self, stdin=None):
         stdin = stdin or sys.stdin
@@ -531,7 +668,7 @@ def status() -> int:
     print(f"remote host : {host or '(not configured -> local only)'}")
     if host:
         print(f"reachable   : {probe_remote(host)}")
-    print(f"mirror      : {mirror_pyramid()} ({describe_age(mirror_age_s())})")
+    print(f"mirror      : {mirror_pyramid()} ({describe_mirror_snapshot()})")
     return 0
 
 
@@ -561,7 +698,7 @@ def main() -> int:
         if age is None or age > float(os.environ.get("NAPMEM_MIRROR_MAX_AGE", "3600")):
             threading.Thread(target=sync_mirror, args=(host,), daemon=True).start()
 
-    proxy = FailoverProxy(primary_cmd(host) if host else None, fallback_cmd(), fallback_env())
+    proxy = FailoverProxy(primary_cmd(host) if host else None, fallback_cmd, fallback_env())
     proxy.start(use_primary=reachable)
     proxy.serve()
     return 0
