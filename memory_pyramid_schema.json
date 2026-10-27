@@ -268,7 +268,61 @@
           },
           "evidence": {
             "type": "object",
-            "description": "Literal quotation and source revision verification; missing evidence never implies verified support."
+            "description": "Literal quote and exact ingestion revision binding. Verified quotation does not prove paraphrase truth. High-trust profiles require reviewed support.",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "verified",
+                  "unverified",
+                  "changed",
+                  "missing"
+                ]
+              },
+              "source_kind": {
+                "type": "string"
+              },
+              "source_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "quote": {
+                "type": "string"
+              },
+              "quote_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "line_range": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "quote_truncated": {
+                "type": "boolean"
+              },
+              "assertion_support": {
+                "type": "string",
+                "enum": [
+                  "verbatim",
+                  "unverified"
+                ]
+              },
+              "extraction": {
+                "type": "object"
+              }
+            }
           },
           "observed_at": {
             "type": [
@@ -336,10 +390,16 @@
             "type": "string"
           },
           "source_sha256": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "source_id": {
             "type": "string"
+          },
+          "extraction": {
+            "type": "object"
           }
         },
         "required": [
@@ -378,6 +438,13 @@
         "type": "object"
       },
       "description": "Content-free cache/replica deletion state. External originals, exports and backups have separate retention."
+    },
+    "evidence_redactions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Content-free source/range and quotation hashes that suppress overlapping evidence after forgetting."
     }
   },
   "required": [

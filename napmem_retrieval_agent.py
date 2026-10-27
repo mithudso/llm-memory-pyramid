@@ -144,7 +144,8 @@ class NapMemRetrievalAgent:
 
     def inspect_provenance(self, record_id: str, *, scope: str | None = None,
                            as_of: str | None = None, max_bytes: int = 16384,
-                           max_tokens: int | None = 2048) -> dict[str, Any]:
+                           max_tokens: int | None = 2048, verify: bool = False,
+                           allowed_roots: list[str] | None = None) -> dict[str, Any]:
         """Resolve the selected occurrence's own wording, context and source."""
         from copy import deepcopy
         from napmem_model import normalize_record, visible
@@ -180,6 +181,13 @@ class NapMemRetrievalAgent:
                   "evidence": selected.get("evidence", {})}
         if canonical_id:
             result["canonical_id"] = canonical_id
+        if verify:
+            from napmem_evidence import verify_evidence
+            result["verification"] = verify_evidence(selected, allowed_roots=allowed_roots)
+        else:
+            result["verification"] = {
+                "status": "not_rechecked", "binding_status": selected.get("evidence", {}).get("status", "unverified"),
+                "reason": "stored_ingestion_revision_only"}
         return self._bounded(result, max_bytes, max_tokens)
 
     def get_topic_track(self, topic_slug: str, *, scope: str | None = None,

@@ -26,6 +26,7 @@ py-modules = [
     "napmem_model",
     "napmem_search",
     "napmem_controls",
+    "napmem_evidence",
     "napmem_eval",
     "semantic_index",
     "ollama_extractor",

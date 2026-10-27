@@ -27,6 +27,9 @@ _CONTROL_KEYS = {"overrides", "corrections", "assertions", "tombstones", "exclud
 _OVERRIDE_FIELDS = {"pinned", "review_status", "valid_to"}
 _IDENTITY_FIELDS = {"record_ids", "scope", "text_sha256"}
 _CORRECTION_FIELDS = {"original_ids", "assertion_id", "scope", "text_sha256"}
+_REDACTION_FIELDS = {"scope", "source_sha256", "quote_sha256", "line_range"}
+_LINE_RANGE = re.compile(r"L?([0-9]+)(?:-L?([0-9]+))?", re.IGNORECASE)
+_MARKDOWN_PREFIX = re.compile(r"^(?:>\s*|(?:[-*+]|[0-9]+[.)])\s+|\[[ xX]\]\s+)")
 
 
 def _json(value: Any) -> bytes:
@@ -77,7 +80,119 @@ def _identity(scope: Any, text_hash: Any) -> None:
         raise ValueError("text_sha256 must be a SHA-256 digest")
 
 
+def _line_bounds(value: Any) -> tuple[int, int] | None:
+    if not isinstance(value, str) or len(value) > 64:
+        return None
+    match = _LINE_RANGE.fullmatch(value.strip())
+    if match is None:
+        return None
+    start, end = int(match[1]), int(match[2] or match[1])
+    return (start, end) if 0 < start <= end else None
+
+
+def _range_label(bounds: tuple[int, int]) -> str:
+    start, end = bounds
+    return f"L{start}" if start == end else f"L{start}-L{end}"
+
+
+def _redactions(data: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = data.get("evidence_redactions", [])
+    if not isinstance(raw, list):
+        raise ValueError("evidence_redactions must be a list")
+    seen = set()
+    for policy in raw:
+        if not isinstance(policy, dict) or set(policy) != _REDACTION_FIELDS:
+            raise ValueError("Malformed content-free evidence redaction")
+        normalize_record({"id": "redaction_validation", "text": "", "scope": policy["scope"]})
+        for field in ("source_sha256", "quote_sha256"):
+            if policy[field] is not None and not _digest(policy[field]):
+                raise ValueError(f"evidence redaction {field} must be a SHA-256 digest or null")
+        bounds = _line_bounds(policy["line_range"])
+        if policy["line_range"] is not None and (bounds is None or policy["line_range"] != _range_label(bounds)):
+            raise ValueError("evidence redaction line_range must be normalized or null")
+        if policy["quote_sha256"] is None and (policy["source_sha256"] is None or bounds is None):
+            raise ValueError("evidence redaction must bind a quote or a source range")
+        identity = _json(policy)
+        if identity in seen:
+            raise ValueError("Duplicate evidence redaction")
+        seen.add(identity)
+    return deepcopy(raw)
+
+
+def _capture_redactions(data: dict[str, Any], records: list[dict[str, Any]]) -> None:
+    policies = {_json(policy): policy for policy in _redactions(data)}
+    for record in records:
+        evidence = record["evidence"]
+        quotes = [evidence.get("quote"), record.get("source_quote"), record["source_anchor"].get("source_quote")]
+        quote_hashes = {_sha(quote) for quote in quotes if isinstance(quote, str) and quote}
+        source_hash = evidence.get("source_sha256")
+        source_hash = source_hash if _digest(source_hash) else None
+        bounds = _line_bounds(evidence.get("line_range", record["source_anchor"].get("line_range")))
+        if not quote_hashes and (source_hash is None or bounds is None):
+            continue
+        for quote_hash in quote_hashes or {None}:
+            policy = {"scope": record["scope"], "source_sha256": source_hash,
+                      "quote_sha256": quote_hash, "line_range": _range_label(bounds) if bounds else None}
+            policies[_json(policy)] = policy
+    if policies or "evidence_redactions" in data:
+        data["evidence_redactions"] = [policies[key] for key in sorted(policies)]
+
+
+def _quote_line_hashes(quote: str) -> set[str]:
+    hashes = set()
+    for line in quote.splitlines():
+        text = line.strip()
+        while text:
+            hashes.add(_sha(text.lower().strip()))
+            stripped = _MARKDOWN_PREFIX.sub("", text, count=1).strip()
+            if stripped == text:
+                break
+            text = stripped
+    return hashes
+
+
+def _redact_evidence(record: dict[str, Any], policies: list[dict[str, Any]],
+                     controls: dict[str, Any]) -> bool:
+    evidence = record["evidence"]
+    quote = evidence.get("quote")
+    quotes = [quote, record.get("source_quote"), record["source_anchor"].get("source_quote")]
+    quote_hashes = {_sha(value) for value in quotes if isinstance(value, str) and value}
+    if _digest(evidence.get("quote_sha256")) and not quote:
+        quote_hashes.add(evidence["quote_sha256"])
+    bounds = _line_bounds(evidence.get("line_range", record["source_anchor"].get("line_range")))
+    matched = False
+    for policy in policies:
+        if policy["scope"] != record["scope"]:
+            continue
+        if policy["quote_sha256"] is not None and policy["quote_sha256"] in quote_hashes:
+            matched = True
+            break
+        forbidden_bounds = _line_bounds(policy["line_range"])
+        if (bounds and forbidden_bounds and policy["source_sha256"] is not None
+                and policy["source_sha256"] == evidence.get("source_sha256")
+                and bounds[0] <= forbidden_bounds[1] and forbidden_bounds[0] <= bounds[1]):
+            matched = True
+            break
+    if not matched:
+        forbidden = {item["text_sha256"] for item in controls["tombstones"] if item["scope"] == record["scope"]}
+        matched = any(forbidden.intersection(_quote_line_hashes(value))
+                      for value in quotes if isinstance(value, str) and value)
+    if not matched:
+        return False
+    changed = bool(quote or evidence.get("quote_sha256") or "source_quote" in record
+                   or "source_quote" in record["source_anchor"])
+    evidence.update(quote="", quote_sha256=None, status="unverified",
+                    assertion_support="unverified", reason="redacted_by_forget")
+    record.pop("source_quote", None)
+    record["source_anchor"].pop("source_quote", None)
+    assertion = record["source_anchor"].get("assertion")
+    if isinstance(assertion, dict):
+        assertion.pop("source_quote", None)
+    return changed
+
+
 def _controls(data: dict[str, Any]) -> dict[str, Any]:
+    _redactions(data)
     raw = data.get("controls", {})
     if not isinstance(raw, dict) or set(raw) - _CONTROL_KEYS:
         raise ValueError("Malformed persistent controls: unknown fields or non-object")
@@ -115,8 +230,11 @@ def _controls(data: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Malformed operator assertion identity")
         change_id = rid[len("rec_control_"):]
         evidence = normalized["evidence"]
-        if (evidence.get("status") != "verified" or evidence.get("source_kind") != "operator"
-                or evidence.get("quote") != normalized["text"]
+        redacted = (evidence.get("status") == "unverified" and evidence.get("reason") == "redacted_by_forget"
+                    and evidence.get("quote") == "" and evidence.get("quote_sha256") is None
+                    and evidence.get("assertion_support") == "unverified")
+        if ((not redacted and (evidence.get("status") != "verified" or evidence.get("quote") != normalized["text"]))
+                or evidence.get("source_kind") != "operator"
                 or evidence.get("source_sha256") != _sha(normalized["text"])
                 or evidence.get("revision") != change_id
                 or normalized["source_anchor"].get("session_id") != "session_control_" + change_id
@@ -148,7 +266,7 @@ def _controls(data: dict[str, Any]) -> dict[str, Any]:
         if _source(source) != source or not (enabled is True or enabled == "forgotten"):
             raise ValueError("Excluded source keys must be normalized and values must be true or 'forgotten'")
     journal_fields = {"action", "id", "at", "affected_ids", "hashes", "fields"}
-    journal_changes = _OVERRIDE_FIELDS | {"excluded_sources", "tombstones", "assertions", "corrections", "overrides", "status"}
+    journal_changes = _OVERRIDE_FIELDS | {"excluded_sources", "tombstones", "assertions", "corrections", "overrides", "status", "evidence_redactions"}
     if len(result["journal"]) > JOURNAL_LIMIT:
         raise ValueError("Control journal exceeds bounded retention")
     for entry in result["journal"]:
@@ -188,12 +306,14 @@ def _tombstoned(controls: dict[str, Any], record: dict[str, Any]) -> bool:
 def filter_incoming(data: dict[str, Any], records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return normalized copies after durable replay and source suppression."""
     controls = _controls(data)
+    policies = _redactions(data)
     result = []
     for record in records:
         record = normalize_record(record)
         if (_tombstoned(controls, record) or fingerprint(record) in controls["corrections"]
                 or _excluded(controls, record)):
             continue
+        _redact_evidence(record, policies, controls)
         result.append(record)
     return result
 
@@ -269,7 +389,9 @@ def _repack(occurrences: list[dict[str, Any]]) -> dict[str, Any] | None:
     return canonical
 
 
-def _apply(data: dict[str, Any], controls: dict[str, Any]) -> None:
+def _apply(data: dict[str, Any], controls: dict[str, Any]) -> set[str]:
+    policies = _redactions(data)
+    redacted = set()
     records = deepcopy(data.get("memory_records", []))
     present = {rid for record in records for rid in [record["id"], *record.get("duplicates", [])]}
     controls["assertions"] = [a for a in controls["assertions"] if not _tombstoned(controls, normalize_record(a))]
@@ -291,6 +413,8 @@ def _apply(data: dict[str, Any], controls: dict[str, Any]) -> None:
                 correction = controls["corrections"][fp]
                 correction["original_ids"] = sorted(set(correction["original_ids"]) | {item["id"]})
                 item.update(status="superseded", review_status="rejected")
+            if _redact_evidence(item, policies, controls):
+                redacted.add(item["id"])
             kept.append(item)
         rebuilt = _repack(kept)
         if rebuilt:
@@ -303,7 +427,10 @@ def _apply(data: dict[str, Any], controls: dict[str, Any]) -> None:
             assertion = anchor.get("assertion", {})
             assertion["supersedes"] = [rid for rid in assertion.get("supersedes", []) if rid not in removed or rid in present]
     data["memory_records"] = result
+    retained = {item["id"]: item for record in result for item in _occurrences(record)}
+    controls["assertions"] = [deepcopy(retained.get(item["id"], item)) for item in controls["assertions"]]
     data["controls"] = controls
+    return redacted
 
 
 def apply_controls(data: dict[str, Any]) -> None:
@@ -410,6 +537,10 @@ def preview_action(data: dict[str, Any], action: str, *, record_id: str | None =
     if action == "correct":
         change_id = _sha(_json([request_hash, _generation(data), moment]))[:24]
         preview["affected_ids"] = sorted(set(affected) | {"rec_control_" + change_id})
+    if action == "forget":
+        simulated = deepcopy(data)
+        preview["redacted_evidence_ids"] = apply_action(
+            simulated, action, record_id=record_id, value=value, source=source, at=moment)["redacted_evidence_ids"]
     preview["preview_token"] = _token(data, request_hash, moment)
     return preview
 
@@ -461,6 +592,8 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
         for item in records.values():
             if (item["scope"], _text_hash(item)) in identities:
                 hashes.add(fingerprint(item))
+        _capture_redactions(working, [item for rid, item in records.items()
+                                     if rid in family or (item["scope"], _text_hash(item)) in identities])
         controls["tombstones"] = [{"scope": scope, "text_sha256": text_hash}
                                   for scope, text_hash in sorted(identities | {
                                       (item["scope"], item["text_sha256"]) for item in controls["tombstones"]})]
@@ -471,7 +604,7 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
                                    and item["assertion_id"] not in family}
         controls["overrides"] = {fp: item for fp, item in controls["overrides"].items()
                                  if fp not in hashes and not family.intersection(item["record_ids"])}
-        changed_fields = ["tombstones", "assertions", "corrections", "overrides"]
+        changed_fields = ["tombstones", "assertions", "corrections", "overrides", "evidence_redactions"]
     elif action == "correct":
         target_id = record_id
         while fingerprint(records[target_id]) in controls["corrections"]:
@@ -521,7 +654,7 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
             override["valid_to"] = parse_time(value if value is not None else moment).isoformat()
             changed_fields = ["valid_to"]
         hashes.add(fp)
-    _apply(working, controls)
+    redacted = _apply(working, controls)
     if action in ("forget", "forget_session", "exclude"):
         _prune_raw(working)
     controls["journal"].append({"action": action, "id": change_id, "at": moment,
@@ -535,6 +668,7 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
     data.clear()
     data.update(working)
     return {"action": action, "change_id": change_id, "affected_ids": sorted(set(affected)),
+            "redacted_evidence_ids": sorted(redacted),
             "generation": generation, "proposed_generation": generation + 1,
             "canonical": "complete", "persistence": "pending_caller_commit",
             "cache": "pending_parent_purge", "mirrors": "pending_acknowledgment",

@@ -195,6 +195,10 @@ the mirror can be stale but never divergent.
 - A high-salience fact or task does not establish a durable profile. Persistent
   profile kinds require explicit approval; unresolved subject conflicts are
   withheld. Never emit a fabricated numeric confidence.
+- Source binding uses the original extraction input, not a later path reread.
+  Verified quotation provenance does not prove a paraphrase. Profile evidence
+  must be supported; source re-verification requires explicit allowed roots.
+  Preserve hash/range evidence redactions when forgetting overlapping quotes.
 - Operator controls live outside derived layers. Apply them before source
   reconciliation and after extraction. Keep hash-only replay suppression and
   source scope routing when forgetting raw metadata. Retrieval MCP stays

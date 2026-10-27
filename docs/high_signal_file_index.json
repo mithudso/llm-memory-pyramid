@@ -37,6 +37,11 @@
       "summary": "Offline evidence-retrieval evaluation, independent of answer generation."
     },
     {
+      "path": "napmem_evidence.py",
+      "signal": "high",
+      "summary": "Bind literal source passages to the exact text supplied to extraction."
+    },
+    {
       "path": "napmem_mcp_failover.py",
       "signal": "high",
       "summary": "NapMem MCP failover proxy (stdio)"
@@ -107,6 +112,21 @@
       "summary": "Deterministic, network-free evidence scorer and benchmark contract tests."
     },
     {
+      "path": "test_napmem_evidence.py",
+      "signal": "high",
+      "summary": "Offline tests for literal source binding and explicitly allowed file checks."
+    },
+    {
+      "path": "test_napmem_evidence_extraction.py",
+      "signal": "high",
+      "summary": "Offline checks for exact extraction inputs and untrusted model quotations."
+    },
+    {
+      "path": "test_napmem_evidence_forget.py",
+      "signal": "high",
+      "summary": "Forgetting erases literal source evidence without deleting unrelated facts."
+    },
+    {
       "path": "test_napmem_extensions.py",
       "signal": "high",
       "summary": "Tests for the production-path extensions: LLM extractor parsing/validation,"
@@ -135,6 +155,11 @@
       "path": "test_napmem_protocol.py",
       "signal": "high",
       "summary": "Offline regressions for the stdlib MCP protocol boundary."
+    },
+    {
+      "path": "test_napmem_provenance.py",
+      "signal": "high",
+      "summary": "Source proof, profile admission and explicit re-verification at public boundaries."
     },
     {
       "path": "test_napmem_regressions.py",

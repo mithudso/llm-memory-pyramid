@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–4 passed; next is TASK-240,
-verified source evidence.
+TASK-236–TASK-245 track the ten stages. Stages 1–5 passed; next is TASK-241,
+transactional persistence, resumable ingestion and coherent snapshots.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -49,6 +49,13 @@ offline benchmark author and independent read-only compatibility review.
   claim forgetting removes correction/alias families. Fixed implicit replay
   scope loss with pseudonymous routing (KNOW-251). All 219 tests/Ruff/compile
   pass. Canonical receipts do not claim external original/backup/mirror deletion.
+- Stage 5: exact source revision/quotation binding and explicit bounded
+  re-verification implemented. Anthropic/Ollama ingestion carries original
+  input and actual extractor/model/prompt provenance. Quotes and paraphrase
+  support remain distinct; mismatching supplied quotes stay unverified.
+  Profiles now require reviewed supported evidence. Shared evidence quotes
+  are redacted through persistent hash/range policies when forgetting a claim;
+  replay cannot restore those literal passages. All 280 tests and Ruff pass.
 
 **Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
 altering runtime behavior. Then proceed through scoped time-aware model,

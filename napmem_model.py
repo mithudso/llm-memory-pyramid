@@ -220,6 +220,20 @@ def _stable_id(prefix: str, *parts: Any) -> str:
     return prefix + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
 
 
+def _profile_evidence_supported(record: dict[str, Any]) -> bool:
+    evidence = record["evidence"]
+    if evidence.get("status") != "verified":
+        return False
+    if evidence.get("source_kind") == "operator":
+        from napmem_evidence import verify_evidence
+        return verify_evidence(record).get("status") == "verified"
+    quote = evidence.get("quote")
+    return (evidence.get("assertion_support") == "verbatim" and isinstance(quote, str)
+            and bool(quote) and evidence.get("quote_sha256") == hashlib.sha256(quote.encode()).hexdigest()
+            and isinstance(evidence.get("source_sha256"), str)
+            and bool(re.fullmatch(r"[0-9a-f]{64}", evidence["source_sha256"])))
+
+
 def build_derived(data: dict[str, Any]) -> None:
     """Rebuild scoped tracks, explicitly approved persistent profiles and conflict hints."""
     at = datetime.now(UTC)
@@ -239,7 +253,7 @@ def build_derived(data: dict[str, Any]) -> None:
     conflict_ids = {r["id"] for members in conflict_groups.values() for r in members}
     for record in current:
         if (record["memory_kind"] in PERSISTENT_KINDS and record["review_status"] == "approved"
-                and record["id"] not in conflict_ids):
+                and record["id"] not in conflict_ids and _profile_evidence_supported(record)):
             profile_groups[record["scope"], record["memory_kind"], record["text"]].append(record)
     data["topic_tracks"] = []
     for (scope, slug), members in sorted(tracks.items()):
@@ -254,6 +268,7 @@ def build_derived(data: dict[str, Any]) -> None:
     data["user_profiles"] = [
         {"id": _stable_id("prof_", scope, kind, text), "scope": scope,
          "category": kind, "trait": text, "review_status": "approved",
+         "evidence_status": "verified", "confidence_status": "not_calibrated",
          "provenance_records": [r["id"] for r in members]}
         for (scope, kind, text), members in sorted(profile_groups.items())
     ]

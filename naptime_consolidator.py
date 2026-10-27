@@ -306,7 +306,12 @@ class NaptimeConsolidator:
         except (ExtractionError, anthropic.AnthropicError, TypeError, OSError) as exc:
             logger.error("LLM batch extraction failed (%s); falling back to heuristic", exc)
             return set()
-        _, ingested = ingest_extractions(self.distiller, outputs, file_paths)
+        from llm_extraction_prompts import PROMPT_VERSION
+        source_contents = {sid: content for sid, _, content, _ in changed}
+        _, ingested = ingest_extractions(
+            self.distiller, outputs, file_paths, source_contents=source_contents,
+            extraction_info={"method": "anthropic_batch", "model": DEFAULT_MODEL,
+                             "prompt_version": PROMPT_VERSION})
         return ingested
 
     def _extract_ollama(self, changed: list[tuple[str, str, str, float]]) -> set[str]:
@@ -339,12 +344,16 @@ class NaptimeConsolidator:
             for session_id, fpath, content, _ in changed
         }
         file_paths = {session_id: fpath for session_id, fpath, _, _ in changed}
+        extraction_info = {}
         try:
-            outputs = extract_ollama(prompts, hosts)
+            outputs = extract_ollama(prompts, hosts, extraction_info=extraction_info)
         except OSError as exc:
             logger.error("Ollama extraction failed (%s); falling back to heuristic", exc)
             return set()
-        _, ingested = ingest_extractions(self.distiller, outputs, file_paths)
+        source_contents = {sid: content for sid, _, content, _ in changed}
+        _, ingested = ingest_extractions(self.distiller, outputs, file_paths,
+                                         source_contents=source_contents,
+                                         extraction_info=extraction_info)
         return ingested
 
     def scan_and_consolidate(self) -> int:

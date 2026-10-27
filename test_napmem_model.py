@@ -20,6 +20,12 @@ def record(rid="r1", **fields):
              "topic_slug": "editor", "canonical": rid, "created_at": JAN,
              "source_anchor": {"session_id": "s_" + rid, "file_path": rid + ".md"}}
     value.update(fields)
+    if fields.get("review_status") == "approved" and "evidence" not in fields:
+        # Positive reviewed fixtures carry literal input evidence; approval
+        # alone never manufactures source support in production.
+        from napmem_evidence import bind_evidence
+        value["source_anchor"] = {**value["source_anchor"], "line_range": "L1"}
+        value = bind_evidence(value, value["text"], method="test_fixture")
     return value
 
 

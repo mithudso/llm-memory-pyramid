@@ -325,6 +325,8 @@ class MemoryPyramidDistiller:
             match = new_by_text.get(rec["text"].lower().strip())
             if match is not None and match["id"] not in consumed_ids:
                 old_text = rec["text"]
+                proof_changed = (rec.get("evidence", {}).get("source_sha256") !=
+                                 match.get("evidence", {}).get("source_sha256"))
                 kept_anchors = {d: dict(anchors[d]) for d in foreign}
                 if match["text"] != old_text:
                     for anchor in kept_anchors.values():
@@ -342,7 +344,8 @@ class MemoryPyramidDistiller:
                         continue
                     if (field in ("subject", "valid_from", "valid_to", "status", "supersedes",
                                   "review_status", "authority", "pinned", "last_verified_at")
-                            and field not in match.get("_context_updates", [])):
+                            and field not in match.get("_context_updates", [])
+                            and not (field == "last_verified_at" and proof_changed)):
                         continue
                     if field in match:
                         rec[field] = copy.deepcopy(match[field])
@@ -411,6 +414,10 @@ class MemoryPyramidDistiller:
                 for field in ("observed_at", "created_at"):
                     if field in prior_context:
                         unit[field] = prior_context[field]
+                if (unit.get("evidence", {}).get("source_sha256") ==
+                        prior_context.get("evidence", {}).get("source_sha256")
+                        and "last_verified_at" in prior_context):
+                    unit["last_verified_at"] = prior_context["last_verified_at"]
                 if reclaimed.startswith(prefix) and reclaimed[len(prefix):].isdigit():
                     max_reclaimed = max(max_reclaimed, int(reclaimed[len(prefix):]))
             else:
@@ -438,19 +445,24 @@ class MemoryPyramidDistiller:
         build_derived(self.data)
 
     def ingest_session(self, session_id: str, title: str, file_path: str, content: str,
-                       *, scope: str | None = None, metadata: dict | None = None):
+                       *, scope: str | None = None, metadata: dict | None = None,
+                       extraction_info: dict | None = None):
         """
         Ingests a raw session log into Layer 0 and triggers distillation using
         the built-in heuristic extractor.
         """
         new_records = self.extract_atomic_units(content, session_id, file_path)
         return self.ingest_session_records(session_id, title, file_path, new_records,
-                                           scope=scope, metadata=metadata)
+                                           scope=scope, metadata=metadata,
+                                           source_content=content,
+                                           extraction_info=extraction_info or {"method": "heuristic"})
 
     def ingest_session_records(self, session_id: str, title: str, file_path: str,
                                new_records: list[dict[str, Any]], *,
                                scope: str | None = None,
-                               metadata: dict | None = None) -> int:
+                               metadata: dict | None = None,
+                               source_content: str | None = None,
+                               extraction_info: dict | None = None) -> int:
         """
         Ingests pre-extracted Layer 1 records for a session (e.g. from the LLM
         extractor in llm_extractor.py) and runs the reconcile -> dedup ->
@@ -458,6 +470,11 @@ class MemoryPyramidDistiller:
         rec_<session_id>_NNN ids and complete source anchors.
         """
         from napmem_controls import apply_controls, filter_incoming
+        from napmem_evidence import bind_evidence
+        info = extraction_info or {"method": "provided"}
+        if (not isinstance(info, dict) or set(info) - {
+                "method", "model", "prompt_version", "source_revision"}):
+            raise ValueError("extraction_info contains unsupported fields")
         apply_controls(self.data)
         prior_source = next((s for s in self.data["raw_conversations"]
                              if s["session_id"] == session_id), {})
@@ -478,6 +495,7 @@ class MemoryPyramidDistiller:
             item["_context_updates"] = sorted(provided)
             normalized.append(item)
         new_records = filter_incoming(self.data, normalized)
+        new_records = [bind_evidence(record, source_content, **info) for record in new_records]
         resolved_scopes = {record["scope"] for record in normalized}
         resolved_scope = (next(iter(resolved_scopes)) if len(resolved_scopes) == 1
                           else scope or (metadata or {}).get("scope", "legacy"))
@@ -489,6 +507,10 @@ class MemoryPyramidDistiller:
             "timestamp": _utcnow(),
             "file_path": file_path,
             "scope": resolved_scope,
+            "source_id": source_key,
+            "source_sha256": hashlib.sha256(source_content.encode()).hexdigest()
+            if source_content is not None else None,
+            "extraction": copy.deepcopy(info),
         }
         # Re-ingest semantics: replace the Layer 0 entry and reconcile the
         # session's previously distilled Layer 1 records against the fresh

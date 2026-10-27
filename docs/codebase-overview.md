@@ -38,6 +38,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/DEVELOPMENT.md` | Development |
 | `docs/INSTALLATION.md` | Installation |
 | `docs/MCP.md` | MCP |
+| `docs/PROVENANCE.md` | Evidence and verification |
 | `docs/RETRIEVAL.md` | Scoped evidence retrieval |
 | `docs/SECURITY.md` | Security |
 | `docs/TESTING.md` | Testing |
@@ -74,6 +75,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `memory_pyramid_schema.json` | JSON configuration, schema, index or example data |
 | `napmem_controls.py` | Pure operator controls that persist across extraction replay and alias promotion. |
 | `napmem_eval.py` | Offline evidence-retrieval evaluation, independent of answer generation. |
+| `napmem_evidence.py` | Bind literal source passages to the exact text supplied to extraction. |
 | `napmem_mcp_failover.py` | NapMem MCP failover proxy (stdio) |
 | `napmem_mcp_server.py` | NapMem MCP Server (stdio) |
 | `napmem_model.py` | Pure, versioned assertion context and derived views for NapMem stores. |
@@ -92,12 +94,16 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_controls.py` | Pure replay, deletion-family and operator-preview tests. |
 | `test_napmem_controls_integration.py` | Operator controls remain effective across ingestion, cache and reload boundaries. |
 | `test_napmem_eval.py` | Deterministic, network-free evidence scorer and benchmark contract tests. |
+| `test_napmem_evidence.py` | Offline tests for literal source binding and explicitly allowed file checks. |
+| `test_napmem_evidence_extraction.py` | Offline checks for exact extraction inputs and untrusted model quotations. |
+| `test_napmem_evidence_forget.py` | Forgetting erases literal source evidence without deleting unrelated facts. |
 | `test_napmem_extensions.py` | Tests for the production-path extensions: LLM extractor parsing/validation, |
 | `test_napmem_failover.py` | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |
 | `test_napmem_lifecycle.py` | Integration gates for compatible scoped assertion ingestion. |
 | `test_napmem_model.py` | Pure scoped assertion, migration and derived-view tests. |
 | `test_napmem_pipeline.py` | Integration test for NapMem + Document Distiller Memory Pipeline |
 | `test_napmem_protocol.py` | Offline regressions for the stdlib MCP protocol boundary. |
+| `test_napmem_provenance.py` | Source proof, profile admission and explicit re-verification at public boundaries. |
 | `test_napmem_regressions.py` | Offline regression checks for store reconciliation and disposable caches. |
 | `test_napmem_retrieval_contract.py` | Public retrieval adapters preserve scope, offline defaults and budgets. |
 | `test_napmem_safety.py` | Offline regressions for prompt CPU bounds and wrapper filesystem safety. |
