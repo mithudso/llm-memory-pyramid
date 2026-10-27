@@ -50,6 +50,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/known-issues.md` | Known issues |
 | `docs/logging.md` | Logging |
 | `docs/onboarding.md` | Onboarding |
+| `docs/product-roadmap-2026-10-27.md` | NapMem product improvement roadmap |
 | `docs/repo-bootstrap-audit-2026-10-26.md` | Repository bootstrap audit — 2026-10-26 |
 | `docs/requirements.md` | Requirements |
 | `docs/runbooks/run-naptime-consolidator.md` | Runbook: run the naptime consolidator |

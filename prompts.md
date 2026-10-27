@@ -81,3 +81,11 @@ Versioned record of user requests, in order. Newest last.
     fix confirmed source defects; validate offline; commit and publish.
 
 **Delta:** v1.6.0 → v1.7.0; one triggering request added.
+
+## v1.8.0 — 2026-10-27
+
+17. "After reading and optimizing this repo, identify how this app can be improved. What features could be added or what things could be changed to make this a world class program?"
+    — assess current capabilities and gaps; recommend a prioritized product
+    roadmap with acceptance criteria. Proposed features are not implemented.
+
+**Delta:** v1.7.0 → v1.8.0; one triggering request and product assessment added.
