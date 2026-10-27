@@ -75,6 +75,26 @@ class TransactionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "lost its manifest"):
             agent.query("Preference")
 
+    def test_restore_retains_independent_same_text_in_another_project(self):
+        from napmem_snapshots import export_snapshot
+        store = MemoryPyramidDistiller(self.path)
+        for session in ("a", "b"):
+            store.ingest_session(session, session, session + ".md", "Same preference", scope="project:" + session)
+        target = next(r["id"] for r in store.data["memory_records"] if r["scope"] == "project:a")
+        backup = str(Path(self.tmp.name) / "backup")
+        export_snapshot(self.path, backup)
+        store.control("forget", record_id=target)
+        store.restore_snapshot(backup)
+        self.assertEqual([r["scope"] for r in store.data["memory_records"]], ["project:b"])
+
+    def test_new_managed_snapshot_reader_requires_manifest(self):
+        directory = Path(self.tmp.name) / "generations" / ("gen-1-" + "a" * 32)
+        directory.mkdir(parents=True)
+        path = directory / "napmem_pyramid.json"
+        MemoryPyramidDistiller(str(path)).ingest_session("a", "A", "a.md", "Preference")
+        with self.assertRaisesRegex(ValueError, "lost its manifest"):
+            NapMemRetrievalAgent(str(path))
+
     def test_retry_purge_interleaving_cannot_restore_payload(self):
         from contextlib import contextmanager
         from napmem_jobs import JobQueue

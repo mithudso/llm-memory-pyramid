@@ -632,6 +632,11 @@ class MemoryPyramidDistiller:
             receipt = apply_action(self.data, action, **arguments,
                                    expected_generation=expected_generation,
                                    preview_token=preview_token)
+            if action == "forget":
+                identities = set(self.data.get("forgotten_record_ids", []))
+                identities.update(hashlib.sha256(identity.encode()).hexdigest()
+                                  for identity in receipt["affected_ids"])
+                self.data["forgotten_record_ids"] = sorted(identities)
             self._remember_record_ids(previous["memory_records"])
             source_scopes = self.data.setdefault("source_scopes", {})
             if not isinstance(source_scopes, dict):
@@ -746,14 +751,20 @@ class MemoryPyramidDistiller:
         # Backup assertions retain their original scope. Restore never relabels
         # old evidence with a later source scope. A current forgotten text also
         # suppresses older backup copies made before an explicit scope change.
-        forbidden = {item["text_sha256"] for item in new_controls.get("tombstones", [])}
+        forgotten_ids = set(current.get("forgotten_record_ids", [])) | set(restored.get("forgotten_record_ids", []))
+        # Earlier v2 stores still have content-free affected IDs in the journal.
+        for change in new_controls.get("journal", []):
+            if change["action"] == "forget":
+                forgotten_ids.update(hashlib.sha256(identity.encode()).hexdigest()
+                                     for identity in change["affected_ids"])
+        restored["forgotten_record_ids"] = sorted(forgotten_ids)
         for record in restored["memory_records"]:
             occurrences = [record]
-            occurrences.extend({**record, **anchor.get("assertion", {})}
-                               for anchor in record.get("duplicate_anchors", {}).values())
+            occurrences.extend({**record, **anchor.get("assertion", {}), "id": identity}
+                               for identity, anchor in record.get("duplicate_anchors", {}).items())
             for assertion in occurrences:
                 text_hash = hashlib.sha256(assertion["text"].lower().strip().encode()).hexdigest()
-                if text_hash in forbidden:
+                if hashlib.sha256(assertion["id"].encode()).hexdigest() in forgotten_ids:
                     policy = {"scope": assertion["scope"], "text_sha256": text_hash}
                     if policy not in merged["tombstones"]:
                         merged["tombstones"].append(policy)

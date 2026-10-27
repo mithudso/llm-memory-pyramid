@@ -16,6 +16,7 @@ Tools provided:
 import argparse
 import json
 import os
+import re
 import stat
 from typing import Any
 
@@ -27,7 +28,10 @@ VALID_LAYERS = ("all", "profiles", "tracks", "records")
 class NapMemRetrievalAgent:
     def __init__(self, pyramid_path: str = "napmem_pyramid.json"):
         self.pyramid_path = pyramid_path
-        self._snapshot_required = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(pyramid_path)), "manifest.json"))
+        directory = os.path.dirname(os.path.abspath(pyramid_path))
+        managed_generation = (os.path.basename(os.path.dirname(directory)) == "generations"
+                              and re.fullmatch(r"gen-[0-9]+-[0-9a-f]{32}", os.path.basename(directory)) is not None)
+        self._snapshot_required = managed_generation or os.path.exists(os.path.join(directory, "manifest.json"))
         self._seen_fingerprint = None
         self.data = self._load_pyramid()
 

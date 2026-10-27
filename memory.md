@@ -38,7 +38,8 @@ offline benchmark author and independent read-only compatibility review.
   No production stores, services, indexing or snapshot transfers were changed.
 - Independent review follow-up: an older backup plus a later session scope
   could revive forgotten text; restore now retains historical scopes and also
-  suppresses older matching copies under current tombstones. Retry validation
+  suppresses older copies of the forgotten record family. Independently scoped
+  copies retain their own lifecycle. Retry validation
   and payload update now share one SQLite transaction, so PrivacyPurge wins.
   Rename identity survives edits on the same inode. A verified reader refuses
   to downgrade when its manifest disappears. All 47 focused persistence tests
