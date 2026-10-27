@@ -34,127 +34,167 @@ class NapMemRetrievalAgent:
                 return migrate_store(json.load(f))
         raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please run memory_pyramid_distiller.py first.")
 
-    def search_memory_pyramid(self, query: str, layer: str = "all") -> dict[str, Any]:
-        """
-        Active memory search tool.
-        layer can be 'profiles', 'tracks', 'records', or 'all'.
+    @staticmethod
+    def _bounded(payload, max_bytes=16384, max_tokens=2048):
+        from napmem_search import bounded_response
+        return bounded_response(payload, max_bytes=max_bytes, max_tokens=max_tokens)
 
-        Raises ValueError on an unknown layer rather than silently returning no
-        matches — this is a tool surface for LLM agents, where a typo'd layer
-        would otherwise masquerade as "no memory found".
-        """
+    def query(self, query: str, *, scope: str | None = None, as_of: str | None = None,
+              top_k: int = 5, mode: str = "hybrid", max_bytes: int = 16384,
+              max_tokens: int | None = 2048, backend=None) -> dict[str, Any]:
+        """Shared, scoped evidence contract. Defaults never contact a service."""
+        from napmem_search import search
+        result = search(self.data, query, scope=scope, as_of=as_of, top_k=top_k,
+                        mode=mode, max_bytes=max_bytes, max_tokens=max_tokens,
+                        backend=backend)
+        selected = {record["id"] for record in result["matches"]}
+        result["profiles"] = [profile for profile in self.data.get("user_profiles", [])
+                              if profile["provenance_records"] and
+                              set(profile["provenance_records"]) <= selected]
+        groups = {}
+        for record in result["matches"]:
+            groups.setdefault((record["scope"], record["topic_slug"]), []).append(record)
+        result["tracks"] = [
+            {"scope": item_scope, "topic_slug": slug,
+             "summary": "; ".join(record["text"] for record in members[:3]),
+             "record_ids": [record["id"] for record in members]}
+            for (item_scope, slug), members in groups.items()
+        ]
+        return self._bounded(result, max_bytes, max_tokens)
+
+    def search_memory_pyramid(self, query: str, layer: str = "all", *,
+                              scope: str | None = None, as_of: str | None = None,
+                              top_k: int = 20, max_bytes: int = 16384,
+                              max_tokens: int | None = 2048) -> dict[str, Any]:
+        """Bounded legacy layer view; scope and valid time precede matching."""
+        from napmem_search import eligible_records
         if layer not in VALID_LAYERS:
             raise ValueError(f"Unknown layer '{layer}'; expected one of {VALID_LAYERS}")
-        query_lower = query.lower()
-        results = {"query": query, "layer": layer, "matches": {}}
-
-        # Layer 3: Profiles
-        if layer in ["profiles", "all"]:
-            profile_matches = [
+        if not isinstance(query, str) or not query.strip() or len(query) > 2048:
+            raise ValueError("query must be a nonempty string of at most 2048 characters")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
+            raise ValueError("top_k must be a positive integer no greater than 100")
+        records = eligible_records(self.data, scope, as_of)
+        eligible_ids = {r["id"] for r in records}
+        lower = query.casefold()
+        matches = {}
+        if layer in ("profiles", "all"):
+            matches["user_profiles"] = [
                 p for p in self.data.get("user_profiles", [])
-                if query_lower in p["trait"].lower() or query_lower in p["category"].lower()
+                if set(p["provenance_records"]) <= eligible_ids
+                and (lower in p["trait"].casefold() or lower in p["category"].casefold())
             ]
-            results["matches"]["user_profiles"] = profile_matches
-
-        # Layer 2: Topic Tracks
-        if layer in ["tracks", "all"]:
-            track_matches = [
-                t for t in self.data.get("topic_tracks", [])
-                if query_lower in t["title"].lower() or query_lower in t["topic_slug"].lower() or query_lower in t["summary"].lower()
+        if layer in ("tracks", "all"):
+            # Reassemble from eligible evidence; a cached current summary can
+            # otherwise disclose a future or differently scoped assertion.
+            groups = {}
+            for record in records:
+                groups.setdefault((record["scope"], record["topic_slug"]), []).append(record)
+            tracks = []
+            for (record_scope, slug), members in sorted(groups.items()):
+                summary = "; ".join(r["text"] for r in members[:3])
+                if lower in slug.casefold() or lower in summary.casefold():
+                    tracks.append({"scope": record_scope, "topic_slug": slug,
+                                   "title": slug.replace("-", " ").title(),
+                                   "summary": summary, "record_ids": [r["id"] for r in members]})
+            matches["topic_tracks"] = tracks
+        if layer in ("records", "all"):
+            matches["memory_records"] = [
+                r for r in records if lower in r["text"].casefold() or lower in r["type"].casefold()
             ]
-            results["matches"]["topic_tracks"] = track_matches
+        omitted = sum(max(0, len(items) - top_k) for items in matches.values())
+        matches = {key: items[:top_k] for key, items in matches.items()}
+        return self._bounded({"query": query, "layer": layer, "scope": scope,
+                              "as_of": as_of, "mode": "substring", "matches": matches,
+                              "omitted_count": omitted, "truncated": omitted > 0,
+                              "generation": self.data.get("generation", 0)}, max_bytes, max_tokens)
 
-        # Layer 1: Atomic Memory Records
-        if layer in ["records", "all"]:
-            record_matches = [
-                r for r in self.data.get("memory_records", [])
-                if query_lower in r["text"].lower() or query_lower in r["type"].lower()
-            ]
-            results["matches"]["memory_records"] = record_matches
-
-        return results
-
-    def semantic_search(self, query: str, top_k: int = 5) -> dict[str, Any]:
-        """
-        Embedding cosine search over Layer 1 records via semantic_index.py.
-        Falls back to substring search when no embedding backend is usable, and
-        discloses which path answered in the result's `mode` field.
-        """
-        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
-            raise ValueError("top_k must be a positive integer")
-        records = self.data.get("memory_records", [])
+    def semantic_search(self, query: str, top_k: int = 5, *, scope: str | None = None,
+                        as_of: str | None = None, max_bytes: int = 16384,
+                        max_tokens: int | None = 2048) -> dict[str, Any]:
+        """Explicit legacy embedding path; initialization remains an injectable seam."""
+        from napmem_search import eligible_records
+        from napmem_model import parse_time
+        from datetime import UTC, datetime
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
+            raise ValueError("top_k must be a positive integer no greater than 100")
+        if not isinstance(query, str) or not query.strip() or len(query) > 2048:
+            raise ValueError("query must be a nonempty string of at most 2048 characters")
+        at = parse_time(as_of).isoformat() if as_of is not None else datetime.now(UTC).isoformat()
+        records = eligible_records(self.data, scope, at)
         try:
-            from semantic_index import SemanticIndex  # lazy: optional feature
+            from semantic_index import SemanticIndex
             index = SemanticIndex(self.pyramid_path)
             hits = index.search(query, records, top_k=top_k)
-            return {
-                "query": query,
-                "mode": f"semantic:{index.backend.name}",
-                "matches": [{"score": h["score"], **h["record"]} for h in hits],
-            }
+            result = {"query": query, "scope": scope, "as_of": at,
+                      "mode": f"semantic:{index.backend.name}",
+                      "matches": [{"score": h["score"], **h["record"]} for h in hits]}
         except (RuntimeError, OSError, ValueError, ImportError) as exc:
-            fallback = self.search_memory_pyramid(query, layer="records")
-            return {
-                "query": query,
-                "mode": "substring-fallback",
-                "fallback_reason": str(exc),
-                "matches": fallback["matches"]["memory_records"][:top_k],
-            }
+            fallback = self.search_memory_pyramid(query, "records", scope=scope, as_of=as_of,
+                                                  top_k=top_k, max_bytes=max_bytes, max_tokens=max_tokens)
+            result = {"query": query, "scope": scope, "mode": "substring-fallback",
+                      "fallback_reason": type(exc).__name__,
+                      "matches": fallback["matches"]["memory_records"]}
+        return self._bounded(result, max_bytes, max_tokens)
 
-    def inspect_provenance(self, record_id: str) -> dict[str, Any]:
-        """
-        Resolves an atomic record back to its Layer 0 source anchor and raw conversation metadata.
-
-        Duplicate IDs (units folded into a canonical record at dedup time) resolve to
-        their canonical record, with the duplicate's own anchor when it was recorded;
-        the result then carries a `canonical_id` key.
-        """
-        record = next((r for r in self.data.get("memory_records", []) if r["id"] == record_id), None)
-        canonical_id = None
-        anchor = None
-        if not record:
-            for r in self.data.get("memory_records", []):
-                if record_id in r.get("duplicates", []):
-                    record = r
-                    canonical_id = r["id"]
-                    anchor = r.get("duplicate_anchors", {}).get(record_id)
-                    break
-        if not record:
+    def inspect_provenance(self, record_id: str, *, scope: str | None = None,
+                           as_of: str | None = None, max_bytes: int = 16384,
+                           max_tokens: int | None = 2048) -> dict[str, Any]:
+        """Resolve the selected occurrence's own wording, context and source."""
+        from copy import deepcopy
+        from napmem_model import normalize_record, visible
+        if not isinstance(record_id, str) or not record_id or len(record_id) > 512:
+            raise ValueError("record_id must be a nonempty string of at most 512 characters")
+        record = next((r for r in self.data.get("memory_records", [])
+                       if record_id == r["id"] or record_id in r.get("duplicates", [])), None)
+        if record is None or record.get("instruction_bearing") or record.get("source_excluded"):
             return {"error": f"Record ID {record_id} not found."}
-
-        anchor = anchor or record["source_anchor"]
-        raw_session = next((s for s in self.data.get("raw_conversations", []) if s["session_id"] == anchor["session_id"]), None)
-
-        result = {
-            "record_id": record_id,
-            "text": record["text"],
-            "type": record["type"],
-            "salience": record["salience"],
-            "duplicates": record.get("duplicates", []),
-            "source_anchor": anchor,
-            "raw_session": raw_session
-        }
+        selected = deepcopy(record)
+        canonical_id = None
+        if record_id != record["id"]:
+            anchor = record.get("duplicate_anchors", {}).get(record_id)
+            if anchor is None:
+                return {"error": f"Record ID {record_id} not found."}
+            selected = normalize_record({**deepcopy(anchor.get("assertion", {})),
+                                         "id": record_id, "text": anchor.get("paraphrase_text", record["text"]),
+                                         "type": record["type"], "salience": record["salience"],
+                                         "source_anchor": deepcopy(anchor)})
+            canonical_id = record["id"]
+        check = deepcopy(selected)
+        if as_of is None and check.get("status") == "superseded":
+            check.update(status="active", valid_from=None, valid_to=None)
+        if not visible(check, scope, as_of):
+            return {"error": f"Record ID {record_id} not found in the requested scope or time."}
+        anchor = selected["source_anchor"]
+        session = next((s for s in self.data.get("raw_conversations", [])
+                        if s["session_id"] == anchor.get("session_id")), None)
+        result = {"record_id": record_id, "text": selected["text"], "type": selected["type"],
+                  "salience": selected["salience"], "duplicates": [], "source_anchor": anchor,
+                  "raw_session": session, "scope": selected.get("scope", "legacy"),
+                  "memory_kind": selected.get("memory_kind"), "status": selected.get("status"),
+                  "evidence": selected.get("evidence", {})}
         if canonical_id:
             result["canonical_id"] = canonical_id
-        return result
+        return self._bounded(result, max_bytes, max_tokens)
 
-    def get_topic_track(self, topic_slug: str) -> dict[str, Any]:
-        """
-        Retrieves a full topic track with all associated atomic records.
-        """
-        track = next((t for t in self.data.get("topic_tracks", []) if t["topic_slug"] == topic_slug), None)
-        if not track:
+    def get_topic_track(self, topic_slug: str, *, scope: str | None = None,
+                        as_of: str | None = None, top_k: int = 20,
+                        max_bytes: int = 16384, max_tokens: int | None = 2048) -> dict[str, Any]:
+        """Expand only eligible evidence for a topic, within explicit result budgets."""
+        from napmem_search import eligible_records
+        if not isinstance(topic_slug, str) or not topic_slug or len(topic_slug) > 256:
+            raise ValueError("topic_slug must be a nonempty string of at most 256 characters")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
+            raise ValueError("top_k must be a positive integer no greater than 100")
+        records = [r for r in eligible_records(self.data, scope, as_of)
+                   if r["topic_slug"] == topic_slug]
+        if not records:
             return {"error": f"Topic slug '{topic_slug}' not found."}
-
-        associated_records = [
-            r for r in self.data.get("memory_records", [])
-            if r["id"] in track["record_ids"]
-        ]
-
-        return {
-            "track": track,
-            "records": associated_records
-        }
+        return self._bounded({"track": {"topic_slug": topic_slug, "scope": scope,
+                                        "title": topic_slug.replace("-", " ").title()},
+                              "records": records[:top_k],
+                              "omitted_count": max(0, len(records) - top_k),
+                              "truncated": len(records) > top_k}, max_bytes, max_tokens)
 
     def compute_context_budget_savings(self) -> dict[str, Any]:
         """

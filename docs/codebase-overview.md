@@ -37,6 +37,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/DEVELOPMENT.md` | Development |
 | `docs/INSTALLATION.md` | Installation |
 | `docs/MCP.md` | MCP |
+| `docs/RETRIEVAL.md` | Scoped evidence retrieval |
 | `docs/SECURITY.md` | Security |
 | `docs/TESTING.md` | Testing |
 | `docs/bootstrap-prompt.md` | Bootstrap prompt: recreate the NapMem memory pyramid + semantic indexing |
@@ -58,6 +59,8 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/semantic-indexing-and-hooks-reference.md` | Semantic indexing, hooks, and scripts — full reference |
 | `evaluations/baseline_hashed_heldout_v1.json` | JSON configuration, schema, index or example data |
 | `evaluations/baseline_substring_heldout_v1.json` | JSON configuration, schema, index or example data |
+| `evaluations/hybrid_initial_heldout_v2.json` | JSON configuration, schema, index or example data |
+| `evaluations/hybrid_regression_v2.json` | JSON configuration, schema, index or example data |
 | `evaluations/memory_quality_v1.json` | JSON configuration, schema, index or example data |
 | `llm_extraction_prompts.py` | LLM Zero-Fabrication Extraction Prompts & Guardrails for Memory Distillation |
 | `llm_extractor.py` | LLM Extraction Pipeline (production path for the NapMem distiller) |
@@ -74,6 +77,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `napmem_model.py` | Pure, versioned assertion context and derived views for NapMem stores. |
 | `napmem_pyramid.json` | JSON configuration, schema, index or example data |
 | `napmem_retrieval_agent.py` | NapMem Active Retrieval Agent |
+| `napmem_search.py` | Offline scoped retrieval with complete-entry JSON budgets. |
 | `naptime_consolidator.py` | Naptime Async Memory Consolidator |
 | `ollama_extractor.py` | ollama_extractor.py — zero-API-cost LLM extraction via local Ollama chat |
 | `prompts.md` | prompts.md — request log |
@@ -91,4 +95,6 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_pipeline.py` | Integration test for NapMem + Document Distiller Memory Pipeline |
 | `test_napmem_protocol.py` | Offline regressions for the stdlib MCP protocol boundary. |
 | `test_napmem_regressions.py` | Offline regression checks for store reconciliation and disposable caches. |
+| `test_napmem_retrieval_contract.py` | Public retrieval adapters preserve scope, offline defaults and budgets. |
 | `test_napmem_safety.py` | Offline regressions for prompt CPU bounds and wrapper filesystem safety. |
+| `test_napmem_search.py` | Offline search safety, ranking and exact serialized-budget tests. |

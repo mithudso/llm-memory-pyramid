@@ -52,6 +52,11 @@
       "summary": "NapMem Active Retrieval Agent"
     },
     {
+      "path": "napmem_search.py",
+      "signal": "high",
+      "summary": "Offline scoped retrieval with complete-entry JSON budgets."
+    },
+    {
       "path": "naptime_consolidator.py",
       "signal": "high",
       "summary": "Naptime Async Memory Consolidator"
@@ -122,9 +127,19 @@
       "summary": "Offline regression checks for store reconciliation and disposable caches."
     },
     {
+      "path": "test_napmem_retrieval_contract.py",
+      "signal": "high",
+      "summary": "Public retrieval adapters preserve scope, offline defaults and budgets."
+    },
+    {
       "path": "test_napmem_safety.py",
       "signal": "high",
       "summary": "Offline regressions for prompt CPU bounds and wrapper filesystem safety."
+    },
+    {
+      "path": "test_napmem_search.py",
+      "signal": "high",
+      "summary": "Offline search safety, ranking and exact serialized-budget tests."
     }
   ]
 }

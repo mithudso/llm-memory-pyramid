@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–2 passed; next is TASK-238,
-hybrid bounded retrieval.
+TASK-236–TASK-245 track the ten stages. Stages 1–3 passed; next is TASK-239,
+durable user controls.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -28,6 +28,19 @@ offline benchmark author and independent read-only compatibility review.
   profiles and unresolved conflicts withhold traits. Removed constant 0.95
   confidence. All 159 tests, Ruff and compile checks pass. The prior profile
   risk KNOW-234 is now an implemented fix; production stores remain untouched.
+- Stage 3: offline BM25/sparse hybrid and optional injected embeddings,
+  pre-ranking scope/time/safety filters, abstention and compact payload budgets
+  implemented with scoped legacy adapters. All 189 tests/Ruff/compile pass.
+  Initial held-out result retained; a short-query qualifier-loss bug was
+  fixed generically. Regression report has Recall@5 0.86, MRR 0.8733,
+  abstention 0.76, all 13 protected/all 11 current-fact cases passing and zero
+  scope/lifecycle/marked-instruction leakage. It reuses an inspected split,
+  so it is a regression receipt, not a fresh blind qualification.
+- Validation incident: a focused test bypassed its SemanticIndex constructor
+  mock and contacted the configured embedding backend with synthetic fixture
+  text. Restored the seam and added no-network regression tests; all later
+  test commands force NAPMEM_EMBED_BACKEND=hashed. No production data was
+  accessed or service configuration changed. Concrete lesson: KNOW-250.
 
 **Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
 altering runtime behavior. Then proceed through scoped time-aware model,

@@ -217,8 +217,9 @@ def evaluate(mode: str = "substring", split: str = "heldout", *,
              max_tokens: int | None = None, agent_class: type | None = None) -> dict[str, Any]:
     """Run fixed queries against a disposable store, with network access blocked.
 
-    Legacy baselines receive the query text unchanged and do not receive scope
-    or validity filtering. Those limitations are measured, not repaired here.
+    Legacy adapters receive query text without per-case scope or time options;
+    their current runtime defaults apply. Frozen v1 reports capture the original
+    unfiltered behavior before scope/lifecycle implementation.
     The optional hybrid adapter calls ``agent.query`` with explicit scope,
     as_of, top_k=5 and budgets. It fails clearly if that API is unavailable.
     Latencies cover the retrieval call including any temporary cache work;
@@ -259,7 +260,9 @@ def evaluate(mode: str = "substring", split: str = "heldout", *,
                          "category": case["category"], "expected_ids": case["expected_ids"],
                          "result_ids": result_ids, "scores": score_query(case, result_ids, records, as_of=fixture["as_of"]),
                          "latency_ms": latency, "result_bytes": len(_encoded(response))})
-    runtime_files = ("napmem_retrieval_agent.py", "semantic_index.py")
+    runtime_files = tuple(name for name in ("napmem_retrieval_agent.py", "semantic_index.py",
+                                            "napmem_model.py", "napmem_search.py")
+                          if (ROOT / name).exists())
     return {
         "report_version": REPORT_VERSION, "fixture_version": fixture["version"],
         "fixture_sha256": hashlib.sha256(Path(fixture_path).read_bytes()).hexdigest(),
@@ -272,7 +275,7 @@ def evaluate(mode: str = "substring", split: str = "heldout", *,
         "limitations": fixture["limitations"] + [
             "Evidence retrieval only: this does not score extraction, generated answers, production traffic, or real embeddings.",
             "Unsupported injection counts IDs outside the query labels; incomplete labels can overstate it.",
-            "Legacy substring and hashed modes ignore scope and lifecycle; the evaluator preserves that behavior.",
+            "Legacy modes use their runtime defaults; frozen v1 reports document the original unfiltered behavior.",
             "Latency is a single local pass with cold first-query cache cost; it is machine dependent and excluded from quality gates.",
             "Result bytes count canonical compact UTF-8 JSON of the complete response, before metric top-five truncation.",
         ],

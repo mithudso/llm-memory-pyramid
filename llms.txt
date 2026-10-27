@@ -22,6 +22,7 @@
 - [napmem_mcp_server.py](napmem_mcp_server.py): NapMem MCP Server (stdio)
 - [napmem_model.py](napmem_model.py): Pure, versioned assertion context and derived views for NapMem stores.
 - [napmem_retrieval_agent.py](napmem_retrieval_agent.py): NapMem Active Retrieval Agent
+- [napmem_search.py](napmem_search.py): Offline scoped retrieval with complete-entry JSON budgets.
 - [naptime_consolidator.py](naptime_consolidator.py): Naptime Async Memory Consolidator
 - [ollama_extractor.py](ollama_extractor.py): ollama_extractor.py — zero-API-cost LLM extraction via local Ollama chat
 - [pyproject.toml](pyproject.toml): Repository configuration or supporting file
@@ -36,7 +37,9 @@
 - [test_napmem_pipeline.py](test_napmem_pipeline.py): Integration test for NapMem + Document Distiller Memory Pipeline
 - [test_napmem_protocol.py](test_napmem_protocol.py): Offline regressions for the stdlib MCP protocol boundary.
 - [test_napmem_regressions.py](test_napmem_regressions.py): Offline regression checks for store reconciliation and disposable caches.
+- [test_napmem_retrieval_contract.py](test_napmem_retrieval_contract.py): Public retrieval adapters preserve scope, offline defaults and budgets.
 - [test_napmem_safety.py](test_napmem_safety.py): Offline regressions for prompt CPU bounds and wrapper filesystem safety.
+- [test_napmem_search.py](test_napmem_search.py): Offline search safety, ranking and exact serialized-budget tests.
 
 ## Context files
 - [Digest](llms-small.txt)
