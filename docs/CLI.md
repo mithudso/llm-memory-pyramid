@@ -24,6 +24,11 @@ and `--max-tokens` as needed. Tokens are a disclosed byte-based estimate.
 Named scopes include explicitly global records. Unscoped queries include
 legacy and global records; `--scope '*'` is an explicit cross-scope query.
 
+`inspect --view review` opens the scoped extraction queue. Other terminal views
+include profiles, conflicts, stale evidence, timeline and project handoff.
+`diff BEFORE AFTER` compares two explicit source revisions. See [the inspector
+guide](INSPECTOR.md) for correction and pagination behavior.
+
 `ingest /absolute/source.md --scope project:name` records an explicit source.
 `--enqueue` captures a durable job. `jobs run --commit` runs queued heuristic
 work. Anthropic `jobs submit` and `jobs collect` are separate online commands.

@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–7 passed; next is TASK-243,
-the memory inspector, followed by observability and client adapters.
+TASK-236–TASK-245 track the ten stages. Stages 1–8 passed; next is TASK-244,
+observability, followed by consistent MCP contracts and source adapters.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -16,6 +16,12 @@ will change with the corresponding implemented features.
 clean main 0790dc7 with no open owned PRs; created the tracked stages and
 tasks/plan.md; captured implementation constraints in KNOW-246. Started an
 offline benchmark author and independent read-only compatibility review.
+- Stage 8: eight scoped terminal inspector views, evidence/age/review state,
+  durable correction previews, historical timeline and project handoff added.
+  Bounded pagination retains complete assertions and source diffs retain whole
+  hunks. Inspection is read-only and shares managed snapshot validation.
+  All 31 inspector tests and 54 focused inspector/CLI tests pass; full suite
+  411 passed before one final CLI workflow test. Stele remains task authority.
 - Stage 7 implementation: portable `napmem` command and TOML/env/CLI precedence;
   offline defaults, read-only doctor, explicit online integrations and source
   boundaries. Private shared client moved to optional `ollama` extra without

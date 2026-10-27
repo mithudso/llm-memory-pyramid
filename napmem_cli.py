@@ -62,6 +62,10 @@ def build_parser():
         item.add_argument("--max-tokens", type=int, default=2048)
     doctor = command("doctor", help="read-only diagnostics; no default probes or initialization")
     doctor.add_argument("--probe", action="store_true", help="explicitly probe the configured Ollama endpoint")
+    diff = command("diff", help="compare two explicit source revisions without changing memory")
+    diff.add_argument("before")
+    diff.add_argument("after")
+    diff.add_argument("--max-bytes", type=int, default=8192)
     control = command("control", help="apply or preview a durable local control")
     from napmem_controls import ACTIONS
     control.add_argument("action", choices=ACTIONS)
@@ -291,6 +295,13 @@ def _jobs(config, args):
 
 
 def execute(config: NapMemConfig, args) -> dict[str, Any]:
+    if args.command == "diff":
+        from napmem_inspector import source_diff
+        from napmem_sources import read_source
+        roots = list(config.source_roots) or None
+        old = read_source(args.before, roots, max_bytes=2 * 1024 * 1024)
+        new = read_source(args.after, roots, max_bytes=2 * 1024 * 1024)
+        return source_diff(old["content"], new["content"], max_bytes=args.max_bytes)
     if args.command == "doctor":
         return _doctor(config, args)
     if args.command == "init":

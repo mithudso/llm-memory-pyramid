@@ -182,6 +182,19 @@ class TestCli(IsolatedEnvironment):
         self.assertEqual(len(result["query"]["matches"]), 1)
         self.assertTrue(self.query()["matches"])
 
+    def test_inspector_and_explicit_diff_share_the_cli_without_mutating_store(self):
+        self.run_cli("demo")
+        before = self.store.read_bytes()
+        result = self.run_cli("inspect", "--view", "review", "--scope", "project:napmem-demo-alpha")
+        self.assertEqual(result["view"], "review")
+        self.assertTrue(result["records"])
+        old, new = self.root / "before.md", self.root / "after.md"
+        old.write_text("Use Vim\n")
+        new.write_text("Use Emacs\n")
+        diff = self.run_cli("diff", str(old), str(new))
+        self.assertIn("-Use Vim", diff["records"][0]["diff"])
+        self.assertEqual(self.store.read_bytes(), before)
+
     def test_control_preview_is_read_only_and_apply_persists(self):
         self.ingest()
         rid = self.query()["matches"][0]["id"]

@@ -38,6 +38,7 @@ py-modules = [
     "napmem_snapshots",
     "napmem_config",
     "napmem_cli",
+    "napmem_inspector",
     "semantic_index",
     "ollama_extractor",
     "llm_extractor",
