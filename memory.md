@@ -2,6 +2,28 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v2.0.0 — 2026-10-27
+
+**Active task:** implement all ten roadmap improvements in order, EPIC-235.
+TASK-236–TASK-245 track the ten stages. Current stage: TASK-236, evaluation.
+
+**Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
+added. Package/schema/MCP versions will change with implemented features.
+
+**Completed:** read current source, instructions and prior assessment; checked
+clean main 0790dc7 with no open owned PRs; created the tracked stages and
+tasks/plan.md; captured implementation constraints in KNOW-246. Started an
+offline benchmark author and independent read-only compatibility review.
+
+**Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
+altering runtime behavior. Then proceed through scoped time-aware model,
+hybrid retrieval, controls, evidence, safe persistence/jobs, CLI/config,
+inspector, metrics and typed MCP/adapters. Each stage must pass focused tests;
+full integration gates and publication remain required. Do not stop after an
+early stage merely because its work is tracked. Use the installed .venv.
+Production stores, inference, embeddings, indexing, hooks and schedulers stay
+untouched. Git commit hooks start indexing; suppress them per command only.
+
 ## v1.8.0 — 2026-10-27
 
 **Active task:** none — product assessment complete. TASK-230 covers evidence,
