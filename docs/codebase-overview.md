@@ -71,6 +71,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `napmem_eval.py` | Offline evidence-retrieval evaluation, independent of answer generation. |
 | `napmem_mcp_failover.py` | NapMem MCP failover proxy (stdio) |
 | `napmem_mcp_server.py` | NapMem MCP Server (stdio) |
+| `napmem_model.py` | Pure, versioned assertion context and derived views for NapMem stores. |
 | `napmem_pyramid.json` | JSON configuration, schema, index or example data |
 | `napmem_retrieval_agent.py` | NapMem Active Retrieval Agent |
 | `naptime_consolidator.py` | Naptime Async Memory Consolidator |
@@ -85,6 +86,8 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_eval.py` | Deterministic, network-free evidence scorer and benchmark contract tests. |
 | `test_napmem_extensions.py` | Tests for the production-path extensions: LLM extractor parsing/validation, |
 | `test_napmem_failover.py` | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |
+| `test_napmem_lifecycle.py` | Integration gates for compatible scoped assertion ingestion. |
+| `test_napmem_model.py` | Pure scoped assertion, migration and derived-view tests. |
 | `test_napmem_pipeline.py` | Integration test for NapMem + Document Distiller Memory Pipeline |
 | `test_napmem_protocol.py` | Offline regressions for the stdlib MCP protocol boundary. |
 | `test_napmem_regressions.py` | Offline regression checks for store reconciliation and disposable caches. |

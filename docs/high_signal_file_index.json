@@ -42,6 +42,11 @@
       "summary": "NapMem MCP Server (stdio)"
     },
     {
+      "path": "napmem_model.py",
+      "signal": "high",
+      "summary": "Pure, versioned assertion context and derived views for NapMem stores."
+    },
+    {
       "path": "napmem_retrieval_agent.py",
       "signal": "high",
       "summary": "NapMem Active Retrieval Agent"
@@ -90,6 +95,16 @@
       "path": "test_napmem_failover.py",
       "signal": "high",
       "summary": "Tests for napmem_mcp_failover.py \u2014 the remote-SSH / local-mirror MCP proxy."
+    },
+    {
+      "path": "test_napmem_lifecycle.py",
+      "signal": "high",
+      "summary": "Integration gates for compatible scoped assertion ingestion."
+    },
+    {
+      "path": "test_napmem_model.py",
+      "signal": "high",
+      "summary": "Pure scoped assertion, migration and derived-view tests."
     },
     {
       "path": "test_napmem_pipeline.py",

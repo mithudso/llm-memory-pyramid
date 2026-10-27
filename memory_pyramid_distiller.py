@@ -16,6 +16,7 @@ rebuilds Layers 2-3 from the surviving records.
 """
 
 import argparse
+import copy
 import json
 import os
 import re
@@ -24,9 +25,12 @@ from collections import deque
 from datetime import UTC, datetime
 from typing import Any
 
+from napmem_model import (
+    CONTEXT_FIELDS, apply_supersession, build_derived, migrate_store, normalize_record,
+)
+
 UNIT_TYPES = ["concept", "fact", "actionable", "question", "problem", "statement", "quote", "idea"]
 SALIENCE_LEVELS = ["high", "medium", "low"]
-PROFILE_CONFIDENCE = 0.95
 
 CHECKBOX_RE = re.compile(r"^-\s*\[[ xX]\]\s*")
 BULLET_RE = re.compile(r"^-\s+")
@@ -38,6 +42,16 @@ def _utcnow() -> str:
 
 def _slugify(heading: str) -> str:
     return heading.lower().replace(" ", "-")
+
+
+def _assertion_key(record):
+    """Never fold a claim across scope, subject or explicit validity boundaries."""
+    return tuple(record.get(field) for field in
+                 ("scope", "subject", "memory_kind", "valid_from", "valid_to", "status"))
+
+
+def _text_identity(record):
+    return (_assertion_key(record), record["text"].lower().strip())
 
 class MemoryPyramidDistiller:
     def __init__(self, pyramid_path: str = "napmem_pyramid.json",
@@ -60,15 +74,15 @@ class MemoryPyramidDistiller:
     def _load_pyramid(self) -> dict[str, Any]:
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {
+                return migrate_store(json.load(f))
+        return migrate_store({
             "version": "1.0.0",
             "updated_at": _utcnow(),
             "user_profiles": [],
             "topic_tracks": [],
             "memory_records": [],
             "raw_conversations": []
-        }
+        })
 
     def save(self):
         self.data["updated_at"] = _utcnow()
@@ -174,13 +188,17 @@ class MemoryPyramidDistiller:
         preserved in the canonical's `duplicate_anchors` map so duplicate IDs stay
         resolvable and removable per session.
         """
-        existing_texts = {r["text"].lower().strip(): r for r in self.data["memory_records"]}
+        existing_texts = {_text_identity(r): r for r in self.data["memory_records"]}
         merged_records = []
 
         def fold(rec, canonical_rec):
             if rec["id"] != canonical_rec["id"] and rec["id"] not in canonical_rec["duplicates"]:
                 canonical_rec["duplicates"].append(rec["id"])
                 anchor = dict(rec["source_anchor"])
+                anchor["assertion"] = {
+                    field: copy.deepcopy(rec[field]) for field in
+                    (*CONTEXT_FIELDS, "created_at") if field in rec
+                }
                 if rec["text"] != canonical_rec["text"]:
                     anchor["paraphrase_text"] = rec["text"]
                 canonical_rec.setdefault("duplicate_anchors", {})[rec["id"]] = anchor
@@ -189,7 +207,7 @@ class MemoryPyramidDistiller:
         # semantic pass (one embed round-trip per merge, not per record).
         exact_misses: list[dict[str, Any]] = []
         for rec in new_records:
-            canonical_rec = existing_texts.get(rec["text"].lower().strip())
+            canonical_rec = existing_texts.get(_text_identity(rec))
             if canonical_rec is not None:
                 fold(rec, canonical_rec)
             else:
@@ -206,10 +224,24 @@ class MemoryPyramidDistiller:
             try:
                 index = self._get_semantic_index()
                 if index is not None:
-                    near_ids = index.nearest_many(
-                        [r["text"] for r in exact_misses],
-                        self.data["memory_records"], self.semantic_threshold,
-                    )
+                    groups = {}
+                    for pos, rec in enumerate(exact_misses):
+                        # Similarity alone cannot establish equivalence between
+                        # preferences, constraints or decisions with different values.
+                        signature = None
+                        if rec.get("memory_kind") in ("preference", "constraint", "decision", "goal"):
+                            signature = tuple(re.findall(r"\w+", rec["text"].casefold()))
+                        groups.setdefault((_assertion_key(rec), signature), []).append(pos)
+                    for (key, signature), positions in groups.items():
+                        candidates = [r for r in self.data["memory_records"]
+                                      if _assertion_key(r) == key and
+                                      (signature is None or tuple(re.findall(
+                                          r"\w+", r["text"].casefold())) == signature)]
+                        found = index.nearest_many(
+                            [exact_misses[p]["text"] for p in positions],
+                            candidates, self.semantic_threshold)
+                        for pos, found_id in zip(positions, found):
+                            near_ids[pos] = found_id
             except (ImportError, RuntimeError, OSError, ValueError) as exc:
                 import logging
                 logging.getLogger(__name__).warning(
@@ -218,7 +250,7 @@ class MemoryPyramidDistiller:
 
         by_id = {r["id"]: r for r in self.data["memory_records"]}
         for rec, near_id in zip(exact_misses, near_ids):
-            clean_text = rec["text"].lower().strip()
+            clean_text = _text_identity(rec)
             canonical_rec = existing_texts.get(clean_text) or by_id.get(near_id or "")
             if canonical_rec is not None:
                 fold(rec, canonical_rec)
@@ -257,16 +289,19 @@ class MemoryPyramidDistiller:
         # of being renumbered — external provenance references stay valid
         # across a no-op re-ingest.
         # Keep one ordered slot per occurrence, not just one ID per text.
-        reclaimable: dict[str, deque[str]] = {}
+        reclaimable: dict[str, deque] = {}
 
         kept: list[dict[str, Any]] = []
+        referenced = {rid for record in self.data["memory_records"]
+                      for rid in record.get("supersedes", [])}
         for rec in self.data["memory_records"]:
             anchors = rec.get("duplicate_anchors", {})
             for duplicate_id in rec.get("duplicates", []):
                 anchor = anchors.get(duplicate_id, {})
                 if anchor.get("session_id") == session_id:
                     duplicate_text = anchor.get("paraphrase_text", rec["text"])
-                    reclaimable.setdefault(duplicate_text.lower().strip(), deque()).append(duplicate_id)
+                    reclaimable.setdefault(duplicate_text.lower().strip(), deque()).append(
+                        (duplicate_id, copy.deepcopy(anchor.get("assertion", {}))))
             foreign = [
                 d for d in rec.get("duplicates", [])
                 if anchors.get(d, {}).get("session_id") not in (session_id, None)
@@ -292,16 +327,33 @@ class MemoryPyramidDistiller:
                 rec["topic_slug"] = match.get(
                     "topic_slug", _slugify(match["source_anchor"].get("heading", "General")))
                 rec["source_anchor"] = match["source_anchor"]
+                for field in CONTEXT_FIELDS:
+                    if field == "observed_at" and rec.get(field) is not None:
+                        continue
+                    if (field in ("subject", "valid_from", "valid_to", "status", "supersedes",
+                                  "review_status", "authority", "pinned", "last_verified_at")
+                            and field not in match.get("_context_updates", [])):
+                        continue
+                    if field in match:
+                        rec[field] = copy.deepcopy(match[field])
                 rec["duplicates"] = foreign
                 rec["duplicate_anchors"] = kept_anchors
                 consumed_ids.add(match["id"])
                 kept.append(rec)
                 continue
             if not foreign:
+                # Explicitly superseded evidence remains historical even if
+                # its original mutable source is later edited or removed.
+                if rec["id"] in referenced and rec.get("status") == "superseded":
+                    kept.append(rec)
                 continue
             promoted_id = foreign[0]
             old_text = rec["text"]
             promoted_anchor = dict(anchors[promoted_id])
+            promoted_context = promoted_anchor.pop("assertion", {})
+            for field in (*CONTEXT_FIELDS, "created_at"):
+                if field in promoted_context:
+                    rec[field] = copy.deepcopy(promoted_context[field])
             rec["id"] = promoted_id
             rec["canonical"] = promoted_id
             # Provenance invariant: a record's text must be text its anchor's
@@ -341,10 +393,14 @@ class MemoryPyramidDistiller:
         prefix = f"rec_{session_id}_"
         for unit in remaining:
             prior_ids = reclaimable.get(unit["text"].lower().strip())
-            reclaimed = prior_ids.popleft() if prior_ids else None
-            if reclaimed is not None:
+            prior = prior_ids.popleft() if prior_ids else None
+            if prior is not None:
+                reclaimed, prior_context = prior
                 unit["id"] = reclaimed
                 unit["canonical"] = reclaimed
+                for field in ("observed_at", "created_at"):
+                    if field in prior_context:
+                        unit[field] = prior_context[field]
                 if reclaimed.startswith(prefix) and reclaimed[len(prefix):].isdigit():
                     max_reclaimed = max(max_reclaimed, int(reclaimed[len(prefix):]))
             else:
@@ -367,69 +423,52 @@ class MemoryPyramidDistiller:
         return max_n + 1
 
     def rebuild_higher_layers(self):
-        """
-        Synthesizes Layer 2 (Topic Tracks) and Layer 3 (User Profiles) from Layer 1 records.
-        """
-        # Group by topic_slug for Layer 2
-        topic_groups: dict[str, list[dict[str, Any]]] = {}
-        for rec in self.data["memory_records"]:
-            slug = rec.get("topic_slug", "general")
-            topic_groups.setdefault(slug, []).append(rec)
+        """Rebuild only supported, scoped and current derived assertions."""
+        apply_supersession(self.data)
+        build_derived(self.data)
 
-        self.data["topic_tracks"] = []
-        for idx, (slug, recs) in enumerate(topic_groups.items(), 1):
-            high_salience_texts = [r["text"] for r in recs if r["salience"] == "high"]
-            summary = "; ".join(high_salience_texts[:3]) if high_salience_texts else f"{len(recs)} records under {slug}."
-            
-            track = {
-                "track_id": f"track_{idx:02d}",
-                "topic_slug": slug,
-                "title": slug.replace("-", " ").title(),
-                "summary": summary,
-                "record_ids": [r["id"] for r in recs],
-                "last_updated": _utcnow()
-            }
-            self.data["topic_tracks"].append(track)
-
-        # Synthesize Layer 3 User & System Profiles
-        fact_records = [r for r in self.data["memory_records"] if r["type"] in ["fact", "actionable"] and r["salience"] == "high"]
-        self.data["user_profiles"] = []
-        for idx, rec in enumerate(fact_records, 1):
-            # Heuristic stand-in emits only a subset of the schema's category enum
-            # (preference/constraint/workflow); "identity" and "goal" are reserved
-            # for the LLM-based production extractor.
-            category = "preference" if "prefer" in rec["text"].lower() else "constraint" if "never" in rec["text"].lower() or "must" in rec["text"].lower() else "workflow"
-            profile = {
-                "id": f"prof_{idx:02d}",
-                "category": category,
-                "trait": rec["text"],
-                "confidence": PROFILE_CONFIDENCE,
-                "provenance_records": [rec["id"]] + rec.get("duplicates", [])
-            }
-            self.data["user_profiles"].append(profile)
-
-    def ingest_session(self, session_id: str, title: str, file_path: str, content: str):
+    def ingest_session(self, session_id: str, title: str, file_path: str, content: str,
+                       *, scope: str | None = None, metadata: dict | None = None):
         """
         Ingests a raw session log into Layer 0 and triggers distillation using
         the built-in heuristic extractor.
         """
         new_records = self.extract_atomic_units(content, session_id, file_path)
-        return self.ingest_session_records(session_id, title, file_path, new_records)
+        return self.ingest_session_records(session_id, title, file_path, new_records,
+                                           scope=scope, metadata=metadata)
 
     def ingest_session_records(self, session_id: str, title: str, file_path: str,
-                               new_records: list[dict[str, Any]]) -> int:
+                               new_records: list[dict[str, Any]], *,
+                               scope: str | None = None,
+                               metadata: dict | None = None) -> int:
         """
         Ingests pre-extracted Layer 1 records for a session (e.g. from the LLM
         extractor in llm_extractor.py) and runs the reconcile -> dedup ->
         rebuild -> save pipeline. Records must already carry
         rec_<session_id>_NNN ids and complete source anchors.
         """
+        prior_source = next((s for s in self.data["raw_conversations"]
+                             if s["session_id"] == session_id), {})
+        if (scope is None and "scope" not in (metadata or {})
+                and not any("scope" in record for record in new_records)):
+            scope = prior_source.get("scope")
+        normalized = []
+        for record in new_records:
+            item = normalize_record(record, scope=scope, metadata=metadata)
+            provided = set(record).intersection(CONTEXT_FIELDS)
+            provided.update(set(metadata or {}).intersection(CONTEXT_FIELDS))
+            if scope is not None:
+                provided.add("scope")
+            item["_context_updates"] = sorted(provided)
+            normalized.append(item)
+        new_records = normalized
         # Register Layer 0 raw conversation
         raw_entry = {
             "session_id": session_id,
             "title": title,
             "timestamp": _utcnow(),
-            "file_path": file_path
+            "file_path": file_path,
+            "scope": scope or (metadata or {}).get("scope", "legacy"),
         }
         # Re-ingest semantics: replace the Layer 0 entry and reconcile the
         # session's previously distilled Layer 1 records against the fresh
@@ -442,6 +481,8 @@ class MemoryPyramidDistiller:
 
         # Phase 3: Reconcile prior generation, then deduplicate the remainder
         remaining_records = self._reconcile_session_records(session_id, new_records)
+        for record in remaining_records:
+            record.pop("_context_updates", None)
         self.deduplicate_and_merge(remaining_records)
 
         # Phase 4: Rebuild Pyramid Layers 2 and 3

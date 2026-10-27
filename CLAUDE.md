@@ -86,6 +86,13 @@ the mirror can be stale but never divergent.
   sentinel delimiter with loop-neutralization (`_neutralize_sentinel`); never
   interpolate raw text or metadata outside the guarded region.
 - Layers 2–3 are derived state — always rebuilt from Layer 1, never edited.
+- Store version 2 adds assertion scope, valid time, review state and evidence.
+  Reads migrate version 1 in memory; ingestion persists version 2. Legacy
+  records retain scope `legacy` and unknown validity. Named project retrieval
+  must filter before ranking and exclude legacy assertions.
+- A high-salience fact or task does not establish a durable profile. Persistent
+  profile kinds require explicit approval; unresolved subject conflicts are
+  withheld. Never emit a fabricated numeric confidence.
 
 ## Conventions
 

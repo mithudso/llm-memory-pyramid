@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stage 1 passed; next is TASK-237,
-the scoped temporal model.
+TASK-236–TASK-245 track the ten stages. Stages 1–2 passed; next is TASK-238,
+hybrid bounded retrieval.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -22,6 +22,12 @@ offline benchmark author and independent read-only compatibility review.
   hashed-TF has 297 scope violations and zero correct abstentions. These are
   fixture results, not production accuracy. Scorer tests 17/17 and full
   suite 128/128 pass. Reproduction gates report no baseline regressions.
+- Stage 2: store v2 migration and scoped temporal assertions implemented.
+  Legacy scope remains unknown; metadata/IDs survive no-op replay and alias
+  promotion. Explicit updates retain history; approval gates persistent
+  profiles and unresolved conflicts withhold traits. Removed constant 0.95
+  confidence. All 159 tests, Ruff and compile checks pass. The prior profile
+  risk KNOW-234 is now an implemented fix; production stores remain untouched.
 
 **Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
 altering runtime behavior. Then proceed through scoped time-aware model,

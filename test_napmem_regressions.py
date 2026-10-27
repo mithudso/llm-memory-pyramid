@@ -46,7 +46,8 @@ class TestReconciliationRegressions(unittest.TestCase):
         self.assertEqual((record["type"], record["salience"], record["topic_slug"]),
                          ("fact", "high", "new"))
         self.assertEqual(distiller.data["topic_tracks"][0]["topic_slug"], "new")
-        self.assertEqual(distiller.data["user_profiles"][0]["trait"], "original statement")
+        # Salience and classification alone do not establish a durable trait.
+        self.assertEqual(distiller.data["user_profiles"], [])
 
     def test_wording_refresh_preserves_foreign_duplicate_promotion(self):
         distiller = MemoryPyramidDistiller(self.pyramid)

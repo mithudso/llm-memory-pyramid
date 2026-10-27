@@ -73,7 +73,22 @@ are never edited directly.
   and its embedding cache are single-writer; other machines query over
   ssh-stdio MCP. See [deployment-topology.md](deployment-topology.md).
 
-## Deployment
+## Scoped assertion model (store version 2)
+
+`napmem_model.py` validates scope, memory kind, subject, valid-time intervals,
+supersession and review state. Version 1 stores migrate in memory without
+changing record IDs or inventing source verification. Their unscoped records
+use `legacy`; a named project query excludes them. Explicit `global` memory
+can apply across projects. `*` is an explicit query scope, never a stored scope.
+
+Each duplicate anchor retains its own assertion metadata. Promotion adopts
+that occurrence's scope and evidence. Tracks and profiles use stable derived
+IDs. Only approved persistent kinds can become profiles, and unresolved
+subject conflicts are withheld. Salience never serves as confidence.
+Explicit supersession retains historical assertions and uses half-open valid
+intervals; ingestion time does not establish real-world validity.
+
+## Deployment topology
 
 Production topology (three-machine fleet, canonical consolidator on the
 always-on Linux box, launchd/systemd variants, security model) is documented

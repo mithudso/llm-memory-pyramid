@@ -19,6 +19,8 @@ import os
 import stat
 from typing import Any
 
+from napmem_model import migrate_store
+
 VALID_LAYERS = ("all", "profiles", "tracks", "records")
 
 class NapMemRetrievalAgent:
@@ -29,7 +31,7 @@ class NapMemRetrievalAgent:
     def _load_pyramid(self) -> dict[str, Any]:
         if os.path.exists(self.pyramid_path):
             with open(self.pyramid_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return migrate_store(json.load(f))
         raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please run memory_pyramid_distiller.py first.")
 
     def search_memory_pyramid(self, query: str, layer: str = "all") -> dict[str, Any]:
