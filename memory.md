@@ -2,6 +2,28 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v2.2.0 — 2026-10-27
+
+**Delta:** v2.1.0 → v2.2.0; merged delivery and developer-install parity.
+
+PR 18 merged all ten roadmap stages into main at
+be84a2341a4b4780eda53d7600bafeff80e4c80e after all five CI jobs passed.
+The feature branch was deleted; main and origin/main matched with identical
+trees to the tested feature head. No owned PRs remained open.
+
+A final local entrypoint check then exposed stale developer metadata:
+the repository .venv reported llm-memory-pyramid 0.1.1 although source and the
+fresh acceptance wheel were 0.2.0. `python -m pip install --no-deps .` upgraded
+only the repository package to 0.2.0. The existing ollama-client 0.1.0 remained
+installed; no dependency reinstall, service operation or inference was needed.
+The actual .venv/bin/napmem entrypoint now reports 0.2.0. Its independent loaded
+source/temporary-store verification is recorded in acceptance receipt v1.2.
+
+**Remaining steps:** no product implementation remains. This follow-up changes
+documentation only: commit/push its receipt, verify CI and merge/sync main.
+If the docs/local-install-acceptance branch is already merged, nothing remains.
+Do not operate production stores, model services, indexing, hooks or schedulers.
+
 ## v2.1.0 — 2026-10-27
 
 **Delta:** v2.0.0 → v2.1.0; all ten roadmap stages implemented and accepted.

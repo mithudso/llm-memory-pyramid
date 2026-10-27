@@ -437,3 +437,98 @@ The following are local temporary evidence, not example installation locations. 
   }
 }
 ```
+
+---
+
+# Developer environment parity — v1.2.0
+
+Delta: preserved both earlier receipts and verified the existing developer virtual environment after the parent upgraded only the project package. This closes the local stale-metadata discrepancy; it does not repeat the fresh-install acceptance.
+
+Observed at: 2026-10-27T13:25:27.926218+00:00
+Merged source: be84a2341a4b4780eda53d7600bafeff80e4c80e
+Actual console: /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem
+Console SHA-256: a89a1fbcb73d4655de19d0bbcd603ad0824d8e7ac3985bfbffbfc50b3879e029
+Interpreter: /Users/mitch/dev/llm-memory-pyramid/.venv/bin/python
+Installed modules: /Users/mitch/dev/llm-memory-pyramid/.venv/lib/python3.12/site-packages
+Installed metadata: /Users/mitch/dev/llm-memory-pyramid/.venv/lib/python3.12/site-packages/llm_memory_pyramid-0.2.0.dist-info/METADATA
+Metadata SHA-256: 44c16ac97956d06a2311ed916ea0df5235578d0e7fa360367915ed9869743253
+Working directory: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/run
+
+The actual console and installed distribution metadata both report 0.2.0. All 23 installed runtime module hashes exactly match the committed merged source and the v1.1 source-binding table above. The console imports from the developer virtual environment, with the checkout source directory absent from sys.path. Ollama client 0.1.0 is present; Anthropic is absent.
+
+Five actual console invocations exited 0: version, temporary demo, Alpha query, Beta query and doctor. Alpha returned only Vim; Beta returned only VS Code. Doctor reported offline/hashed operation, probed=false and unchanged store-directory file hashes, byte counts and mtimes. Seven processes loaded a temporary PYTHONPATH startup guard. Its two positive probes were blocked; runtime network/process attempts were zero. No installed startup file, .pth file, hook, dependency or service was modified by this verifier.
+
+Temporary configuration: /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/config.toml
+Temporary pyramid: /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/stores/main.json
+Temporary startup guard: /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/guard/sitecustomize.py
+
+The following commands inherited NAPMEM_MODE=offline, NAPMEM_EMBED_BACKEND=hashed, NAPMEM_METRICS=0 and the explicit temporary configuration. PYTHONPATH contained only the temporary guard directory.
+
+```sh
+NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem --version
+NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem --pyramid /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/stores/main.json demo
+NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem --pyramid /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/stores/main.json query 'favorite editor' --scope project:napmem-demo-alpha
+NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem --pyramid /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/stores/main.json query 'favorite editor' --scope project:napmem-demo-beta
+NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline /Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem --pyramid /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/stores/main.json doctor
+```
+
+Evidence artifacts:
+
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/receipt.json
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/identity.json
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/source-manifest.json
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/commands.json
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/guard-processes.jsonl
+- /var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/guard-attempts.jsonl
+
+Limit: this is an existing developer environment with an installed optional client. It verifies offline loaded-state parity, not production services or online integrations. No production/default data, model, embedding server, indexer, SSH connection or deployment was used.
+
+## Developer environment machine-readable receipt
+
+```json
+{
+  "agent": "live-acceptance-verifier",
+  "definition_version": "1.0.0",
+  "status": "complete",
+  "evidence": [
+    {
+      "source": "/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/receipt.json",
+      "observed_at": "2026-10-27T13:25:27.926218+00:00",
+      "supported_claim": "Actual developer console version, temporary demo/scoped queries/doctor and runtime guards passed."
+    },
+    {
+      "source": "/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/identity.json",
+      "observed_at": "2026-10-27T13:25:27.926218+00:00",
+      "supported_claim": "Installed package metadata is 0.2.0 and all 23 installed modules match merged main."
+    }
+  ],
+  "changes": [
+    "/Users/mitch/dev/llm-memory-pyramid/docs/acceptance-offline-2026-10-27.md"
+  ],
+  "remaining": [],
+  "details": {
+    "surface": "Existing developer virtual environment console outside checkout",
+    "acceptance_condition": "Actual installed napmem reports 0.2.0, matches merged runtime bytes and passes temporary offline demo/query/doctor without probes or runtime network/process attempts.",
+    "source_revision": "be84a2341a4b4780eda53d7600bafeff80e4c80e",
+    "loaded_revision": "llm-memory-pyramid 0.2.0; installed METADATA SHA256 44c16ac97956d06a2311ed916ea0df5235578d0e7fa360367915ed9869743253",
+    "process_or_origin": "/Users/mitch/dev/llm-memory-pyramid/.venv/bin/napmem",
+    "configuration_identity": "/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-developer-venv-parity-ihtvf65t/config.toml; explicit temporary pyramid; offline/hashed; temporary PYTHONPATH guard only",
+    "observations": {
+      "installed_modules_match_merged_main": 23,
+      "console_commands_exit_zero": 5,
+      "guarded_processes": 7,
+      "positive_guard_probes": 2,
+      "runtime_guard_attempts": 0,
+      "demo_alpha": "Vim",
+      "demo_beta": "VS Code",
+      "doctor_probed": false,
+      "doctor_store_tree_unchanged": true,
+      "persistent_environment_or_hooks_modified": false
+    },
+    "mismatches": [],
+    "unverified_checks": [
+      "Online integrations and production services are outside this focused parity check."
+    ]
+  }
+}
+```
