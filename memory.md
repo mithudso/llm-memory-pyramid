@@ -5,15 +5,23 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Current stage: TASK-236, evaluation.
+TASK-236–TASK-245 track the ten stages. Stage 1 passed; next is TASK-237,
+the scoped temporal model.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
-added. Package/schema/MCP versions will change with implemented features.
+added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
+will change with the corresponding implemented features.
 
 **Completed:** read current source, instructions and prior assessment; checked
 clean main 0790dc7 with no open owned PRs; created the tracked stages and
 tasks/plan.md; captured implementation constraints in KNOW-246. Started an
 offline benchmark author and independent read-only compatibility review.
+- Stage 1: 200 synthetic queries, 83 records and 20 scenario families with
+  fixed 100/100 dev/held-out split. Original substring and hashed-TF reports
+  captured before runtime changes. Held-out Recall@5: 0.3067 / 0.9200;
+  hashed-TF has 297 scope violations and zero correct abstentions. These are
+  fixture results, not production accuracy. Scorer tests 17/17 and full
+  suite 128/128 pass. Reproduction gates report no baseline regressions.
 
 **Continuation:** branch feat/napmem-trusted-memory. Implement stage 1 before
 altering runtime behavior. Then proceed through scoped time-aware model,

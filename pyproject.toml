@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-memory-pyramid"
-version = "0.1.1"
+version = "0.2.0"
 description = "NapMem layered agent-memory pyramid; Ollama embeddings and extraction via the shared ollama-client library."
 requires-python = ">=3.11"
 dependencies = [

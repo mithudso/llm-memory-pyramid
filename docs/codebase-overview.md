@@ -56,6 +56,9 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/runbooks/run-naptime-consolidator.md` | Runbook: run the naptime consolidator |
 | `docs/security-review-ledger.md` | Security review ledger |
 | `docs/semantic-indexing-and-hooks-reference.md` | Semantic indexing, hooks, and scripts — full reference |
+| `evaluations/baseline_hashed_heldout_v1.json` | JSON configuration, schema, index or example data |
+| `evaluations/baseline_substring_heldout_v1.json` | JSON configuration, schema, index or example data |
+| `evaluations/memory_quality_v1.json` | JSON configuration, schema, index or example data |
 | `llm_extraction_prompts.py` | LLM Zero-Fabrication Extraction Prompts & Guardrails for Memory Distillation |
 | `llm_extractor.py` | LLM Extraction Pipeline (production path for the NapMem distiller) |
 | `llms-facts.txt` | Generated source-tagged project facts |
@@ -65,6 +68,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `memory.md` | memory.md — operator work log |
 | `memory_pyramid_distiller.py` | Memory Pyramid Distiller (NapMem + Document Distiller Integration) |
 | `memory_pyramid_schema.json` | JSON configuration, schema, index or example data |
+| `napmem_eval.py` | Offline evidence-retrieval evaluation, independent of answer generation. |
 | `napmem_mcp_failover.py` | NapMem MCP failover proxy (stdio) |
 | `napmem_mcp_server.py` | NapMem MCP Server (stdio) |
 | `napmem_pyramid.json` | JSON configuration, schema, index or example data |
@@ -77,6 +81,8 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `scripts/repo_docs.py` | Generate static repository maps, or check their exact content without writes. |
 | `scripts/run-naptime.sh` | Naptime consolidator wrapper — portable (macOS launchd + Linux systemd). |
 | `semantic_index.py` | Semantic Embedding Index for the NapMem Pyramid |
+| `tasks/plan.md` | Implementation plan: trusted NapMem memory |
+| `test_napmem_eval.py` | Deterministic, network-free evidence scorer and benchmark contract tests. |
 | `test_napmem_extensions.py` | Tests for the production-path extensions: LLM extractor parsing/validation, |
 | `test_napmem_failover.py` | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |
 | `test_napmem_pipeline.py` | Integration test for NapMem + Document Distiller Memory Pipeline |

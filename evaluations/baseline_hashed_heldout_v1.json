@@ -1,0 +1,3720 @@
+{
+  "as_of": "2026-09-01T00:00:00Z",
+  "budgets": null,
+  "by_category": {
+    "abstention": {
+      "abstention_correct_cases": 12,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 4,
+      "lifecycle_violations": 5,
+      "mrr_at_5": null,
+      "mrr_at_5_cases": 0,
+      "ndcg_at_5": null,
+      "ndcg_at_5_cases": 0,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 12,
+      "recall_at_5": null,
+      "recall_at_5_cases": 0,
+      "returned_count": 60,
+      "scope_violations": 36,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 1.0
+    },
+    "cross_session": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 14,
+      "lifecycle_violations": 3,
+      "mrr_at_5": 0.7083333333333334,
+      "mrr_at_5_cases": 10,
+      "ndcg_at_5": 0.6792204367717772,
+      "ndcg_at_5_cases": 10,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 10,
+      "recall_at_5": 0.8,
+      "recall_at_5_cases": 10,
+      "returned_count": 50,
+      "scope_violations": 29,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.68
+    },
+    "deleted_memory": {
+      "abstention_correct_cases": 2,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 2,
+      "mrr_at_5": null,
+      "mrr_at_5_cases": 0,
+      "ndcg_at_5": null,
+      "ndcg_at_5_cases": 0,
+      "protected_pass_cases": 2,
+      "protected_pass_rate": 0,
+      "query_count": 2,
+      "recall_at_5": null,
+      "recall_at_5_cases": 0,
+      "returned_count": 10,
+      "scope_violations": 5,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 1.0
+    },
+    "deleted_source": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 1,
+      "mrr_at_5": 1.0,
+      "mrr_at_5_cases": 1,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_5_cases": 1,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 1,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 1,
+      "returned_count": 5,
+      "scope_violations": 4,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "exact_error": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 1,
+      "mrr_at_5": 0.5,
+      "mrr_at_5_cases": 1,
+      "ndcg_at_5": 0.6309297535714575,
+      "ndcg_at_5_cases": 1,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 1,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 1,
+      "returned_count": 5,
+      "scope_violations": 4,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "exact_id": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 1,
+      "lifecycle_violations": 9,
+      "mrr_at_5": 0.6033333333333333,
+      "mrr_at_5_cases": 10,
+      "ndcg_at_5": 0.7010065430524243,
+      "ndcg_at_5_cases": 10,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 10,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 10,
+      "returned_count": 50,
+      "scope_violations": 20,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "exact_symbol": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 2,
+      "lifecycle_violations": 5,
+      "mrr_at_5": 0.9,
+      "mrr_at_5_cases": 10,
+      "ndcg_at_5": 0.9261859507142916,
+      "ndcg_at_5_cases": 10,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 10,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 10,
+      "returned_count": 50,
+      "scope_violations": 39,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "exact_text": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 1,
+      "lifecycle_violations": 7,
+      "mrr_at_5": 1.0,
+      "mrr_at_5_cases": 8,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_5_cases": 8,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 8,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 8,
+      "returned_count": 40,
+      "scope_violations": 30,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "memory_kind": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 0,
+      "mrr_at_5": 1.0,
+      "mrr_at_5_cases": 1,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_5_cases": 1,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 1,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 1,
+      "returned_count": 5,
+      "scope_violations": 4,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "paraphrase": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 2,
+      "lifecycle_violations": 18,
+      "mrr_at_5": 0.5608695652173913,
+      "mrr_at_5_cases": 23,
+      "ndcg_at_5": 0.637338162821813,
+      "ndcg_at_5_cases": 23,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 23,
+      "recall_at_5": 0.8695652173913043,
+      "recall_at_5_cases": 23,
+      "returned_count": 115,
+      "scope_violations": 62,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8260869565217391
+    },
+    "renamed_source": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 1,
+      "mrr_at_5": 1.0,
+      "mrr_at_5_cases": 1,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_5_cases": 1,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 1,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 1,
+      "returned_count": 5,
+      "scope_violations": 3,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8
+    },
+    "scope": {
+      "abstention_correct_cases": 4,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 1,
+      "lifecycle_violations": 3,
+      "mrr_at_5": null,
+      "mrr_at_5_cases": 0,
+      "ndcg_at_5": null,
+      "ndcg_at_5_cases": 0,
+      "protected_pass_cases": 4,
+      "protected_pass_rate": 0,
+      "query_count": 4,
+      "recall_at_5": null,
+      "recall_at_5_cases": 0,
+      "returned_count": 20,
+      "scope_violations": 15,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 1.0
+    },
+    "source_instruction": {
+      "abstention_correct_cases": 4,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 7,
+      "lifecycle_violations": 1,
+      "mrr_at_5": null,
+      "mrr_at_5_cases": 0,
+      "ndcg_at_5": null,
+      "ndcg_at_5_cases": 0,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 4,
+      "recall_at_5": null,
+      "recall_at_5_cases": 0,
+      "returned_count": 20,
+      "scope_violations": 12,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 1.0
+    },
+    "stale_mirror": {
+      "abstention_correct_cases": 0,
+      "abstention_correct_rate": null,
+      "current_fact_correct_cases": 0,
+      "current_fact_correct_rate": null,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 0,
+      "lifecycle_violations": 1,
+      "mrr_at_5": 0.5,
+      "mrr_at_5_cases": 2,
+      "ndcg_at_5": 0.5,
+      "ndcg_at_5_cases": 2,
+      "protected_pass_cases": 0,
+      "protected_pass_rate": null,
+      "query_count": 2,
+      "recall_at_5": 0.5,
+      "recall_at_5_cases": 2,
+      "returned_count": 10,
+      "scope_violations": 6,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.9
+    },
+    "temporal": {
+      "abstention_correct_cases": 1,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 6,
+      "current_fact_correct_rate": 0,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 1,
+      "lifecycle_violations": 7,
+      "mrr_at_5": 0.8,
+      "mrr_at_5_cases": 5,
+      "ndcg_at_5": 0.852371901428583,
+      "ndcg_at_5_cases": 5,
+      "protected_pass_cases": 2,
+      "protected_pass_rate": 0,
+      "query_count": 6,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 5,
+      "returned_count": 30,
+      "scope_violations": 15,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.8333333333333334
+    },
+    "update": {
+      "abstention_correct_cases": 2,
+      "abstention_correct_rate": 0,
+      "current_fact_correct_cases": 5,
+      "current_fact_correct_rate": 0,
+      "duplicate_results": 0,
+      "instruction_bearing_results": 1,
+      "lifecycle_violations": 8,
+      "mrr_at_5": 0.5,
+      "mrr_at_5_cases": 3,
+      "ndcg_at_5": 0.6309297535714575,
+      "ndcg_at_5_cases": 3,
+      "protected_pass_cases": 5,
+      "protected_pass_rate": 0,
+      "query_count": 5,
+      "recall_at_5": 1.0,
+      "recall_at_5_cases": 3,
+      "returned_count": 25,
+      "scope_violations": 13,
+      "unknown_ids": 0,
+      "unsupported_injection_query_rate": 1.0,
+      "unsupported_result_rate": 0.88
+    }
+  },
+  "coverage": {
+    "categories_in_split": {
+      "abstention": 12,
+      "cross_session": 10,
+      "deleted_memory": 2,
+      "deleted_source": 1,
+      "exact_error": 1,
+      "exact_id": 10,
+      "exact_symbol": 10,
+      "exact_text": 8,
+      "memory_kind": 1,
+      "paraphrase": 23,
+      "renamed_source": 1,
+      "scope": 4,
+      "source_instruction": 4,
+      "stale_mirror": 2,
+      "temporal": 6,
+      "update": 5
+    },
+    "scenarios_in_split": 10,
+    "total_queries": 200,
+    "total_records": 83
+  },
+  "fixture_sha256": "7c6c09508902842e61c204bde5257d780b01bf7af1e18d050c13b47b27c76b8e",
+  "fixture_version": "1.0.0",
+  "latency_ms": {
+    "max": 16.729917,
+    "mean": 7.53127875,
+    "median": 7.428229,
+    "min": 7.263833,
+    "p95": 7.611958
+  },
+  "limitations": [
+    "200 authored queries cover 20 scenario families and 83 atomic records; queries within a scenario share evidence and are not 200 independent tasks.",
+    "Each scenario has ten individually written queries. This balanced construction oversamples identifiers, negative questions, and lifecycle edges relative to unknown production traffic.",
+    "No paraphrases were generated by a model. Paraphrases and multilingual cases are limited human-authored examples; there is no broad language or domain representativeness claim.",
+    "Renamed/deleted-source cases retain record text and annotate source_state. They measure retrieval continuity, not filesystem provenance verification.",
+    "Stale-mirror cases test recall of an indicator and threshold, not actual mirror freshness, transport failover, or live monitoring.",
+    "Source-instruction cases score whether irrelevant hostile quoted records enter evidence; they do not execute instructions or test a downstream model.",
+    "The development/held-out split isolates scenario content but shares question categories and fixture conventions. It does not establish out-of-distribution generalization.",
+    "Evidence retrieval only: this does not score extraction, generated answers, production traffic, or real embeddings.",
+    "Unsupported injection counts IDs outside the query labels; incomplete labels can overstate it.",
+    "Legacy substring and hashed modes ignore scope and lifecycle; the evaluator preserves that behavior.",
+    "Latency is a single local pass with cold first-query cache cost; it is machine dependent and excluded from quality gates.",
+    "Result bytes count canonical compact UTF-8 JSON of the complete response, before metric top-five truncation."
+  ],
+  "metrics": {
+    "abstention_correct_cases": 25,
+    "abstention_correct_rate": 0,
+    "current_fact_correct_cases": 11,
+    "current_fact_correct_rate": 0,
+    "duplicate_results": 0,
+    "instruction_bearing_results": 34,
+    "lifecycle_violations": 72,
+    "mrr_at_5": 0.7068888888888889,
+    "mrr_at_5_cases": 75,
+    "ndcg_at_5": 0.7534464742895384,
+    "ndcg_at_5_cases": 75,
+    "protected_pass_cases": 13,
+    "protected_pass_rate": 0,
+    "query_count": 100,
+    "recall_at_5": 0.92,
+    "recall_at_5_cases": 75,
+    "returned_count": 500,
+    "scope_violations": 297,
+    "unknown_ids": 0,
+    "unsupported_injection_query_rate": 1.0,
+    "unsupported_result_rate": 0.846
+  },
+  "mode": "hashed",
+  "report_version": "1.0.0",
+  "result_bytes": {
+    "max": 3268,
+    "mean": 2949.83,
+    "median": 2928.0,
+    "min": 2815,
+    "p95": 3139
+  },
+  "results": [
+    {
+      "category": "update",
+      "expected_ids": [
+        "estuary_new"
+      ],
+      "latency_ms": 16.729917,
+      "query_id": "q101",
+      "result_bytes": 2993,
+      "result_ids": [
+        "estuary_old",
+        "estuary_new",
+        "estuary_canary",
+        "estuary_other",
+        "ember_quote"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": false,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "estuary_new"
+      ],
+      "latency_ms": 7.316583,
+      "query_id": "q102",
+      "result_bytes": 2922,
+      "result_ids": [
+        "atlas_logout",
+        "estuary_canary",
+        "estuary_old",
+        "estuary_new",
+        "estuary_other"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.25,
+        "ndcg_at_5": 0.43067655807339306,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [
+        "estuary_old"
+      ],
+      "latency_ms": 7.263833,
+      "query_id": "q103",
+      "result_bytes": 2887,
+      "result_ids": [
+        "estuary_old",
+        "estuary_new",
+        "willow_copy",
+        "juniper_done",
+        "estuary_other"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [
+        "estuary_new"
+      ],
+      "latency_ms": 7.353667,
+      "query_id": "q104",
+      "result_bytes": 2993,
+      "result_ids": [
+        "estuary_old",
+        "estuary_new",
+        "estuary_canary",
+        "estuary_other",
+        "ember_quote"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": false,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "estuary_new"
+      ],
+      "latency_ms": 7.308584,
+      "query_id": "q105",
+      "result_bytes": 2885,
+      "result_ids": [
+        "harbor_old",
+        "estuary_canary",
+        "estuary_old",
+        "estuary_new",
+        "estuary_other"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.25,
+        "ndcg_at_5": 0.43067655807339306,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "estuary_new",
+        "estuary_canary"
+      ],
+      "latency_ms": 7.356792,
+      "query_id": "q106",
+      "result_bytes": 3019,
+      "result_ids": [
+        "drift_backoff",
+        "estuary_canary",
+        "estuary_old",
+        "estuary_new",
+        "ember_quote"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6509209298071326,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "scope",
+      "expected_ids": [],
+      "latency_ms": 7.414875,
+      "query_id": "q107",
+      "result_bytes": 2973,
+      "result_ids": [
+        "estuary_other",
+        "estuary_old",
+        "estuary_new",
+        "lucent_focus",
+        "cobalt_missing"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "estuary_canary"
+      ],
+      "latency_ms": 7.429958,
+      "query_id": "q108",
+      "result_bytes": 2852,
+      "result_ids": [
+        "estuary_canary",
+        "prism_sample",
+        "ember_review",
+        "aurora_vim",
+        "aurora_code"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.329292,
+      "query_id": "q109",
+      "result_bytes": 2997,
+      "result_ids": [
+        "beacon_new",
+        "estuary_other",
+        "ember_secret",
+        "ember_quote",
+        "aurora_beta"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 5,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "update",
+      "expected_ids": [],
+      "latency_ms": 7.370583,
+      "query_id": "q110",
+      "result_bytes": 2880,
+      "result_ids": [
+        "estuary_old",
+        "juniper_task",
+        "cobalt_digest",
+        "willow_spanish",
+        "meridian_yaml"
+      ],
+      "scenario": "estuary",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_error",
+      "expected_ids": [
+        "quartz_error"
+      ],
+      "latency_ms": 7.361875,
+      "query_id": "q111",
+      "result_bytes": 2850,
+      "result_ids": [
+        "cedar_zone",
+        "quartz_error",
+        "aurora_vim",
+        "aurora_code",
+        "aurora_tabs"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "quartz_atomic"
+      ],
+      "latency_ms": 7.398375,
+      "query_id": "q112",
+      "result_bytes": 2947,
+      "result_ids": [
+        "quartz_atomic",
+        "estuary_canary",
+        "juniper_rule",
+        "willow_date",
+        "lucent_oldfile"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "quartz_error",
+        "quartz_recover"
+      ],
+      "latency_ms": 7.399125,
+      "query_id": "q113",
+      "result_bytes": 3008,
+      "result_ids": [
+        "quartz_error",
+        "quartz_recover",
+        "quartz_atomic",
+        "meadow_task",
+        "harbor_new"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "quartz_atomic"
+      ],
+      "latency_ms": 7.372375,
+      "query_id": "q114",
+      "result_bytes": 3048,
+      "result_ids": [
+        "quartz_atomic",
+        "quartz_error",
+        "quartz_recover",
+        "lucent_click",
+        "delta_focus"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "quartz_recover"
+      ],
+      "latency_ms": 7.363208,
+      "query_id": "q115",
+      "result_bytes": 2968,
+      "result_ids": [
+        "quartz_error",
+        "quartz_recover",
+        "aurora_tabs",
+        "quartz_atomic",
+        "prism_sample"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "source_instruction",
+      "expected_ids": [],
+      "latency_ms": 7.314125,
+      "query_id": "q116",
+      "result_bytes": 3192,
+      "result_ids": [
+        "quartz_transcript",
+        "cobalt_new",
+        "quartz_recover",
+        "ember_quote",
+        "lucent_click"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 2,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "source_instruction",
+      "expected_ids": [],
+      "latency_ms": 7.455875,
+      "query_id": "q117",
+      "result_bytes": 3088,
+      "result_ids": [
+        "quartz_transcript",
+        "meridian_token",
+        "cobalt_new",
+        "quartz_recover",
+        "cobalt_old"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "quartz_recover"
+      ],
+      "latency_ms": 7.451834,
+      "query_id": "q118",
+      "result_bytes": 3045,
+      "result_ids": [
+        "quartz_atomic",
+        "quartz_error",
+        "quartz_recover",
+        "quartz_transcript",
+        "aurora_vim"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.3333333333333333,
+        "ndcg_at_5": 0.5,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 1,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "quartz_atomic"
+      ],
+      "latency_ms": 7.419583,
+      "query_id": "q119",
+      "result_bytes": 2815,
+      "result_ids": [
+        "quartz_atomic",
+        "aurora_vim",
+        "aurora_code",
+        "aurora_tabs",
+        "aurora_beta"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.4115,
+      "query_id": "q120",
+      "result_bytes": 3038,
+      "result_ids": [
+        "willow_copy",
+        "meadow_budget",
+        "meadow_train",
+        "quartz_recover",
+        "quartz_transcript"
+      ],
+      "scenario": "quartz",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "update",
+      "expected_ids": [
+        "harbor_new"
+      ],
+      "latency_ms": 7.424083,
+      "query_id": "q121",
+      "result_bytes": 2880,
+      "result_ids": [
+        "harbor_old",
+        "harbor_new",
+        "harbor_pii",
+        "harbor_other",
+        "aurora_vim"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": false,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "harbor_new"
+      ],
+      "latency_ms": 7.364917,
+      "query_id": "q122",
+      "result_bytes": 2956,
+      "result_ids": [
+        "delta_focus",
+        "harbor_old",
+        "harbor_pii",
+        "lucent_focus",
+        "harbor_new"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.2,
+        "ndcg_at_5": 0.38685280723454163,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [
+        "harbor_old"
+      ],
+      "latency_ms": 7.478042,
+      "query_id": "q123",
+      "result_bytes": 2911,
+      "result_ids": [
+        "harbor_old",
+        "harbor_pii",
+        "harbor_other",
+        "harbor_new",
+        "beacon_new"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "harbor_new",
+        "harbor_pii"
+      ],
+      "latency_ms": 7.47425,
+      "query_id": "q124",
+      "result_bytes": 2937,
+      "result_ids": [
+        "harbor_pii",
+        "harbor_old",
+        "harbor_other",
+        "harbor_new",
+        "beacon_audience"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 0.8772153153380493,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "scope",
+      "expected_ids": [],
+      "latency_ms": 7.379334,
+      "query_id": "q125",
+      "result_bytes": 2870,
+      "result_ids": [
+        "harbor_other",
+        "harbor_old",
+        "kiln_metric",
+        "orchard_build",
+        "harbor_new"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "harbor_pii"
+      ],
+      "latency_ms": 7.442333,
+      "query_id": "q126",
+      "result_bytes": 2850,
+      "result_ids": [
+        "harbor_pii",
+        "meridian_token",
+        "delta_old",
+        "meadow_access",
+        "delta_label"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "harbor_new"
+      ],
+      "latency_ms": 7.405,
+      "query_id": "q127",
+      "result_bytes": 2865,
+      "result_ids": [
+        "harbor_old",
+        "harbor_new",
+        "harbor_pii",
+        "harbor_other",
+        "aurora_vim"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.31675,
+      "query_id": "q128",
+      "result_bytes": 2907,
+      "result_ids": [
+        "harbor_pii",
+        "kiln_overflow",
+        "harbor_new",
+        "harbor_old",
+        "meridian_error"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "update",
+      "expected_ids": [],
+      "latency_ms": 7.298166,
+      "query_id": "q129",
+      "result_bytes": 2872,
+      "result_ids": [
+        "harbor_old",
+        "harbor_new",
+        "harbor_other",
+        "aurora_vim",
+        "aurora_tabs"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "harbor_pii"
+      ],
+      "latency_ms": 7.40275,
+      "query_id": "q130",
+      "result_bytes": 2863,
+      "result_ids": [
+        "orchard_global",
+        "harbor_pii",
+        "aurora_tabs",
+        "willow_copy",
+        "harbor_old"
+      ],
+      "scenario": "harbor",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "lucent_click"
+      ],
+      "latency_ms": 7.409584,
+      "query_id": "q131",
+      "result_bytes": 2870,
+      "result_ids": [
+        "willow_date",
+        "lucent_click",
+        "willow_copy",
+        "willow_spanish",
+        "estuary_canary"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "lucent_draft"
+      ],
+      "latency_ms": 7.433542,
+      "query_id": "q132",
+      "result_bytes": 2923,
+      "result_ids": [
+        "lucent_draft",
+        "aurora_vim",
+        "kestrel_cursor",
+        "aurora_tabs",
+        "aurora_code"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "lucent_focus"
+      ],
+      "latency_ms": 7.379084,
+      "query_id": "q133",
+      "result_bytes": 3013,
+      "result_ids": [
+        "lucent_focus",
+        "prism_deleted",
+        "delta_focus",
+        "prism_sample",
+        "lucent_oldfile"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "lucent_click"
+      ],
+      "latency_ms": 7.425042,
+      "query_id": "q134",
+      "result_bytes": 3062,
+      "result_ids": [
+        "lucent_focus",
+        "lucent_oldfile",
+        "lucent_click",
+        "delta_focus",
+        "atlas_logout"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.3333333333333333,
+        "ndcg_at_5": 0.5,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "lucent_oldfile"
+      ],
+      "latency_ms": 7.431667,
+      "query_id": "q135",
+      "result_bytes": 2994,
+      "result_ids": [
+        "quartz_atomic",
+        "lucent_oldfile",
+        "quartz_error",
+        "quartz_recover",
+        "aurora_vim"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "renamed_source",
+      "expected_ids": [
+        "lucent_oldfile"
+      ],
+      "latency_ms": 7.4265,
+      "query_id": "q136",
+      "result_bytes": 2966,
+      "result_ids": [
+        "lucent_oldfile",
+        "lucent_click",
+        "juniper_task",
+        "cedar_zone",
+        "cedar_other"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "lucent_click",
+        "lucent_draft"
+      ],
+      "latency_ms": 7.467042,
+      "query_id": "q137",
+      "result_bytes": 3268,
+      "result_ids": [
+        "delta_focus",
+        "ember_quote",
+        "lucent_click",
+        "drift_hostile",
+        "quartz_transcript"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 3,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.3333333333333333,
+        "ndcg_at_5": 0.3065735963827292,
+        "protected_pass": null,
+        "recall_at_5": 0.5,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "lucent_draft"
+      ],
+      "latency_ms": 7.401042,
+      "query_id": "q138",
+      "result_bytes": 2997,
+      "result_ids": [
+        "lucent_draft",
+        "lucent_focus",
+        "lucent_oldfile",
+        "kestrel_cursor",
+        "lucent_click"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 1,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.462209,
+      "query_id": "q139",
+      "result_bytes": 3070,
+      "result_ids": [
+        "lucent_click",
+        "lucent_focus",
+        "cobalt_new",
+        "quartz_recover",
+        "ember_quote"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.506375,
+      "query_id": "q140",
+      "result_bytes": 2896,
+      "result_ids": [
+        "lucent_focus",
+        "lucent_click",
+        "aurora_tabs",
+        "meadow_access",
+        "drift_timeout"
+      ],
+      "scenario": "lucent",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "meadow_access"
+      ],
+      "latency_ms": 7.412208,
+      "query_id": "q141",
+      "result_bytes": 2874,
+      "result_ids": [
+        "meadow_access",
+        "delta_old",
+        "delta_label",
+        "delta_symbol",
+        "harbor_pii"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "meadow_train"
+      ],
+      "latency_ms": 7.791125,
+      "query_id": "q142",
+      "result_bytes": 2888,
+      "result_ids": [
+        "meadow_train",
+        "aurora_tabs",
+        "meadow_budget",
+        "prism_sample",
+        "meadow_access"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "meadow_budget"
+      ],
+      "latency_ms": 7.530083,
+      "query_id": "q143",
+      "result_bytes": 2929,
+      "result_ids": [
+        "meadow_other",
+        "meadow_access",
+        "cobalt_digest",
+        "cobalt_old",
+        "meadow_budget"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.2,
+        "ndcg_at_5": 0.38685280723454163,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "meadow_train",
+        "meadow_access"
+      ],
+      "latency_ms": 7.488125,
+      "query_id": "q144",
+      "result_bytes": 3018,
+      "result_ids": [
+        "orchard_links",
+        "meadow_train",
+        "kiln_overflow",
+        "kestrel_cursor",
+        "drift_hostile"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.38685280723454163,
+        "protected_pass": null,
+        "recall_at_5": 0.5,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "scope",
+      "expected_ids": [],
+      "latency_ms": 7.464667,
+      "query_id": "q145",
+      "result_bytes": 2861,
+      "result_ids": [
+        "meadow_other",
+        "meadow_budget",
+        "beacon_owner",
+        "orchard_links",
+        "prism_log"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "memory_kind",
+      "expected_ids": [
+        "meadow_task"
+      ],
+      "latency_ms": 7.537833,
+      "query_id": "q146",
+      "result_bytes": 2992,
+      "result_ids": [
+        "meadow_task",
+        "atlas_logout",
+        "lucent_draft",
+        "kestrel_gone",
+        "willow_copy"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "meadow_budget"
+      ],
+      "latency_ms": 7.392375,
+      "query_id": "q147",
+      "result_bytes": 2831,
+      "result_ids": [
+        "meadow_budget",
+        "aurora_tabs",
+        "meadow_access",
+        "atlas_cookie",
+        "prism_sample"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.43375,
+      "query_id": "q148",
+      "result_bytes": 2866,
+      "result_ids": [
+        "atlas_other",
+        "aurora_vim",
+        "aurora_tabs",
+        "cedar_other",
+        "prism_sample"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 5,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "meadow_budget"
+      ],
+      "latency_ms": 7.377917,
+      "query_id": "q149",
+      "result_bytes": 2864,
+      "result_ids": [
+        "meadow_budget",
+        "beacon_owner",
+        "meadow_other",
+        "orchard_links",
+        "prism_log"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.441292,
+      "query_id": "q150",
+      "result_bytes": 2949,
+      "result_ids": [
+        "meadow_train",
+        "meadow_budget",
+        "prism_sample",
+        "juniper_idea",
+        "quartz_recover"
+      ],
+      "scenario": "meadow",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "update",
+      "expected_ids": [
+        "kestrel_new"
+      ],
+      "latency_ms": 7.468583,
+      "query_id": "q151",
+      "result_bytes": 2927,
+      "result_ids": [
+        "kestrel_old",
+        "kestrel_new",
+        "kestrel_gone",
+        "drift_timeout",
+        "kiln_other"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": false,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "kestrel_new"
+      ],
+      "latency_ms": 7.441375,
+      "query_id": "q152",
+      "result_bytes": 2910,
+      "result_ids": [
+        "orchard_global",
+        "kestrel_old",
+        "kestrel_new",
+        "aurora_tabs",
+        "atlas_cookie"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.3333333333333333,
+        "ndcg_at_5": 0.5,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [
+        "kestrel_old"
+      ],
+      "latency_ms": 7.507708,
+      "query_id": "q153",
+      "result_bytes": 2898,
+      "result_ids": [
+        "kestrel_new",
+        "kestrel_old",
+        "juniper_done",
+        "cobalt_digest",
+        "atlas_logout"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "kestrel_cursor"
+      ],
+      "latency_ms": 7.53125,
+      "query_id": "q154",
+      "result_bytes": 2957,
+      "result_ids": [
+        "kestrel_cursor",
+        "willow_idea",
+        "orchard_build",
+        "juniper_idea",
+        "meridian_file"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "kestrel_cursor"
+      ],
+      "latency_ms": 7.5255,
+      "query_id": "q155",
+      "result_bytes": 2926,
+      "result_ids": [
+        "kestrel_cursor",
+        "meadow_budget",
+        "prism_sample",
+        "meadow_train",
+        "meadow_task"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "kestrel_gone"
+      ],
+      "latency_ms": 7.528375,
+      "query_id": "q156",
+      "result_bytes": 3139,
+      "result_ids": [
+        "kestrel_gone",
+        "atlas_logout",
+        "orchard_global",
+        "drift_hostile",
+        "quartz_transcript"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 2,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "deleted_source",
+      "expected_ids": [
+        "kestrel_gone"
+      ],
+      "latency_ms": 7.766833,
+      "query_id": "q157",
+      "result_bytes": 3072,
+      "result_ids": [
+        "kestrel_gone",
+        "cobalt_missing",
+        "cobalt_new",
+        "cobalt_old",
+        "kiln_other"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "kestrel_new",
+        "kestrel_cursor"
+      ],
+      "latency_ms": 7.611958,
+      "query_id": "q158",
+      "result_bytes": 2950,
+      "result_ids": [
+        "kestrel_cursor",
+        "orchard_links",
+        "atlas_pkce",
+        "drift_timeout",
+        "cobalt_old"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 0.6131471927654584,
+        "protected_pass": null,
+        "recall_at_5": 0.5,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "kestrel_new"
+      ],
+      "latency_ms": 7.561708,
+      "query_id": "q159",
+      "result_bytes": 2863,
+      "result_ids": [
+        "harbor_old",
+        "kiln_other",
+        "kestrel_old",
+        "harbor_new",
+        "kestrel_new"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.2,
+        "ndcg_at_5": 0.38685280723454163,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.595334,
+      "query_id": "q160",
+      "result_bytes": 2961,
+      "result_ids": [
+        "ember_review",
+        "kestrel_new",
+        "kestrel_gone",
+        "meadow_access",
+        "delta_label"
+      ],
+      "scenario": "kestrel",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "ember_allow"
+      ],
+      "latency_ms": 7.371,
+      "query_id": "q161",
+      "result_bytes": 2968,
+      "result_ids": [
+        "ember_allow",
+        "ember_review",
+        "ember_quote",
+        "cobalt_digest",
+        "harbor_pii"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "ember_allow"
+      ],
+      "latency_ms": 7.480167,
+      "query_id": "q162",
+      "result_bytes": 2911,
+      "result_ids": [
+        "ember_review",
+        "cobalt_digest",
+        "ember_allow",
+        "lucent_draft",
+        "aurora_beta"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.3333333333333333,
+        "ndcg_at_5": 0.5,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "ember_secret"
+      ],
+      "latency_ms": 7.463416,
+      "query_id": "q163",
+      "result_bytes": 2878,
+      "result_ids": [
+        "ember_review",
+        "meadow_access",
+        "juniper_task",
+        "cobalt_digest",
+        "atlas_logout"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.0,
+        "ndcg_at_5": 0.0,
+        "protected_pass": null,
+        "recall_at_5": 0.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "ember_review"
+      ],
+      "latency_ms": 7.502834,
+      "query_id": "q164",
+      "result_bytes": 2934,
+      "result_ids": [
+        "ember_review",
+        "juniper_task",
+        "juniper_rule",
+        "estuary_old",
+        "ember_allow"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "ember_allow",
+        "ember_secret"
+      ],
+      "latency_ms": 7.479542,
+      "query_id": "q165",
+      "result_bytes": 3218,
+      "result_ids": [
+        "ember_allow",
+        "ember_secret",
+        "ember_quote",
+        "drift_hostile",
+        "quartz_transcript"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 3,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "source_instruction",
+      "expected_ids": [],
+      "latency_ms": 7.44075,
+      "query_id": "q166",
+      "result_bytes": 3199,
+      "result_ids": [
+        "ember_quote",
+        "drift_hostile",
+        "ember_secret",
+        "quartz_transcript",
+        "meridian_token"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 3,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "source_instruction",
+      "expected_ids": [],
+      "latency_ms": 7.396416,
+      "query_id": "q167",
+      "result_bytes": 3036,
+      "result_ids": [
+        "ember_secret",
+        "juniper_rule",
+        "estuary_new",
+        "meridian_error",
+        "ember_quote"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "ember_review"
+      ],
+      "latency_ms": 7.39925,
+      "query_id": "q168",
+      "result_bytes": 2899,
+      "result_ids": [
+        "ember_review",
+        "estuary_canary",
+        "prism_sample",
+        "ember_allow",
+        "ember_secret"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "ember_review"
+      ],
+      "latency_ms": 7.389417,
+      "query_id": "q169",
+      "result_bytes": 2843,
+      "result_ids": [
+        "ember_review",
+        "beacon_old",
+        "aurora_tabs",
+        "aurora_code",
+        "beacon_new"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.385208,
+      "query_id": "q170",
+      "result_bytes": 3009,
+      "result_ids": [
+        "ember_allow",
+        "ember_secret",
+        "ember_review",
+        "ember_quote",
+        "willow_copy"
+      ],
+      "scenario": "ember",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 1,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "cedar_zone"
+      ],
+      "latency_ms": 7.396958,
+      "query_id": "q171",
+      "result_bytes": 2910,
+      "result_ids": [
+        "cedar_zone",
+        "drift_timeout",
+        "quartz_error",
+        "quartz_recover",
+        "aurora_vim"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "cedar_zone"
+      ],
+      "latency_ms": 7.353333,
+      "query_id": "q172",
+      "result_bytes": 2904,
+      "result_ids": [
+        "cedar_zone",
+        "prism_deleted",
+        "orchard_global",
+        "lucent_focus",
+        "meadow_task"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "cedar_window"
+      ],
+      "latency_ms": 7.385916,
+      "query_id": "q173",
+      "result_bytes": 2882,
+      "result_ids": [
+        "cedar_window",
+        "willow_copy",
+        "delta_label",
+        "juniper_task",
+        "cobalt_digest"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "cedar_zone",
+        "cedar_window"
+      ],
+      "latency_ms": 7.307625,
+      "query_id": "q174",
+      "result_bytes": 3164,
+      "result_ids": [
+        "cedar_window",
+        "cedar_zone",
+        "drift_hostile",
+        "quartz_transcript",
+        "ember_quote"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 3,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "scope",
+      "expected_ids": [],
+      "latency_ms": 7.382833,
+      "query_id": "q175",
+      "result_bytes": 2945,
+      "result_ids": [
+        "cedar_other",
+        "ember_secret",
+        "ember_quote",
+        "aurora_vim",
+        "aurora_code"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 5,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [
+        "cedar_freeze"
+      ],
+      "latency_ms": 7.484,
+      "query_id": "q176",
+      "result_bytes": 2929,
+      "result_ids": [
+        "cedar_freeze",
+        "juniper_done",
+        "cedar_window",
+        "meadow_train",
+        "quartz_error"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "temporal",
+      "expected_ids": [],
+      "latency_ms": 7.420041,
+      "query_id": "q177",
+      "result_bytes": 2865,
+      "result_ids": [
+        "cedar_freeze",
+        "cedar_window",
+        "atlas_pkce",
+        "cedar_zone",
+        "cedar_other"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": false,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "cedar_zone"
+      ],
+      "latency_ms": 7.448834,
+      "query_id": "q178",
+      "result_bytes": 2917,
+      "result_ids": [
+        "cedar_zone",
+        "cedar_other",
+        "cedar_window",
+        "lucent_oldfile",
+        "cedar_freeze"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "cedar_window"
+      ],
+      "latency_ms": 7.403083,
+      "query_id": "q179",
+      "result_bytes": 2835,
+      "result_ids": [
+        "cedar_window",
+        "harbor_old",
+        "willow_idea",
+        "atlas_other",
+        "aurora_vim"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.379291,
+      "query_id": "q180",
+      "result_bytes": 2910,
+      "result_ids": [
+        "orchard_global",
+        "cedar_zone",
+        "willow_date",
+        "cedar_freeze",
+        "aurora_vim"
+      ],
+      "scenario": "cedar",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "prism_stale"
+      ],
+      "latency_ms": 7.362375,
+      "query_id": "q181",
+      "result_bytes": 2870,
+      "result_ids": [
+        "prism_stale",
+        "willow_spanish",
+        "quartz_atomic",
+        "cedar_other",
+        "meridian_error"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "stale_mirror",
+      "expected_ids": [
+        "prism_stale"
+      ],
+      "latency_ms": 7.479,
+      "query_id": "q182",
+      "result_bytes": 2892,
+      "result_ids": [
+        "prism_errors",
+        "beacon_owner",
+        "meadow_other",
+        "aurora_vim",
+        "orchard_links"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.0,
+        "ndcg_at_5": 0.0,
+        "protected_pass": null,
+        "recall_at_5": 0.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "prism_sample"
+      ],
+      "latency_ms": 7.424709,
+      "query_id": "q183",
+      "result_bytes": 2883,
+      "result_ids": [
+        "prism_sample",
+        "prism_log",
+        "estuary_canary",
+        "willow_date",
+        "beacon_owner"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "prism_errors"
+      ],
+      "latency_ms": 7.390708,
+      "query_id": "q184",
+      "result_bytes": 2979,
+      "result_ids": [
+        "beacon_owner",
+        "prism_errors",
+        "prism_sample",
+        "orchard_global",
+        "ember_quote"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "prism_sample",
+        "prism_errors"
+      ],
+      "latency_ms": 7.630875,
+      "query_id": "q185",
+      "result_bytes": 3112,
+      "result_ids": [
+        "quartz_transcript",
+        "orchard_links",
+        "drift_hostile",
+        "prism_sample",
+        "ember_allow"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 2,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.25,
+        "ndcg_at_5": 0.2640681225725909,
+        "protected_pass": null,
+        "recall_at_5": 0.5,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "prism_log"
+      ],
+      "latency_ms": 7.566834,
+      "query_id": "q186",
+      "result_bytes": 2857,
+      "result_ids": [
+        "prism_sample",
+        "prism_deleted",
+        "lucent_focus",
+        "prism_log",
+        "prism_errors"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.25,
+        "ndcg_at_5": 0.43067655807339306,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 1,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "deleted_memory",
+      "expected_ids": [],
+      "latency_ms": 7.438375,
+      "query_id": "q187",
+      "result_bytes": 2886,
+      "result_ids": [
+        "prism_deleted",
+        "prism_log",
+        "prism_errors",
+        "lucent_focus",
+        "delta_focus"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "prism_stale"
+      ],
+      "latency_ms": 7.433292,
+      "query_id": "q188",
+      "result_bytes": 2819,
+      "result_ids": [
+        "beacon_owner",
+        "prism_stale",
+        "orchard_links",
+        "prism_log",
+        "prism_errors"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "stale_mirror",
+      "expected_ids": [
+        "prism_stale"
+      ],
+      "latency_ms": 7.470208,
+      "query_id": "q189",
+      "result_bytes": 2922,
+      "result_ids": [
+        "prism_stale",
+        "prism_sample",
+        "orchard_global",
+        "beacon_owner",
+        "orchard_links"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.4025,
+      "query_id": "q190",
+      "result_bytes": 2947,
+      "result_ids": [
+        "prism_stale",
+        "beacon_owner",
+        "meridian_error",
+        "quartz_recover",
+        "juniper_rule"
+      ],
+      "scenario": "prism",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 0,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "delta_motion"
+      ],
+      "latency_ms": 7.431125,
+      "query_id": "q191",
+      "result_bytes": 2881,
+      "result_ids": [
+        "delta_motion",
+        "beacon_new",
+        "beacon_old",
+        "beacon_audience",
+        "drift_backoff"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "delta_focus"
+      ],
+      "latency_ms": 7.48975,
+      "query_id": "q192",
+      "result_bytes": 2990,
+      "result_ids": [
+        "delta_symbol",
+        "delta_focus",
+        "lucent_focus",
+        "prism_deleted",
+        "delta_old"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "delta_label"
+      ],
+      "latency_ms": 7.485708,
+      "query_id": "q193",
+      "result_bytes": 2965,
+      "result_ids": [
+        "aurora_tabs",
+        "beacon_old",
+        "ember_quote",
+        "beacon_audience",
+        "aurora_vim"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 2,
+        "mrr_at_5": 0.0,
+        "ndcg_at_5": 0.0,
+        "protected_pass": null,
+        "recall_at_5": 0.0,
+        "returned_count": 5,
+        "scope_violations": 5,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_symbol",
+      "expected_ids": [
+        "delta_symbol"
+      ],
+      "latency_ms": 7.440041,
+      "query_id": "q194",
+      "result_bytes": 3024,
+      "result_ids": [
+        "delta_symbol",
+        "lucent_oldfile",
+        "meridian_file",
+        "aurora_vim",
+        "aurora_code"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "cross_session",
+      "expected_ids": [
+        "delta_focus",
+        "delta_motion"
+      ],
+      "latency_ms": 7.437083,
+      "query_id": "q195",
+      "result_bytes": 3105,
+      "result_ids": [
+        "delta_symbol",
+        "delta_focus",
+        "delta_motion",
+        "ember_quote",
+        "beacon_audience"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 1,
+        "lifecycle_violations": 0,
+        "mrr_at_5": 0.5,
+        "ndcg_at_5": 0.6934264036172708,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 3
+      }
+    },
+    {
+      "category": "deleted_memory",
+      "expected_ids": [],
+      "latency_ms": 7.396416,
+      "query_id": "q196",
+      "result_bytes": 2924,
+      "result_ids": [
+        "delta_old",
+        "harbor_pii",
+        "atlas_other",
+        "delta_motion",
+        "harbor_new"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": false,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 3,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_id",
+      "expected_ids": [
+        "delta_label"
+      ],
+      "latency_ms": 7.381875,
+      "query_id": "q197",
+      "result_bytes": 2851,
+      "result_ids": [
+        "delta_old",
+        "aurora_beta",
+        "willow_copy",
+        "delta_label",
+        "delta_symbol"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.25,
+        "ndcg_at_5": 0.43067655807339306,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    },
+    {
+      "category": "paraphrase",
+      "expected_ids": [
+        "delta_motion"
+      ],
+      "latency_ms": 7.43025,
+      "query_id": "q198",
+      "result_bytes": 2935,
+      "result_ids": [
+        "delta_old",
+        "meadow_access",
+        "delta_label",
+        "delta_symbol",
+        "meadow_budget"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 0.0,
+        "ndcg_at_5": 0.0,
+        "protected_pass": null,
+        "recall_at_5": 0.0,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "abstention",
+      "expected_ids": [],
+      "latency_ms": 7.733333,
+      "query_id": "q199",
+      "result_bytes": 2934,
+      "result_ids": [
+        "delta_old",
+        "delta_label",
+        "delta_symbol",
+        "meridian_yaml",
+        "harbor_pii"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": false,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": null,
+        "ndcg_at_5": null,
+        "protected_pass": null,
+        "recall_at_5": null,
+        "returned_count": 5,
+        "scope_violations": 2,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 5
+      }
+    },
+    {
+      "category": "exact_text",
+      "expected_ids": [
+        "delta_label"
+      ],
+      "latency_ms": 7.475834,
+      "query_id": "q200",
+      "result_bytes": 3006,
+      "result_ids": [
+        "delta_label",
+        "cobalt_missing",
+        "meadow_task",
+        "kestrel_gone",
+        "aurora_vim"
+      ],
+      "scenario": "delta-access",
+      "scores": {
+        "abstention_correct": null,
+        "current_fact_correct": null,
+        "duplicate_results": 0,
+        "instruction_bearing_results": 0,
+        "lifecycle_violations": 1,
+        "mrr_at_5": 1.0,
+        "ndcg_at_5": 1.0,
+        "protected_pass": null,
+        "recall_at_5": 1.0,
+        "returned_count": 5,
+        "scope_violations": 4,
+        "unknown_ids": 0,
+        "unsupported_injection": true,
+        "unsupported_results": 4
+      }
+    }
+  ],
+  "runtime_sha256": {
+    "napmem_retrieval_agent.py": "c300da14d8d659703be637d09e396db4854be32b1e45f8fc52443cfcd865e326",
+    "semantic_index.py": "6fbaa7d8b573b0f347d4f8f05e706d6fd896a4132dc00b2368a5bbd095c91ec0"
+  },
+  "split": "heldout",
+  "top_k": 5
+}

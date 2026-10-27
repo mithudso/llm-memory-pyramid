@@ -27,6 +27,11 @@
       "summary": "JSON configuration, schema, index or example data"
     },
     {
+      "path": "napmem_eval.py",
+      "signal": "high",
+      "summary": "Offline evidence-retrieval evaluation, independent of answer generation."
+    },
+    {
       "path": "napmem_mcp_failover.py",
       "signal": "high",
       "summary": "NapMem MCP failover proxy (stdio)"
@@ -70,6 +75,11 @@
       "path": "semantic_index.py",
       "signal": "high",
       "summary": "Semantic Embedding Index for the NapMem Pyramid"
+    },
+    {
+      "path": "test_napmem_eval.py",
+      "signal": "high",
+      "summary": "Deterministic, network-free evidence scorer and benchmark contract tests."
     },
     {
       "path": "test_napmem_extensions.py",
