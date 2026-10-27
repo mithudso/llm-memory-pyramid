@@ -1,8 +1,8 @@
 # Implementation plan: trusted NapMem memory
 
-Version: 1.0.0
+Version: 1.1.0
 Date: 2026-10-27
-Delta: initial implementation plan authorized by the user.
+Delta: all ten source stages implemented and verified; delivery receipt added.
 Baseline: 0790dc7f31faca1118f961f533199275b93fc73f.
 
 ## Scope and architecture
@@ -45,6 +45,16 @@ Each task has acceptance and verification criteria in Stele. Keep exactly one im
 - Final: all discovered unittest tests, Ruff, compile check, shell syntax and generated-map checks; quality comparison and high-risk fixture gates; independent code/acceptance review; CI, merge and clean synced main.
 
 ## Risks and continuation
+
+Implementation is complete. Local discovery passes 486 tests; static checks and
+independent adversarial fix verification pass. A fresh wheel without optional
+clients passes 61 console invocations and 15 MCP responses. Exact receipts are
+in docs/acceptance-offline-2026-10-27.md and docs/IMPLEMENTATION.md.
+
+Delivery is PR 18: https://github.com/mithudso/llm-memory-pyramid/pull/18
+Feature-head CI passed Python 3.11/3.12/3.14, lint and offline installation.
+The final documentation receipt must pass CI before squash merge and main sync.
+If resuming after the PR is merged, no product work remains; verify clean main.
 
 - Schema changes must not silently grant legacy records global authority. Preserve unknown values and require explicit scope/review for durable profiles.
 - Correction/forget state must survive re-extraction, duplicate promotion and cache regeneration. Report unreachable replicas and backup retention limits honestly.

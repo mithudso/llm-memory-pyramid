@@ -209,3 +209,231 @@ Temporary evidence is retained locally and may disappear when the operating syst
   }
 }
 ```
+
+---
+
+# Final installed acceptance — v1.1.0
+
+Delta: preserved the Stage 7 receipt above and added fresh installation and actual behavior evidence for the completed offline inspector, metrics, adapters, MCP and trusted-memory flow. The final acceptance below supersedes the earlier receipt’s later-stage exclusions.
+
+Final result: **complete for the requested offline acceptance scope**. The final wheel installed without runtime dependencies into another fresh virtual environment. All 61 actual console invocations and three Python identity/guard/snapshot-verification processes exited 0. All 64 processes loaded the guard, and no runtime network or subprocess attempt was recorded.
+
+## Final identity
+
+Observed at: 2026-10-27T13:13:14.649083+00:00
+Source checkout: /Users/mitch/dev/llm-memory-pyramid
+Source base revision: c3905b5891aac52131a2ccb25f457d6155427144 on feat/napmem-trusted-memory, plus the exact source hashes below.
+Frozen source tree: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/source
+Wheel: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/wheel/llm_memory_pyramid-0.2.0-py3-none-any.whl
+Wheel SHA-256: 2cdf30a87ace7f25d079fab439255810e5d2c02b58b2ce79d9fc048ee38fdd35
+Console executable: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/bin/napmem
+Console SHA-256: d231b34413188fda123372366ebe18e2b7fad63824aec0932ae2e2147f2f23b8
+Console interpreter: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/bin/python
+Working directory of actual commands: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/run
+Installed CLI: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/lib/python3.15/site-packages/napmem_cli.py
+Installed inspector: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/lib/python3.15/site-packages/napmem_inspector.py
+Installed metrics: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/lib/python3.15/site-packages/napmem_metrics.py
+Installed adapters: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/lib/python3.15/site-packages/napmem_adapters.py
+Installed MCP server: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/lib/python3.15/site-packages/napmem_mcp_server.py
+Installed fixture: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/share/napmem/evaluations/memory_quality_v1.json
+Configuration: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/config.toml
+Temporary stores: /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/stores
+Python: 3.15.1 (main, Oct 21 2026, 05:55:12) [Clang 21.0.0 (clang-2100.3.34.2)]
+
+CLI/distribution version is 0.2.0; MCP server version is 1.2.0. The wheel advertises no unconditional runtime dependencies. Both ollama_client and anthropic were absent. All 23 installed Python module hashes matched both their wheel members and the frozen source bytes. The fixture hash also matched. Build and fresh installation each exited 0; installation used --no-deps --no-index. Build isolation used only the declared setuptools backend dependency.
+
+The acceptance environment removed PYTHONPATH/PYTHONHOME and inherited NAPMEM_EMBED_BACKEND=hashed, NAPMEM_MODE=offline, PYTHONNOUSERSITE=1, the explicit temporary configuration and an unused temporary NAPMEM_DATA_DIR. Every operational console invocation specified its pyramid path. The new MCP command ran in the same installed process and honored an explicit CLI pyramid over a conflicting NAPMEM_PYRAMID environment value.
+
+## Final behavior
+
+| Surface | Actual result |
+| --- | --- |
+| Demo and scoped queries | Alpha returned Vim; Beta returned VS Code; unrelated scope abstained. |
+| Inspector overview/current/review/stale/timeline/handoff/profiles/conflicts | All eight installed views executed. Current/review/timeline/handoff showed the scoped assertion. Profiles stayed empty until explicit approval, then showed one cited profile. |
+| Conflict and stale fixtures | A portable source produced one conflict with two citations. At an explicit 2027-01-01 reference, the stale view returned both assertions using last_verified_at as its age basis. |
+| Inspector read-only behavior | Store-directory file contents, byte counts and mtimes were unchanged across the eight views. |
+| Source diff | The installed command returned the change from Vim to Helix within the requested 4096-byte JSON budget. |
+| Metrics and feedback | An opt-in query recorded one retrieval; feedback/status showed one opinion. Forget removed that record’s local feedback; status then showed zero opinions. Stored metrics contained no raw query, scope or record ID. |
+| Conversation adapter | Imported two user/assistant messages and retrieved the selected editor in the explicit conversation scope. |
+| Portable export/import | Exported two scoped records and imported them into a new caller-selected scope. Imported records remained source-authority and unreviewed. The old scope returned no imported result. |
+| Global scope and precedence | Explicit global import ignored a forged input scope; its global assertion appeared in the permitted project context. A subcommand scope overrode both a root CLI scope and an environment scope. |
+| Trusted source/update/correction loop | Scoped Markdown ingest retrieved Vim; source update retrieved Nano; a generation/token-bound operator correction retrieved Helix after replay. |
+| Forget and older-backup restore | Forget removed the correction family. Restoring the older backup and replaying the source did not restore Nano or Helix. The other project still returned Emacs. Forgotten literal text remained absent from the canonical store. |
+| Verified snapshot | A final snapshot returned Emacs through the installed offline CLI. Installed load_snapshot reported verified; snapshot file hashes and mtimes were unchanged. |
+| Doctor | No probe and no store-directory content or mtime change; a missing store was not initialized. |
+| Bundled evaluations | Both installed dev and held-out 100-query fixtures completed with zero scope/lifecycle/marked-instruction leakage. |
+
+Stale-view semantics were checked without changing the 30-day threshold. A freshly verified imported source correctly stayed fresh even when its observed_at value was old. The later explicit reference time made the last_verified_at age exceed the threshold. The initial harness assumption about observed_at was corrected; runtime code and thresholds were unchanged.
+
+Forgetting here means canonical-store and adjacent local state behavior. Original source files and the explicitly retained older backup remain operator-managed. This run does not claim deletion from external originals, backups, mirrors or replicas.
+
+## MCP wire acceptance
+
+The actual installed napmem mcp process negotiated protocol 2025-06-18, returned server version 1.2.0, answered ping, and listed four read-only tools with input/output schemas. Its initialized notification emitted no response. Explicit hybrid/lexical searches, provenance inspection, topic-track retrieval and memory statistics succeeded. Fifteen responses included twelve budgeted tool responses. Successful result payloads were exactly equal after parsing structuredContent and the text JSON copy. Store-directory contents and mtimes stayed unchanged.
+
+Byte measurements include the full UTF-8 JSON-RPC response and its newline. Token counts use the advertised ceil(bytes/4) estimate. Tiny budgets returned a complete bounded JSON-RPC error instead of partial JSON.
+
+| Request | Requested bytes | Requested tokens | Actual wire bytes | Estimated tokens | Result |
+| --- | --- | --- | --- | --- | --- |
+| 4 | 16384 | 4096 | 4987 | 1247 | complete result |
+| 5 | 16384 | 4096 | 4963 | 1241 | complete result |
+| 6 | 16384 | 4096 | 4255 | 1064 | complete result |
+| 7 | 16384 | 4096 | 3812 | 953 | complete result |
+| 8 | 16384 | 4096 | 1463 | 366 | complete result |
+| b128 | 128 | 32 | 105 | 27 | bounded protocol error |
+| b512 | 512 | 128 | 105 | 27 | bounded protocol error |
+| b1024 | 1024 | 256 | 106 | 27 | bounded protocol error |
+| b2048 | 2048 | 512 | 1436 | 359 | truncated whole groups |
+| b4096 | 4096 | 1024 | 1437 | 360 | truncated whole groups |
+| b8192 | 8192 | 2048 | 4992 | 1248 | complete result |
+| token | 65536 | 128 | 106 | 27 | bounded protocol error |
+
+## Installed evaluation results
+
+| Metric | Dev, 100 queries | Held-out, 100 queries |
+| --- | --- | --- |
+| Recall@5 | 0.879746835443038 | 0.86 |
+| MRR@5 | 0.8924050632911392 | 0.8733333333333333 |
+| Correct abstention | 0.7619047619047619 | 0.76 |
+| Current-fact correct rate | 0.9166666666666666 | 1 |
+| Protected-case pass rate | 1 | 1 |
+| Unsupported-result rate | 0.20202020202020202 | 0.21978021978021978 |
+| Scope violations | 0 | 0 |
+| Lifecycle violations | 0 | 0 |
+| Marked-instruction results | 0 | 0 |
+
+These are synthetic retrieval regression measurements. The held-out split has previously been inspected, so this is not a new blind evaluation. The dev current-fact rate remains 11/12; the held-out rate remains 11/11. No claim of perfect recall, calibrated confidence, production accuracy or real-model performance follows.
+
+## Final source bindings
+
+Every runtime module, package metadata input, fixture and license below remained unchanged during acceptance. The README changed concurrently from its historical frozen-copy hash to de88ef7b26b1745b9c7e8ca9ba3109cf406a34088efabca1c05a0d3aba6ab23f. It is absent from the wheel, and package metadata declares no README input. That documentation change does not alter the tested installed runtime. The raw source manifest retains the frozen README context; the raw receipt records the observed drift.
+
+| Build input | SHA-256 |
+| --- | --- |
+| /Users/mitch/dev/llm-memory-pyramid/pyproject.toml | 7ac646c32811b95647ecafd666bca3bf00fc940207b1352eaafb4b3b8292aafb |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_model.py | a3742acbd0d1b4c9d55a4a74bce09e389d79e2f9caba9496062c490aba85289f |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_search.py | 15f2d3b7db6b1c4e1029e61f770cda9b6252c23d6659b86d7d1aa1c07badd0e7 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_controls.py | 59d0e02bdc2f89b6a9bb9a8b635d1a94d8f39942287a0e4b032e443032c006d5 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_evidence.py | 85b09592a5091793fb2c768370274420e4789be128ff246b54963f413bcfe7cb |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_eval.py | abd7b0fc26f63175f8f72256668c4123bc8147257d38127b4da24af1a182b2e0 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_storage.py | 2816aa4d86d3f803cc582f478f5100c8159809ca548bf498459b955b68128e8b |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_jobs.py | a38f8d4e047b2b7e6cc5ce4e1af20c00e0b46587496489175dfb88f42d972fd7 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_sources.py | 8213bee307e78f66fc4e60f889969ea4c3039c4165d8ab9f9468cda5815e11a3 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_snapshots.py | 54d3fb3c62bf85997e3bca931acc9798e8601a35a9f2c829e07bf73a0db3c582 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_config.py | 65094f365ea63821460bddbba32fe6bff515aa20656420bc93082f36fa5f92f2 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_cli.py | fa34b4a9e7817e65cc7837bc85466ee636d0e2f185656b189bfaa28046944ba1 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_inspector.py | d28ef183768fb94b08251d8cebc8e9872388a5fca7d3180a341ce2cf234d2038 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_metrics.py | 8cb726b4682a0a4e734a7e493d6a08300862c9ddadd52fa4e43214134736223e |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_adapters.py | 4943094cafe9daaccff9f04db7dde0fef6c135895f1283e0b81e125b2b6db798 |
+| /Users/mitch/dev/llm-memory-pyramid/semantic_index.py | 8a4f7851fbcbcfe6b87d47a9f3163cae2331e378487a4c8859abd52f06be9b88 |
+| /Users/mitch/dev/llm-memory-pyramid/ollama_extractor.py | 768f963c9f586892a0bd2c7307841a9cf9aff845232643d31fdb937f430fb4e1 |
+| /Users/mitch/dev/llm-memory-pyramid/llm_extractor.py | 3e555f7caa80f2ee6bcd1cbf9461e45f2037f7b4962f56b9979cf1a8be28b8dd |
+| /Users/mitch/dev/llm-memory-pyramid/llm_extraction_prompts.py | 2361b192b404c731bc11689cd9b0e25be941f2410bff35c731cb0cb86db0ab88 |
+| /Users/mitch/dev/llm-memory-pyramid/memory_pyramid_distiller.py | c61a7db717f9a3d500e8c61480c6d8e421aeee1121448a9a64bb29f27ce40048 |
+| /Users/mitch/dev/llm-memory-pyramid/naptime_consolidator.py | 21dd15f6244d387b0864408661547c1b40c8871df7a16e1ea7e3f22fc380f598 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_retrieval_agent.py | 120fa81b137ad568e49906bf63c427c3d7c410ca19d5fe76c8eb02610d16bc99 |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_mcp_server.py | 11f9ba05adc11370c77bfbdcd632807d75970b86d4364bc7f52370c5e225043f |
+| /Users/mitch/dev/llm-memory-pyramid/napmem_mcp_failover.py | 449371665a3db46b62a7a0cc27697967c4544ae8d4f2a5138ef14037f63a1c26 |
+| /Users/mitch/dev/llm-memory-pyramid/evaluations/memory_quality_v1.json | 7c6c09508902842e61c204bde5257d780b01bf7af1e18d050c13b47b27c76b8e |
+| /Users/mitch/dev/llm-memory-pyramid/LICENSE | c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4 |
+
+## Final limits
+
+This run covers the requested local offline behavior on macOS with Python 3.15.1. It does not establish Windows/Linux behavior, other Python versions, production deployment, online extraction, real embeddings, remote failover, editor-hook installation or external-replica deletion. Fresh-installed Git ingestion was intentionally omitted so the subprocess guard could remain strict. Git fixture tests belong to the parent workflow and were not independently rerun by this verifier.
+
+The Python guard positively blocked a socket attempt and a process-launch attempt, then recorded zero runtime attempts. It is Python-level instrumentation, not OS network isolation or packet capture. No production/default store, service, SSH connection, inference, real embedding, indexing, deployment or publication was used. Full repository tests, documentation generation, task/prompt/memory updates and Git delivery remain the parent workflow’s responsibility.
+
+## Final evidence artifacts
+
+The following are local temporary evidence, not example installation locations. The operating system may eventually remove them.
+
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/receipt.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/commands.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/checks.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/identity.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/source-manifest.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/mcp-wire.jsonl
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/mcp-budgets.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/guard-processes.jsonl
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/guard-attempts.jsonl
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/eval-dev.json
+- /private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/eval-heldout.json
+
+## Final machine-readable receipt
+
+```json
+{
+  "agent": "live-acceptance-verifier",
+  "definition_version": "1.0.0",
+  "status": "complete",
+  "evidence": [
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/commands.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "All 61 actual console invocations and three Python verification/probe processes exited 0."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/identity.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "Installed CLI 0.2.0 and MCP 1.2.0 loaded frozen wheel modules; optional clients were absent."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/mcp-budgets.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "All twelve measured tool responses fit complete UTF-8 wire and estimated-token budgets; successful text/structured payloads matched."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/checks.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "Inspector, metrics feedback purge, scoped adapters, source/correction replay, forget/older-backup restore and verified snapshots passed."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/guard-attempts.jsonl",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "Only two labeled positive probes attempted guarded operations; runtime attempts were zero."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/eval-dev.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "Installed bundled dev fixture completed 100 synthetic queries."
+    },
+    {
+      "source": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/eval-heldout.json",
+      "observed_at": "2026-10-27T13:13:14.649083+00:00",
+      "supported_claim": "Installed bundled held-out fixture completed 100 synthetic queries."
+    }
+  ],
+  "changes": [
+    "/Users/mitch/dev/llm-memory-pyramid/docs/acceptance-offline-2026-10-27.md"
+  ],
+  "remaining": [],
+  "details": {
+    "surface": "Fresh wheel installed outside checkout: CLI, inspector, metrics, adapters and MCP stdio",
+    "acceptance_condition": "Requested local offline final installed flow passes with hashed embeddings, no optional clients and no runtime network/subprocess attempt.",
+    "source_revision": "c3905b5891aac52131a2ccb25f457d6155427144 plus exact source hashes recorded above; concurrent nonpackaged README change disclosed",
+    "loaded_revision": "2cdf30a87ace7f25d079fab439255810e5d2c02b58b2ce79d9fc048ee38fdd35",
+    "process_or_origin": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/venv/bin/napmem",
+    "configuration_identity": "/private/var/folders/hz/s7btlxx54c32yt375m03q0h40000gn/T/napmem-all-stages-acceptance-leeu455d/config.toml; NAPMEM_EMBED_BACKEND=hashed; NAPMEM_MODE=offline; explicit temporary pyramid paths",
+    "observations": {
+      "console_commands": 61,
+      "guarded_processes": 64,
+      "runtime_guard_attempts": 0,
+      "installed_module_hash_matches": 23,
+      "mcp_responses": 15,
+      "budgeted_tool_responses": 12,
+      "metrics_feedback_before_after": [
+        1,
+        0
+      ],
+      "forgotten_after_old_backup_restore": true,
+      "dev_queries": 100,
+      "heldout_queries": 100
+    },
+    "mismatches": [],
+    "unverified_checks": [
+      "Fresh-installed Git CLI omitted under strict subprocess guard.",
+      "Other platforms/Python versions, online integrations, production services and external replicas are outside this run."
+    ]
+  }
+}
+```

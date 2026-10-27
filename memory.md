@@ -2,11 +2,37 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v2.1.0 — 2026-10-27
+
+**Delta:** v2.0.0 → v2.1.0; all ten roadmap stages implemented and accepted.
+
+**Delivery:** https://github.com/mithudso/llm-memory-pyramid/pull/18
+Feature head f0e316b passed all five CI jobs: Python 3.11/3.12/3.14,
+Ruff and a fresh offline install. Local discovery passes 486 tests. Independent
+adversarial review reports no remaining medium-or-higher findings within its
+reviewed scope; 130 focused tests reproduce the fixes. Final installed-wheel
+acceptance passes 61 actual CLI invocations and 15 MCP responses, with 23 module
+hashes matched and zero runtime network/subprocess attempts under guards.
+Full receipts: docs/IMPLEMENTATION.md and
+docs/acceptance-offline-2026-10-27.md (v1.1.0; stage-7 receipt preserved).
+
+**Remaining steps:** no product implementation remains. If PR 18 is not yet
+merged, push this documentation receipt, wait for CI, squash merge, delete the
+feature branch and synchronize main. If it is merged, verify clean synced main;
+the PR and Stele EPIC-235 hold the final delivery state. Do not run production
+migrations, inference, indexing, hooks or scheduler setup while resuming.
+
+Package 0.2.0, store 2.0.0, MCP server 1.2.0. Fixed-corpus Recall@5 .86,
+MRR .8733 and abstention .76 are regression measurements, not production or
+new blind accuracy. Production stores/services were not migrated or restarted.
+The stage-3 synthetic embedding call remains disclosed below and in the receipt.
+
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
 TASK-236–TASK-245 track the ten stages. All ten feature stages are implemented;
-TASK-245 awaits final fresh-install/CI/delivery receipts before completion.
+TASK-245 awaits final CI/delivery receipts before completion; final installed
+acceptance passed and is preserved in the v2.1.0 entry above.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions

@@ -21,8 +21,11 @@ The final local discovery passes 486 tests. Ruff, compilation, shell syntax and
 independent adversarial fix verification pass. The independent reviewer
 reproduced privacy and protocol failures; fixes now have regression tests.
 Fresh-install evidence and exact wheel/module hashes live in
-[the acceptance receipt](acceptance-offline-2026-10-27.md). CI/merge receipts
-are recorded in the work log after delivery.
+[the acceptance receipt](acceptance-offline-2026-10-27.md): 61 actual CLI
+invocations, 15 MCP responses, 23 installed module hashes matched and no runtime
+network/process attempts under guards. Feature-head CI passes all five jobs,
+including Python 3.11/3.12/3.14 and fresh offline installation. Delivery is PR 18;
+its live status and the work log preserve the merge/sync continuation contract.
 
 ## Measured quality and limits
 
