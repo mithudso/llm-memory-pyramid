@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–6 passed; next is TASK-242,
-portable CLI, configuration and offline packaging.
+TASK-236–TASK-245 track the ten stages. Stages 1–7 passed; next is TASK-243,
+the memory inspector, followed by observability and client adapters.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -16,6 +16,16 @@ will change with the corresponding implemented features.
 clean main 0790dc7 with no open owned PRs; created the tracked stages and
 tasks/plan.md; captured implementation constraints in KNOW-246. Started an
 offline benchmark author and independent read-only compatibility review.
+- Stage 7 implementation: portable `napmem` command and TOML/env/CLI precedence;
+  offline defaults, read-only doctor, explicit online integrations and source
+  boundaries. Private shared client moved to optional `ollama` extra without
+  copying its transport. Packaged synthetic evaluation fixture. CLI/config 22
+  focused tests and complete 375-test suite passed. Independent fresh wheel
+  acceptance passed outside the checkout without either optional client: 20
+  console invocations plus identity/guard checks, zero runtime network attempts.
+  The demo revealed a preference word-form mismatch; generic normalization and
+  regression tests fix it without relaxing short-query qualifier coverage.
+  A final wheel will be checked again after stages 8–10 add their modules.
 - Stage 6: whole-operation single-host locks, atomic generation/fingerprint
   commits, stale-save rejection and long-lived reader refresh implemented.
   Stable source registry handles rename, missing files and same-mtime edits.
@@ -26,6 +36,13 @@ offline benchmark author and independent read-only compatibility review.
   implemented. Stale cache writers cannot recreate deleted vectors. Full suite
   341 passed, then 15 focused transaction/privacy tests passed (four added).
   No production stores, services, indexing or snapshot transfers were changed.
+- Independent review follow-up: an older backup plus a later session scope
+  could revive forgotten text; restore now retains historical scopes and also
+  suppresses older matching copies under current tombstones. Retry validation
+  and payload update now share one SQLite transaction, so PrivacyPurge wins.
+  Rename identity survives edits on the same inode. A verified reader refuses
+  to downgrade when its manifest disappears. All 47 focused persistence tests
+  pass, including deterministic purge/retry interleaving.
 - Stage 1: 200 synthetic queries, 83 records and 20 scenario families with
   fixed 100/100 dev/held-out split. Original substring and hashed-TF reports
   captured before runtime changes. Held-out Recall@5: 0.3067 / 0.9200;

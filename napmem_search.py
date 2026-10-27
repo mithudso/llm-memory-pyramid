@@ -35,6 +35,7 @@ _STOP = frozenset("""a an the and or but if then than of for from to into in on 
 """.split())
 # Small general-language normalizations, independent of fixture/project names.
 _SYNONYMS = (
+    ("prefer", "preference", "preferred", "favorite", "favourite"),
     ("save", "store", "persist", "preserve"),
     ("folder", "directory"), ("delete", "remove", "erase"),
     ("config", "configuration", "setting"), ("picture", "image", "photo"),

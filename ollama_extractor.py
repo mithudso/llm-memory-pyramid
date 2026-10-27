@@ -28,7 +28,15 @@ import logging
 import os
 import re
 
-from ollama_client import OllamaClient, OllamaPool, OllamaUnavailable
+try:
+    from ollama_client import OllamaClient, OllamaPool, OllamaUnavailable
+except ImportError:
+    # The offline runtime has no dependency on the optional shared transport.
+    OllamaClient = OllamaPool = None
+
+    class OllamaUnavailable(RuntimeError):
+        """Unavailable optional transport; no network fallback is implemented here."""
+
 from llm_extraction_prompts import PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
@@ -41,6 +49,10 @@ DEFAULT_CHAT_HOSTS = "http://localhost:11434=qwen3.5:35b"
 GEN_OPTIONS = {"temperature": 0, "num_ctx": 16384, "num_predict": 8192}
 PER_FILE_TIMEOUT_S = 300
 PROBE_TIMEOUT_S = 3
+OLLAMA_INSTALL_MESSAGE = (
+    "Ollama extraction requires the optional shared ollama-client package. "
+    "Install it with: python -m pip install 'llm-memory-pyramid[ollama]'"
+)
 
 
 class OllamaExtractionError(Exception):
@@ -68,11 +80,15 @@ def parse_chat_hosts(raw: str | None = None) -> list[tuple[str, str]]:
 
 def _client_for(url: str) -> OllamaClient:
     """Single-host client: no failover or retry here, the host chain is the failover."""
+    if OllamaClient is None or OllamaPool is None:
+        raise OllamaExtractionError(OLLAMA_INSTALL_MESSAGE)
     return OllamaClient(OllamaPool([url], retries=0))
 
 
 def ollama_available(hosts: list[tuple[str, str]] | None = None) -> bool:
     """True when at least one configured host answers and lists its model."""
+    if OllamaClient is None or OllamaPool is None:
+        return False
     for url, model in hosts or parse_chat_hosts():
         try:
             names = _client_for(url).list_models(url, timeout=PROBE_TIMEOUT_S)

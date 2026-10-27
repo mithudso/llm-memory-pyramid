@@ -5,14 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-memory-pyramid"
 version = "0.2.0"
-description = "NapMem layered agent-memory pyramid; Ollama embeddings and extraction via the shared ollama-client library."
+description = "NapMem layered agent-memory pyramid with offline retrieval and optional shared Ollama integration."
 requires-python = ">=3.11"
-dependencies = [
-    "ollama-client @ git+https://github.com/mithudso/ollama-client@740aca7cbc5aab4941779f35f1ca17b59fe73c7f",
-]
+dependencies = []
 
 [project.optional-dependencies]
 llm = ["anthropic"]
+ollama = [
+    "ollama-client @ git+https://github.com/mithudso/ollama-client@740aca7cbc5aab4941779f35f1ca17b59fe73c7f",
+]
+
+[project.scripts]
+napmem = "napmem_cli:main"
 
 [tool.ruff]
 target-version = "py311"
@@ -28,6 +32,12 @@ py-modules = [
     "napmem_controls",
     "napmem_evidence",
     "napmem_eval",
+    "napmem_storage",
+    "napmem_jobs",
+    "napmem_sources",
+    "napmem_snapshots",
+    "napmem_config",
+    "napmem_cli",
     "semantic_index",
     "ollama_extractor",
     "llm_extractor",
@@ -38,3 +48,6 @@ py-modules = [
     "napmem_mcp_server",
     "napmem_mcp_failover",
 ]
+
+[tool.setuptools.data-files]
+"share/napmem/evaluations" = ["evaluations/memory_quality_v1.json"]

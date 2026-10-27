@@ -3,11 +3,15 @@
 ## Setup and running
 
 Install the package in a project virtual environment as described in
-[Installation](INSTALLATION.md). The sanctioned shared `ollama-client`
-dependency is required to import the extension suite. Anthropic is mocked.
+[Installation](INSTALLATION.md). The full compatibility suite exercises the
+sanctioned shared `ollama-client` integration and requires the `ollama` extra.
+Anthropic is mocked. Fresh offline acceptance runs without either optional
+client; `test_napmem_optional_client.py` also blocks private-client imports.
 
 ```bash
 source .venv/bin/activate
+# Full integration-contract suite only (requires private client access):
+python -m pip install -e '.[ollama]'
 NAPMEM_EMBED_BACKEND=hashed python3 -m unittest discover -s . -p "test_*.py"
 python3 -m compileall -q .
 ruff check .
@@ -53,6 +57,10 @@ checks and shell syntax on Python 3.11, 3.12 and 3.14. A separate Ruff job
 checks configured syntax/correctness rules. Both jobs must pass. CI reads the
 shared library with the repository's `OLLAMA_CLIENT_DEPLOY_KEY` secret, at the same
 Git revision pinned in `pyproject.toml`.
+
+The separate offline-install job installs the core wheel without extras and
+runs real console commands outside the checkout. No private deploy key is
+available to that job. Local acceptance receipts record its equivalent checks.
 
 Local tests prove source behavior. They do not prove production deployment,
 scheduler health, remote authentication, live Ollama quality or hook loading.

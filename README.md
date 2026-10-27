@@ -21,38 +21,25 @@ records with stable record IDs, then rebuilds Layers 2–3 from the survivors.
 ## Quick start
 
 ```bash
-# Distill one memory file into the pyramid store
-python3 memory_pyramid_distiller.py --input sample_agent_memory.md
-
-# Watch a directory and consolidate in the background ("naptime")
-python3 naptime_consolidator.py --watch-dir ./memory_logs --once
-
-# Query the pyramid
-python3 napmem_retrieval_agent.py --query "architecture" --layer all
-python3 napmem_retrieval_agent.py --query "editor prefs" --semantic --top-k 5
-python3 napmem_retrieval_agent.py --provenance rec_sess_sample_agent_memory_001
-python3 napmem_retrieval_agent.py --stats
-
-# Production extraction via the Anthropic Batches API (needs `pip install anthropic`)
-python3 llm_extractor.py --input memory_logs/notes.md --semantic-dedup
-
-# Run the test suite
-python3 -m unittest discover -s . -p "test_*.py"
-```
-
-The package requires Python 3.11+ and the shared `ollama-client` library.
-Install into a virtual environment before running the full suite:
-
-```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
-source .venv/bin/activate
+.venv/bin/napmem --pyramid /tmp/napmem-demo/store.json demo
+.venv/bin/napmem --pyramid /tmp/napmem-demo/store.json query "preferred editor" --scope project:napmem-demo-alpha
+.venv/bin/napmem --pyramid /tmp/napmem-demo/store.json doctor
+NAPMEM_EMBED_BACKEND=hashed .venv/bin/python -m unittest discover -s . -p "test_*.py"
 ```
 
-Git access to `mithudso/ollama-client` is required. The heuristic distiller
-and substring retrieval use only the standard library. Install `.[llm]` to
-use Anthropic extraction. Ollama extraction and real embeddings need a
-configured Ollama server; the hashed-TF embedding backend runs offline.
+Python 3.11+ is required. The default installation has no runtime dependencies
+and runs offline. Install `.[llm]` for Anthropic or `.[ollama]` for the pinned
+shared Ollama client (the latter requires private repository access). Online
+extraction and embeddings require explicit configuration. The shared transport
+remains in that optional client. See [the CLI guide](docs/CLI.md).
+
+Named project scopes, historical queries, persistent corrections, explicit
+forgetting and source exclusions govern recall. Profiles require reviewed
+persistent claims with supporting evidence. The local inspector explains each
+claim's scope, source and review state. Snapshot restores preserve newer privacy
+controls; deletion receipts disclose replica and backup limits.
 
 ## MCP server
 

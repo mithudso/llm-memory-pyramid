@@ -64,3 +64,9 @@ class RetrievalContractTests(unittest.TestCase):
         result = self.agent.query("editor Sublime", scope="project:a")
         self.assertTrue(result["abstention"])
         self.assertEqual(result["matches"], [])
+
+    def test_preference_word_forms_match_without_relaxing_short_query_coverage(self):
+        for query in ("preferred editor", "favorite editor", "editor preference"):
+            with self.subTest(query=query):
+                result = self.agent.query(query, scope="project:a")
+                self.assertEqual([r["text"] for r in result["matches"]], ["Editor preference is Vim."])

@@ -19,6 +19,7 @@ import math
 import os
 from pathlib import Path
 import statistics
+import sys
 import tempfile
 import time
 from typing import Any
@@ -28,6 +29,8 @@ from napmem_retrieval_agent import NapMemRetrievalAgent
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_FIXTURE = ROOT / "evaluations" / "memory_quality_v1.json"
+if not DEFAULT_FIXTURE.is_file():
+    DEFAULT_FIXTURE = Path(sys.prefix) / "share" / "napmem" / "evaluations" / "memory_quality_v1.json"
 REPORT_VERSION = "1.0.0"
 MODES = ("substring", "hashed", "hybrid")
 SPLITS = ("dev", "heldout", "all")

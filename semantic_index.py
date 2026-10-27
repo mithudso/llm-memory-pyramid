@@ -23,6 +23,8 @@ Usage:
     python3 semantic_index.py --query "storage engine preferences" --top-k 5
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -32,7 +34,15 @@ import os
 import re
 from typing import Any
 
-from ollama_client import OllamaClient, OllamaPool, cosine, parse_urls, urls_from_env
+try:
+    from ollama_client import (
+        OllamaClient, OllamaPool, cosine as _shared_cosine, parse_urls, urls_from_env,
+    )
+except ImportError:
+    # Offline retrieval uses only stdlib math. Ollama transport and URL parsing
+    # remain owned by the optional shared client, with no local replacement.
+    OllamaClient = OllamaPool = _shared_cosine = parse_urls = urls_from_env = None
+
 from napmem_storage import StoreConflict, atomic_write, file_fingerprint, store_lock
 
 logger = logging.getLogger(__name__)
@@ -45,12 +55,38 @@ logger = logging.getLogger(__name__)
 # applies (OLLAMA_URLS, then OLLAMA_HOST, then http://127.0.0.1:11434). Put the
 # fleet in the environment, e.g. deploy/napmem-consolidator.service.
 
+OLLAMA_INSTALL_MESSAGE = (
+    "Ollama embeddings require the optional shared ollama-client package. "
+    "Install it with: python -m pip install 'llm-memory-pyramid[ollama]'"
+)
+
+
+def _require_ollama_client():
+    if OllamaClient is None or OllamaPool is None:
+        raise RuntimeError(OLLAMA_INSTALL_MESSAGE)
+
+
+def cosine(left: list[float], right: list[float]) -> float:
+    """Use shared cosine when installed, otherwise stdlib vector arithmetic."""
+    if _shared_cosine is not None:
+        return _shared_cosine(left, right)
+    if len(left) != len(right):
+        raise ValueError("Vectors must have matching dimensions")
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if not left_norm or not right_norm:
+        return 0.0
+    return sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
+
 
 def _parse_weighted_urls(raw: str) -> list[tuple[str, int]]:
+    _require_ollama_client()
     return parse_urls(raw)
 
 
 def _configured_hosts() -> list[tuple[str, int]]:
+    if OllamaClient is None or OllamaPool is None:
+        return []
     raw = os.environ.get("NAPMEM_OLLAMA_URL") or os.environ.get("NAPMEM_OLLAMA_URLS", "")
     return _parse_weighted_urls(raw) or urls_from_env()
 
@@ -131,6 +167,7 @@ class OllamaBackend:
 
     def __init__(self, base_url: str | None = None, model: str = OLLAMA_MODEL,
                  hosts: list[tuple[str, int]] | None = None):
+        _require_ollama_client()
         if hosts is None:
             hosts = [(base_url.rstrip("/"), 1)] if base_url else []
         self.hosts: list[tuple[str, int]] = [(u.rstrip("/"), w) for u, w in hosts]
@@ -156,6 +193,8 @@ class OllamaBackend:
 
     @staticmethod
     def _host_alive(url: str) -> bool:
+        if OllamaClient is None or OllamaPool is None:
+            return False
         client = OllamaClient(OllamaPool([url], retries=0), embed_model=OLLAMA_MODEL)
         return client.available(url, timeout=PROBE_TIMEOUT_S)
 
@@ -163,6 +202,8 @@ class OllamaBackend:
     def probe(cls, urls: list[str] | None = None) -> "OllamaBackend | None":
         """Probes every configured host; returns a pool of the live ones
         (weighted per NAPMEM_OLLAMA_URLS), or None when none respond."""
+        if OllamaClient is None or OllamaPool is None:
+            return None
         configured = ([(u, 1) for u in urls] if urls is not None else OLLAMA_HOSTS)
         if not configured:
             return None
@@ -198,6 +239,7 @@ def select_backend():
     if forced == "hashed":
         return HashedTfBackend()
     if forced == "ollama":
+        _require_ollama_client()
         backend = OllamaBackend.probe()
         if backend is None:
             raise RuntimeError(

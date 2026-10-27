@@ -6,6 +6,27 @@ on:
   pull_request:
 
 jobs:
+  offline-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Install core without optional clients
+        run: pip install .
+      - name: Exercise installed offline entrypoint outside checkout
+        env:
+          NAPMEM_EMBED_BACKEND: hashed
+          NAPMEM_MODE: offline
+        working-directory: /tmp
+        run: |
+          python -c "import importlib.util; assert importlib.util.find_spec('ollama_client') is None; assert importlib.util.find_spec('anthropic') is None"
+          napmem --version
+          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" demo
+          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" query "preferred editor" --scope project:napmem-demo-alpha
+          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" doctor
+          napmem eval --split heldout --eval-mode hybrid
   test:
     runs-on: ubuntu-latest
     strategy:
