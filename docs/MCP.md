@@ -1,86 +1,78 @@
-# MCP
+# MCP and client contracts
 
-## NapMem MCP server
+Server version: 1.2.0. Protocol: 2025-06-18. Transport: UTF-8 newline-delimited
+JSON-RPC over stdio, implemented with the standard library.
 
-`napmem_mcp_server.py` exposes the pyramid to any MCP client over the stdio
-transport (newline-delimited JSON-RPC 2.0, protocol `2025-06-18`). Pure
-stdlib transport with no MCP SDK dependency. For direct local development:
-
-```json
-{"mcpServers": {"napmem": {"command": "python3", "args": ["napmem_mcp_server.py"]}}}
-```
-
-Point it at a different store with `--pyramid <path>` or `NAPMEM_PYRAMID`.
-The store is re-read on every tool call, so a concurrently running naptime
-consolidator's updates are always visible.
-
-## Failover proxy (`napmem_mcp_failover.py`)
-
-`.mcp.json` registers the proxy, not the server directly:
-
-```json
-{"mcpServers": {"napmem": {"command": "python3", "args": ["napmem_mcp_failover.py"]}}}
-```
-
-| Situation | Behavior |
-|---|---|
-| Remote reachable at startup | Relays to the canonical server over SSH; refreshes `~/.napmem/mirror/` in the background when older than `NAPMEM_MIRROR_MAX_AGE` (3600 s) |
-| Remote unreachable at startup | Serves local `napmem_mcp_server.py --pyramid ~/.napmem/mirror/napmem_pyramid.json` |
-| SSH dies mid-session | Spawns the local server, replays `initialize` + `notifications/initialized` (response swallowed), resends in-flight requests |
-| Remote alive but a request unanswered for `NAPMEM_REMOTE_REQUEST_TIMEOUT` (60 s) | Kills the SSH backend and fails over as above |
-| Local server dies | Restarts up to 2 times, then answers requests with JSON-RPC `-32603` errors instead of hanging |
-
-While on the mirror, each `tools/call` result gets an extra text item:
-`[napmem fallback] Remote napmem server is unreachable; this answer came from the local mirror (snapshot is N min old).`
-
-Config: `NAPMEM_REMOTE_HOST` (else first line of `~/.napmem/remote_host`;
-neither means local only), `NAPMEM_REMOTE_PYRAMID`, `NAPMEM_REMOTE_REPO`,
-`NAPMEM_MIRROR_DIR`, `NAPMEM_MIRROR_MAX_AGE`, `NAPMEM_SSH_TIMEOUT` (5 s),
-`NAPMEM_FALLBACK_OLLAMA` (`http://127.0.0.1:11434`; keep it on the same
-embedding model as the remote so the mirrored `.embindex.json` stays valid).
-
-```bash
-python3 napmem_mcp_failover.py --status       # host, reachability, mirror age
-python3 napmem_mcp_failover.py --sync-mirror  # refresh the mirror now
-```
-
-Mirror writes use a private temporary file per refresh plus `os.replace`;
-the configured remote basename maps to fixed local mirror filenames. A pyramid that fails to parse
-as a JSON object never replaces the previous snapshot.
+Use `napmem --pyramid /absolute/store.json mcp` for the configured portable
+entrypoint. Legacy modules and the proxy remain available with explicit stores.
+This release does not modify installed client configurations or services.
 
 ## Tools
 
-| Tool | Arguments | Returns |
+Four read-only tools accept scope, as_of, max_bytes and max_tokens:
+
+| Tool | Selection | Result |
 |---|---|---|
-| `search_memory` | `query` (req), `layer`, `semantic`, `top_k` | Substring matches across profiles/tracks/records, or embedding cosine top-k when `semantic: true` |
-| `inspect_provenance` | `record_id` (req) | Record + source anchor + raw session metadata; duplicate ids resolve via their canonical |
-| `get_topic_track` | `topic_slug` (req) | Full Layer 2 track with associated records |
-| `memory_stats` | — | Token compression / context-budget savings stats |
+| search_memory | Required query; explicit mode hybrid/lexical/semantic, top_k | Shared CLI query contract, matches list |
+| search_memory legacy | Default layer all, or semantic=true | Compatible nested substring matches or semantic list |
+| inspect_provenance | Required record_id | Scoped occurrence evidence/source metadata; no implicit source reread |
+| get_topic_track | Required topic_slug, top_k | Scoped eligible records, bounded as complete entries |
+| memory_stats | Scope/time | Metadata-only counts; no raw source reads |
 
-Tool exceptions (bad layer, missing store, invalid semantic result count)
-return in-band `isError: true`. A missing record/topic lookup returns a data
-object containing an `error` field. Semantic `top_k` must be a positive integer.
+Explicit mode cannot combine with legacy layer/semantic selection. Top-k is
+1–100. Queries have at most 2,048 characters; IDs/topic slugs at most 512.
+Times must be timezone-aware. Unknown fields, invalid Unicode, booleans used as
+integers and invalid scopes are rejected before store loading.
 
-Requests require `jsonrpc: "2.0"`, a string/integer non-null ID and object
-params when provided. Notifications produce no response and do not execute
-request-only tools. Decoder failures, invalid UTF-8 and oversized lines return
-bounded parse errors; later valid requests remain serviceable. These rules
-follow the supported MCP protocol:
-https://modelcontextprotocol.io/specification/2025-06-18/basic/index
+Input/output schemas are published through tools/list. Tool results return
+structuredContent and equivalent JSON in content[0].text. Errors contain no
+private exception bodies. Invalid tool arguments/unknown tools remain in-band
+isError results; malformed RPC params return -32602. Notifications execute no
+tools and receive no reply.
 
-The server reads the pyramid but semantic retrieval can write its disposable
-embedding cache and contact configured Ollama hosts. Use the installed project
-virtual environment for semantic paths. No live MCP installation or production
-connection is asserted by the offline subprocess tests.
+## Complete response budgets
 
-## Manual smoke test
+Tool max_bytes is 128–1,048,576. Max_tokens is a byte-based estimate with minimum
+32, or null to disable that cap. Defaults: 16,384 bytes/2,048 estimated tokens.
+Both JSON copies, escaped text, UTF-8, metadata, newline and fallback note count.
+`_meta.napmem` discloses wire_bytes, estimator, truncation and omitted entries.
+Complete values are removed to fit; JSON is never cut. Tiny metadata budgets
+return a correlated -32001 error.
 
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | python3 napmem_mcp_server.py --pyramid napmem_pyramid.json
-```
+A requested budget unable to hold a minimal response with its original valid
+ID is rejected before dispatch with -32602 under the global output cap. This
+invalid combination does not receive its requested smaller cap; the rejection
+explains why. Accepted requests retain their correlation IDs. IDs are bounded
+strings or signed 64-bit integers. Inbound lines have a 16 MiB hard limit.
 
-The handshake, tool list, and tool calls are covered end-to-end (via
-subprocess) in `test_napmem_extensions.py`; the proxy in `test_napmem_failover.py`.
+CLI budgets cover one JSON payload; MCP budgets cover its larger wire envelope.
+Equivalent scoped requests return the same candidates when both budgets fit.
+Smaller MCP budgets can omit more evidence; clients must inspect truncation.
+
+## Mirrors and fallback
+
+Mirrors publish immutable generations through an atomic pointer. The manifest
+binds store and optional cache checksums/configuration. Failed/older refreshes
+preserve the active generation. Managed generations require manifests even in
+new readers. Legacy flat mirrors disclose unverified generation provenance.
+Snapshot searches cannot write caches.
+
+On remote failure/timeout, the proxy starts the local backend, replays
+initialization and resends pending requests. Its final text block is the
+fallback note. Structured metadata reports the actual spawned snapshot's
+generation, age and verification. Both count toward the final wire budget.
+Deletion receipts disclose pending replicas and operator-managed originals,
+exports and backups; forgetting does not silently erase unreachable mirrors.
+
+## Verified capability matrix
+
+| Surface | Evidence | Limits |
+|---|---|---|
+| Python query | Scoped/time/budget fixtures | Real embedding quality unmeasured |
+| Installed CLI | Fresh wheel, absent optional clients, actual commands outside checkout | Receipt names tested interpreter/platform |
+| Local MCP stdio | Actual subprocess handshake, tools/call and CLI parity | No deployed client installation claim |
+| Proxy | Fake backend lifecycle and validated local snapshots | Production SSH/authentication unverified |
+| Claude Code/Desktop and other external clients | Schema/text protocol interface | Actual installed configurations unverified |
+
+Protocol reference:
+https://modelcontextprotocol.io/specification/2025-06-18/server/tools

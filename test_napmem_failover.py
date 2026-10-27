@@ -132,7 +132,8 @@ class TestFailoverProxy(unittest.TestCase):
         self.assertFalse(msgs[1]["result"]["isError"])
         self.assertIn("[napmem fallback]", content[-1]["text"])
         self.assertIn("test snapshot", content[-1]["text"])
-        self.assertEqual(content[0]["text"], "ready")
+        self.assertEqual(json.loads(content[0]["text"])["legacy_text"], "ready")
+        self.assertEqual(json.loads(content[0]["text"]), msgs[1]["result"]["structuredContent"])
 
     def test_invalid_utf8_backend_fails_over_and_logs(self):
         remote = "import sys,os; sys.stdin.readline(); os.write(1,b'\\xff\\n')"

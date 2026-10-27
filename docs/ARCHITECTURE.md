@@ -36,19 +36,20 @@ are never edited directly.
    against the session's prior generation: re-asserted text keeps its stable
    record ID; stale canonicals are dropped or handed to a surviving duplicate
    from another session (promotion); remaining new units are renumbered after
-   the session's highest surviving suffix to avoid ID collisions.
+   the session's retained suffix high-water mark to prevent ID reuse.
 3. **Dedup/merge** — `deduplicate_and_merge()` folds exact-text matches into
    canonical records, preserving each duplicate's anchor in
    `duplicate_anchors`.
 4. **Rebuild** — Layers 2–3 regenerated from surviving records.
-5. **Save** — atomic write (`.tmp` + `os.replace`).
+5. **Save** — private atomic replace with generation/fingerprint checks. The
+   writer lock covers load/reconcile/save, including nested operations.
 
 ## Key decisions (ADRs)
 
 - **ADR-1: JSON file store, atomic replace.** Single-file store keeps the
   system dependency-free and inspectable; `os.replace` guarantees the
-  consolidator daemon can't corrupt it mid-write. Trade-off: no concurrent
-  writers — one consolidator process at a time.
+  consolidator daemon can't corrupt it mid-write. Whole-operation locks serialize
+  concurrent same-host writers; network filesystems are not a multi-host design.
 - **ADR-2: Stable record IDs across re-ingestion.** Downstream consumers
   (profiles' `provenance_records`, tracks' `record_ids`, external references)
   survive re-ingestion. Enforced by reconcile-before-merge and
@@ -69,8 +70,9 @@ are never edited directly.
   verified on the OPEN fd (kernel-reported path), not the pre-open path —
   mirror-time checks alone are raceable by a sync peer. Default root = the
   watch dir; the wrapper widens to the vetted memory trees.
-- **ADR-8: single canonical consolidator per store, fleet-wide.** The store
-  and its embedding cache are single-writer; other machines query over
+- **ADR-8: single canonical host per store, fleet-wide.** Same-host writers
+  serialize complete operations; embedding writes reject stale store snapshots.
+  Other machines query over
   ssh-stdio MCP. See [deployment-topology.md](deployment-topology.md).
 
 ## Scoped assertion model (store version 2)

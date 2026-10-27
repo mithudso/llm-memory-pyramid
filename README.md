@@ -63,7 +63,7 @@ is the fallback. The local example store is separate; see `CLAUDE.md`.
 | `napmem_mcp_failover.py` | MCP proxy registered in `.mcp.json`: remote SSH server, local-mirror fallback when it is offline |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
 | `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
-| `test_napmem_pipeline.py` | Core unittest suite; run discovery for all three suites |
+| `test_napmem_pipeline.py` | Core unittest suite; run discovery for every suite |
 
 ## Documentation
 

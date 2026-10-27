@@ -205,6 +205,37 @@ class TestCli(IsolatedEnvironment):
         self.assertIn(rid, result["affected_ids"])
         self.assertTrue(self.query()["matches"][0]["pinned"])
 
+    def test_opt_in_metrics_feedback_status_and_forget_do_not_store_personal_text(self):
+        from napmem_metrics import MetricsStore
+        self.ingest()
+        self.assertFalse(Path(str(self.store) + ".metrics.json").exists())
+        result = self.run_cli("query", "Vim editor", "--scope", "project:a", "--metrics")
+        rid = result["matches"][0]["id"]
+        metrics = MetricsStore(str(self.store))
+        self.assertEqual(metrics.summarize()["event_counts"]["retrieval"], 1)
+        self.run_cli("feedback", rid, "useful", "--scope", "project:a")
+        encoded = Path(metrics.path).read_text()
+        self.assertNotIn("Vim", encoded)
+        self.assertNotIn(rid, encoded)
+        before = Path(metrics.path).read_bytes()
+        report = self.run_cli("status", "--scope", "project:a")
+        self.assertIn("metrics", report)
+        self.assertEqual(Path(metrics.path).read_bytes(), before)
+        self.run_cli("control", "forget", "--record-id", rid)
+        self.assertEqual(metrics.summarize()["feedback"]["count"], 0)
+
+    def test_portable_adapter_export_and_import_use_the_same_cli(self):
+        self.ingest()
+        exported = self.run_cli("export", "--scope", "project:a")
+        self.assertEqual(exported["format"], "napmem-portable")
+        source = self.root / "exported.json"
+        source.write_text(json.dumps(exported))
+        receipt = self.run_cli("ingest", str(source), "--format", "portable", "--scope", "project:b")
+        self.assertEqual(receipt["status"], "ingested")
+        matches = self.run_cli("query", "Vim editor", "--scope", "project:b")["matches"]
+        self.assertTrue(matches)
+        self.assertTrue(all(row["review_status"] == "unreviewed" for row in matches))
+
     def test_excluded_source_is_not_opened_again(self):
         self.run_cli("init")
         self.run_cli("control", "exclude", "--source", self.source)
@@ -224,7 +255,7 @@ class TestCli(IsolatedEnvironment):
         with patch.object(MemoryPyramidDistiller, "extract_atomic_units", extract_then_change):
             result = self.ingest()
         self.assertEqual(result["status"], "stale")
-        self.assertEqual(result["reason"], "source_revision_changed")
+        self.assertEqual(result["reason"], "source_changed_or_unavailable")
         self.assertFalse(self.store.exists())
 
     def test_ingest_reloads_operator_exclusions_after_extraction(self):
@@ -238,8 +269,7 @@ class TestCli(IsolatedEnvironment):
 
         with patch.object(MemoryPyramidDistiller, "extract_atomic_units", extract_then_exclude):
             result = self.ingest()
-        self.assertEqual(result["status"], "stale")
-        self.assertEqual(result["reason"], "source_excluded")
+        self.assertEqual(result["status"], "excluded")
         self.assertEqual(json.loads(self.store.read_text())["memory_records"], [])
 
     def test_durable_job_enqueue_run_commit_and_inspection(self):

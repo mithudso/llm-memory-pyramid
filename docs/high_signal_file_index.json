@@ -27,6 +27,21 @@
       "summary": "JSON configuration, schema, index or example data"
     },
     {
+      "path": "napmem_adapters.py",
+      "signal": "high",
+      "summary": "Explicit offline source adapters and bounded, portable memory export."
+    },
+    {
+      "path": "napmem_cli.py",
+      "signal": "high",
+      "summary": "Portable NapMem commands. Default operation is local, offline and explicit."
+    },
+    {
+      "path": "napmem_config.py",
+      "signal": "high",
+      "summary": "Portable TOML configuration with explicit CLI > environment > file precedence."
+    },
+    {
       "path": "napmem_controls.py",
       "signal": "high",
       "summary": "Pure operator controls that persist across extraction replay and alias promotion."
@@ -42,6 +57,16 @@
       "summary": "Bind literal source passages to the exact text supplied to extraction."
     },
     {
+      "path": "napmem_inspector.py",
+      "signal": "high",
+      "summary": "Read-only, scoped memory views and complete-hunk source differences."
+    },
+    {
+      "path": "napmem_jobs.py",
+      "signal": "high",
+      "summary": "Durable extraction jobs with leases and idempotent canonical commits."
+    },
+    {
       "path": "napmem_mcp_failover.py",
       "signal": "high",
       "summary": "NapMem MCP failover proxy (stdio)"
@@ -50,6 +75,11 @@
       "path": "napmem_mcp_server.py",
       "signal": "high",
       "summary": "NapMem MCP Server (stdio)"
+    },
+    {
+      "path": "napmem_metrics.py",
+      "signal": "high",
+      "summary": "Private, content-free local metrics and read-only operational status."
     },
     {
       "path": "napmem_model.py",
@@ -65,6 +95,21 @@
       "path": "napmem_search.py",
       "signal": "high",
       "summary": "Offline scoped retrieval with complete-entry JSON budgets."
+    },
+    {
+      "path": "napmem_snapshots.py",
+      "signal": "high",
+      "summary": "Checksummed store exports and atomic publication of complete mirror generations."
+    },
+    {
+      "path": "napmem_sources.py",
+      "signal": "high",
+      "summary": "Bounded source snapshots and a persistent, rename-aware source registry."
+    },
+    {
+      "path": "napmem_storage.py",
+      "signal": "high",
+      "summary": "Private atomic JSON snapshots and reentrant, bounded single-host writer locks."
     },
     {
       "path": "naptime_consolidator.py",
@@ -95,6 +140,16 @@
       "path": "semantic_index.py",
       "signal": "high",
       "summary": "Semantic Embedding Index for the NapMem Pyramid"
+    },
+    {
+      "path": "test_napmem_adapters.py",
+      "signal": "high",
+      "summary": "Synthetic, offline source interoperability and control-replay acceptance."
+    },
+    {
+      "path": "test_napmem_cli.py",
+      "signal": "high",
+      "summary": "Portable configuration and CLI behavior against synthetic temporary stores."
     },
     {
       "path": "test_napmem_controls.py",
@@ -137,14 +192,39 @@
       "summary": "Tests for napmem_mcp_failover.py \u2014 the remote-SSH / local-mirror MCP proxy."
     },
     {
+      "path": "test_napmem_inspector.py",
+      "signal": "high",
+      "summary": "Offline operator inspection, provenance boundaries and exact budgets."
+    },
+    {
+      "path": "test_napmem_jobs.py",
+      "signal": "high",
+      "summary": "Offline durable queue, lease, cloud-resume and atomic-commit tests."
+    },
+    {
       "path": "test_napmem_lifecycle.py",
       "signal": "high",
       "summary": "Integration gates for compatible scoped assertion ingestion."
     },
     {
+      "path": "test_napmem_mcp_contract.py",
+      "signal": "high",
+      "summary": "Typed MCP contracts, strict pre-load validation and complete wire budgets."
+    },
+    {
+      "path": "test_napmem_metrics.py",
+      "signal": "high",
+      "summary": "Content-free local metrics, retention and strictly read-only status tests."
+    },
+    {
       "path": "test_napmem_model.py",
       "signal": "high",
       "summary": "Pure scoped assertion, migration and derived-view tests."
+    },
+    {
+      "path": "test_napmem_optional_client.py",
+      "signal": "high",
+      "summary": "Offline core acceptance with the optional Ollama package made unimportable."
     },
     {
       "path": "test_napmem_pipeline.py",
@@ -180,6 +260,26 @@
       "path": "test_napmem_search.py",
       "signal": "high",
       "summary": "Offline search safety, ranking and exact serialized-budget tests."
+    },
+    {
+      "path": "test_napmem_snapshots.py",
+      "signal": "high",
+      "summary": "Offline snapshot, checksum and atomic mirror generation tests."
+    },
+    {
+      "path": "test_napmem_sources.py",
+      "signal": "high",
+      "summary": "Offline stable identity, guarded collection and source lifecycle tests."
+    },
+    {
+      "path": "test_napmem_transactions.py",
+      "signal": "high",
+      "summary": "Single-host writer isolation, commit boundaries and stale-reader privacy."
+    },
+    {
+      "path": "test_napmem_trusted_loop.py",
+      "signal": "high",
+      "summary": "Actual offline CLI/MCP loop from scoped sources through correction and restore."
     }
   ]
 }

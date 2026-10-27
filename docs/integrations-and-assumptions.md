@@ -39,13 +39,15 @@ inventory with error/retry/logging status: `docs/external-calls.md`.
 
 ## Hardcoded assumptions
 
-- Store path defaults to `napmem_pyramid.json` in CWD (override: `--pyramid`).
+- Portable CLI defaults to the platform user data directory. Legacy direct
+  modules retain CWD defaults; use explicit `--pyramid` for those entrypoints.
 - Watch dir defaults to `./memory_logs`; only `*.md` files are consolidated.
-- Session IDs derive from file basenames (`sess_<basename>`); renaming a file
-  creates a new session rather than replacing the old one.
-- Token estimates use a fixed ~0.75 words/token ratio (`* 1.33`).
-- Single-writer: exactly one consolidator/distiller process per store at a
-  time; atomicity protects against crashes, not concurrent writers.
+- Registry identity preserves recognized renames. First IDs remain basename
+  compatible; collisions get a hash. Missing sources do not imply deletion.
+- Retrieval token estimates use ceil(UTF-8 bytes/4). Legacy word-compression
+  estimates use words * 1.33; neither is a measured monetary saving.
+- Complete transactions serialize same-host writers. Atomic commits compare
+  generation/fingerprint; stale direct saves fail closed.
 - Record ID format `rec_<session>_<NNN>` with 3-digit zero padding (grows past
   999 without collision — `isdigit()` parse, not fixed-width).
 

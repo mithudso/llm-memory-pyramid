@@ -64,6 +64,10 @@ jobs:
           NAPMEM_EMBED_BACKEND: hashed
       - name: Check static documentation maps
         run: python scripts/repo_docs.py --check
+      - name: Offline memory quality regression gate
+        env:
+          NAPMEM_EMBED_BACKEND: hashed
+        run: python napmem_eval.py --mode hybrid --split heldout --check-baseline evaluations/hybrid_regression_v2.json
       - name: Check wrapper syntax
         run: bash -n scripts/run-naptime.sh
 

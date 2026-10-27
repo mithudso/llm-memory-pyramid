@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–9 passed; TASK-245 integrates
-consistent MCP contracts and source adapters before final delivery checks.
+TASK-236–TASK-245 track the ten stages. All ten feature stages are implemented;
+TASK-245 awaits final fresh-install/CI/delivery receipts before completion.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -16,6 +16,16 @@ will change with the corresponding implemented features.
 clean main 0790dc7 with no open owned PRs; created the tracked stages and
 tasks/plan.md; captured implementation constraints in KNOW-246. Started an
 offline benchmark author and independent read-only compatibility review.
+- Stage 10: strict typed MCP schemas and structured/text equivalence, pre-load
+  argument validation, whole-wire budgets and preserved request correlation.
+  Snapshot fallback reports actual generation/age. Four bounded source adapters
+  and portable export share exclusions, source identity and untrusted imports.
+  CLI exposes configured MCP, adapters, inspector and quality controls. End-to-end
+  CLI/MCP correction/replay/forget/restore loop passes. Final local suite 486/486,
+  Ruff/compile/shell checks and independent 130-test fix verification pass.
+  Final fixed-corpus regression is unchanged (Recall@5 .86, MRR .8733,
+  abstention .76); it is explicitly not a fresh blind evaluation.
+  Remaining: final installed-wheel receipt, generated maps, CI and merge/sync.
 - Stage 9: strict opt-in local metrics, hashed candidate feedback, retention,
   extraction stage rates and measured JSON bytes implemented. Status combines
   source/queue freshness, retrieval fallback/quality, mirror and deletion state

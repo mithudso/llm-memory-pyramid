@@ -57,7 +57,10 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from napmem_mcp_server import MAX_LINE_BYTES, bounded_lines
+from napmem_mcp_server import (
+    MAX_LINE_BYTES, bounded_lines, bounded_tool_result, limit_wire_response,
+    budget_request_error, response_budget_fits_id, tool_budgets, valid_request_id, wire_json,
+)
 from napmem_snapshots import (
     MAX_ARCHIVE_BYTES, STORE_FILE, load_snapshot, publish_snapshot,
     resolve_snapshot_directory, unpack_snapshot,
@@ -495,10 +498,16 @@ class FailoverProxy:
     # --- relay -------------------------------------------------------------
 
     def _emit(self, obj_or_line):
-        line = obj_or_line if isinstance(obj_or_line, str) else json.dumps(obj_or_line)
+        obj = json.loads(obj_or_line) if isinstance(obj_or_line, str) else obj_or_line
+        line = wire_json(limit_wire_response(obj))
         with self.out_lock:
-            self.stdout.write(line if line.endswith("\n") else line + "\n")
-            self.stdout.flush()
+            binary = getattr(self.stdout, "buffer", None)
+            if binary is not None:
+                binary.write(line.encode("utf-8"))
+                binary.flush()
+            else:
+                self.stdout.write(line)
+                self.stdout.flush()
 
     def _fail_pending(self, message: str):
         for key, (line, _m, _s) in list(self.pending.items()):
@@ -520,12 +529,19 @@ class FailoverProxy:
             msg = None
         if isinstance(msg, dict) and "id" in msg:
             msg_id = msg["id"]
-            if isinstance(msg_id, bool) or not isinstance(msg_id, (str, int)):
+            if not valid_request_id(msg_id):
                 # The backend answers invalid IDs with null, which cannot
                 # clear a pending entry keyed by the original invalid value.
                 self._emit({"jsonrpc": "2.0", "id": None,
                             "error": {"code": -32600, "message": "Invalid Request"}})
                 return
+            if msg.get("method") == "tools/call":
+                params = msg.get("params", {})
+                arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
+                maximum, tokens = tool_budgets(arguments if isinstance(arguments, dict) else {})
+                if not response_budget_fits_id(msg_id, maximum, tokens):
+                    self._emit(budget_request_error(msg_id))
+                    return
         dead = None
         with self.lock:
             if isinstance(msg, dict):
@@ -561,6 +577,7 @@ class FailoverProxy:
             except (ValueError, RecursionError) as exc:
                 raise ValueError("Invalid backend JSON") from exc
             method = None
+            request = None
             if isinstance(msg, dict) and "id" in msg and "method" not in msg:
                 key = _id_key(msg["id"])
                 if key in self.replay_ids:
@@ -568,17 +585,70 @@ class FailoverProxy:
                     return
                 entry = self.pending.pop(key, None)
                 method = entry[1] if entry else None
-            if (self.mode == "local" and method == "tools/call" and isinstance(msg, dict)
-                    and isinstance(msg.get("result"), dict)
-                    and isinstance(msg["result"].get("content"), list)):
-                msg["result"]["content"].append({
-                    "type": "text",
-                    "text": ("[napmem fallback] Remote napmem server is unreachable; this "
-                             f"answer came from the local mirror ({self.note_fn()})."),
-                })
+                request = json.loads(entry[0]) if entry else None
+            if method == "tools/call" and isinstance(msg, dict):
+                params = request.get("params", {}) if isinstance(request, dict) else {}
+                arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
+                maximum, tokens = tool_budgets(arguments if isinstance(arguments, dict) else {})
+                result = msg.get("result")
+                if isinstance(result, dict) and isinstance(result.get("content"), list):
+                    payload = result.get("structuredContent")
+                    if not isinstance(payload, dict):
+                        first = result["content"][0] if result["content"] else {}
+                        text = first.get("text", "") if isinstance(first, dict) else ""
+                        try:
+                            payload = json.loads(text)
+                        except (ValueError, TypeError):
+                            payload = {"legacy_text": text}
+                        if not isinstance(payload, dict):
+                            payload = {"legacy_value": payload}
+                    extras = result["content"][1:]
+                    failed = result.get("isError") is True or "error" in payload
+                    if failed:
+                        # Older backends may expose exception text in content.
+                        # The proxy preserves failure status, never that body.
+                        supplied = payload.get("error", {})
+                        code = supplied.get("code") if isinstance(supplied, dict) else None
+                        messages = {"INVALID_TOOL_ARGUMENTS": "Unknown tool or invalid tool arguments",
+                                    "MEMORY_UNAVAILABLE": "Requested memory is unavailable"}
+                        code = code if code in messages else "TOOL_FAILED"
+                        payload = {"error": {"code": code, "message": messages.get(code, "Memory tool could not complete")}}
+                        extras = []
+                    if self.mode == "local":
+                        payload = dict(payload)
+                        age = mirror_age_s(self._local_pyramid) if self._local_pyramid else None
+                        metadata = {"mode": "local_mirror", "snapshot_age_seconds": age,
+                                    "generation": None, "verification": "unavailable"}
+                        try:
+                            if self._local_pyramid is None:
+                                raise ValueError("Custom backend has no mirror snapshot path")
+                            snapshot = load_snapshot(self._local_pyramid.parent)
+                            metadata.update(generation=snapshot["manifest"]["generation"],
+                                            verification=snapshot["verification"]["status"],
+                                            generation_verification=snapshot["verification"]["generation"])
+                        except (OSError, ValueError, TypeError):
+                            pass
+                        payload["fallback"] = metadata
+                        note = str(self.note_fn())[:1024]
+                        extras = [*extras, {"type": "text", "text": (
+                            "[napmem fallback] Remote napmem server is unreachable; this "
+                            f"answer came from the local mirror ({note}).")}]
+                    msg = bounded_tool_result(msg["id"], payload, max_bytes=maximum, max_tokens=tokens,
+                                              extra_content=extras, is_error=failed)
+                else:
+                    if isinstance(msg.get("error"), dict):
+                        code = msg["error"].get("code")
+                        if isinstance(code, bool) or not isinstance(code, int) or not -(2**31) <= code < 2**31:
+                            code = -32603
+                        messages = {-32700: "Parse error", -32600: "Invalid Request", -32601: "Method not found",
+                                    -32602: "Invalid params", -32603: "Internal error",
+                                    -32001: "Response budget too small for metadata"}
+                        msg = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {
+                            "code": code, "message": messages.get(code, "Backend request failed")}}
+                    msg = limit_wire_response(msg, max_bytes=maximum, max_tokens=tokens)
                 self._emit(msg)
                 return
-        self._emit(stripped)
+        self._emit(msg)
 
     def serve(self, stdin=None):
         stdin = stdin or sys.stdin

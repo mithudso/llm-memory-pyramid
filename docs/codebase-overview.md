@@ -32,16 +32,23 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `deploy/README.md` | Deployment units |
 | `deploy/napmem-consolidator.service` | One sweep per activation; the .timer drives the cadence. |
 | `deploy/napmem-consolidator.timer` | OnCalendar (not monotonic OnUnitActiveSec) so Persistent=true actually |
+| `docs/ADAPTERS.md` | Source adapters and portable export |
 | `docs/ARCHITECTURE.md` | Architecture |
+| `docs/CLI.md` | NapMem CLI and configuration |
 | `docs/COMPONENTS.md` | Components |
 | `docs/CONTROLS.md` | Operator memory controls |
 | `docs/DEVELOPMENT.md` | Development |
+| `docs/IMPLEMENTATION.md` | Trusted-memory implementation receipt |
+| `docs/INSPECTOR.md` | Inspect and review memory |
 | `docs/INSTALLATION.md` | Installation |
-| `docs/MCP.md` | MCP |
+| `docs/MCP.md` | MCP and client contracts |
+| `docs/OBSERVABILITY.md` | Local quality and freshness measurements |
+| `docs/PERSISTENCE.md` | Persistence, jobs and snapshots |
 | `docs/PROVENANCE.md` | Evidence and verification |
 | `docs/RETRIEVAL.md` | Scoped evidence retrieval |
 | `docs/SECURITY.md` | Security |
 | `docs/TESTING.md` | Testing |
+| `docs/acceptance-offline-2026-10-27.md` | Fresh-install offline acceptance — 2026-10-27 |
 | `docs/bootstrap-prompt.md` | Bootstrap prompt: recreate the NapMem memory pyramid + semantic indexing |
 | `docs/caching-and-optimization.md` | Caching and optimization |
 | `docs/code-deep-optimizer-2026-10-26.md` | Code-deep-optimizer review — 2026-10-26 |
@@ -61,6 +68,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/semantic-indexing-and-hooks-reference.md` | Semantic indexing, hooks, and scripts — full reference |
 | `evaluations/baseline_hashed_heldout_v1.json` | JSON configuration, schema, index or example data |
 | `evaluations/baseline_substring_heldout_v1.json` | JSON configuration, schema, index or example data |
+| `evaluations/hybrid_final_regression_v2.json` | JSON configuration, schema, index or example data |
 | `evaluations/hybrid_initial_heldout_v2.json` | JSON configuration, schema, index or example data |
 | `evaluations/hybrid_regression_v2.json` | JSON configuration, schema, index or example data |
 | `evaluations/memory_quality_v1.json` | JSON configuration, schema, index or example data |
@@ -73,15 +81,24 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `memory.md` | memory.md — operator work log |
 | `memory_pyramid_distiller.py` | Memory Pyramid Distiller (NapMem + Document Distiller Integration) |
 | `memory_pyramid_schema.json` | JSON configuration, schema, index or example data |
+| `napmem_adapters.py` | Explicit offline source adapters and bounded, portable memory export. |
+| `napmem_cli.py` | Portable NapMem commands. Default operation is local, offline and explicit. |
+| `napmem_config.py` | Portable TOML configuration with explicit CLI > environment > file precedence. |
 | `napmem_controls.py` | Pure operator controls that persist across extraction replay and alias promotion. |
 | `napmem_eval.py` | Offline evidence-retrieval evaluation, independent of answer generation. |
 | `napmem_evidence.py` | Bind literal source passages to the exact text supplied to extraction. |
+| `napmem_inspector.py` | Read-only, scoped memory views and complete-hunk source differences. |
+| `napmem_jobs.py` | Durable extraction jobs with leases and idempotent canonical commits. |
 | `napmem_mcp_failover.py` | NapMem MCP failover proxy (stdio) |
 | `napmem_mcp_server.py` | NapMem MCP Server (stdio) |
+| `napmem_metrics.py` | Private, content-free local metrics and read-only operational status. |
 | `napmem_model.py` | Pure, versioned assertion context and derived views for NapMem stores. |
 | `napmem_pyramid.json` | JSON configuration, schema, index or example data |
 | `napmem_retrieval_agent.py` | NapMem Active Retrieval Agent |
 | `napmem_search.py` | Offline scoped retrieval with complete-entry JSON budgets. |
+| `napmem_snapshots.py` | Checksummed store exports and atomic publication of complete mirror generations. |
+| `napmem_sources.py` | Bounded source snapshots and a persistent, rename-aware source registry. |
+| `napmem_storage.py` | Private atomic JSON snapshots and reentrant, bounded single-host writer locks. |
 | `naptime_consolidator.py` | Naptime Async Memory Consolidator |
 | `ollama_extractor.py` | ollama_extractor.py — zero-API-cost LLM extraction via local Ollama chat |
 | `prompts.md` | prompts.md — request log |
@@ -91,6 +108,8 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `scripts/run-naptime.sh` | Naptime consolidator wrapper — portable (macOS launchd + Linux systemd). |
 | `semantic_index.py` | Semantic Embedding Index for the NapMem Pyramid |
 | `tasks/plan.md` | Implementation plan: trusted NapMem memory |
+| `test_napmem_adapters.py` | Synthetic, offline source interoperability and control-replay acceptance. |
+| `test_napmem_cli.py` | Portable configuration and CLI behavior against synthetic temporary stores. |
 | `test_napmem_controls.py` | Pure replay, deletion-family and operator-preview tests. |
 | `test_napmem_controls_integration.py` | Operator controls remain effective across ingestion, cache and reload boundaries. |
 | `test_napmem_eval.py` | Deterministic, network-free evidence scorer and benchmark contract tests. |
@@ -99,8 +118,13 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_evidence_forget.py` | Forgetting erases literal source evidence without deleting unrelated facts. |
 | `test_napmem_extensions.py` | Tests for the production-path extensions: LLM extractor parsing/validation, |
 | `test_napmem_failover.py` | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |
+| `test_napmem_inspector.py` | Offline operator inspection, provenance boundaries and exact budgets. |
+| `test_napmem_jobs.py` | Offline durable queue, lease, cloud-resume and atomic-commit tests. |
 | `test_napmem_lifecycle.py` | Integration gates for compatible scoped assertion ingestion. |
+| `test_napmem_mcp_contract.py` | Typed MCP contracts, strict pre-load validation and complete wire budgets. |
+| `test_napmem_metrics.py` | Content-free local metrics, retention and strictly read-only status tests. |
 | `test_napmem_model.py` | Pure scoped assertion, migration and derived-view tests. |
+| `test_napmem_optional_client.py` | Offline core acceptance with the optional Ollama package made unimportable. |
 | `test_napmem_pipeline.py` | Integration test for NapMem + Document Distiller Memory Pipeline |
 | `test_napmem_protocol.py` | Offline regressions for the stdlib MCP protocol boundary. |
 | `test_napmem_provenance.py` | Source proof, profile admission and explicit re-verification at public boundaries. |
@@ -108,3 +132,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_retrieval_contract.py` | Public retrieval adapters preserve scope, offline defaults and budgets. |
 | `test_napmem_safety.py` | Offline regressions for prompt CPU bounds and wrapper filesystem safety. |
 | `test_napmem_search.py` | Offline search safety, ranking and exact serialized-budget tests. |
+| `test_napmem_snapshots.py` | Offline snapshot, checksum and atomic mirror generation tests. |
+| `test_napmem_sources.py` | Offline stable identity, guarded collection and source lifecycle tests. |
+| `test_napmem_transactions.py` | Single-host writer isolation, commit boundaries and stale-reader privacy. |
+| `test_napmem_trusted_loop.py` | Actual offline CLI/MCP loop from scoped sources through correction and restore. |

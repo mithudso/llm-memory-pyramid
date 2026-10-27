@@ -7,12 +7,15 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import time
 from typing import Any
 
 from napmem_config import NapMemConfig, resolve_config, runtime_environment
 
 
 def _common(parser):
+    parser.add_argument("--metrics", dest="metrics_enabled", action="store_true", default=argparse.SUPPRESS)
+    parser.add_argument("--no-metrics", dest="metrics_enabled", action="store_false", default=argparse.SUPPRESS)
     for flag, choices in (("mode", ("offline", "local", "remote")),
                            ("embedding-backend", ("hashed", "ollama")),
                            ("extraction", ("heuristic", "ollama", "anthropic"))):
@@ -44,6 +47,9 @@ def build_parser():
     ingest.add_argument("input")
     ingest.add_argument("--session-id")
     ingest.add_argument("--title")
+    ingest.add_argument("--format", choices=("markdown", "conversation", "portable", "git"), default="markdown")
+    ingest.add_argument("--revision", default="HEAD")
+    ingest.add_argument("--git-path")
     ingest.add_argument("--enqueue", action="store_true", help="capture a durable job without running extraction")
     query = command("query", help="retrieve bounded, scoped evidence")
     query.add_argument("query")
@@ -66,6 +72,26 @@ def build_parser():
     diff.add_argument("before")
     diff.add_argument("after")
     diff.add_argument("--max-bytes", type=int, default=8192)
+    status = command("status", help="read local freshness, fallback and quality measurements")
+    status.add_argument("--as-of")
+    status.add_argument("--mirror-dir")
+    status.add_argument("--max-bytes", type=int, default=16384)
+    status.add_argument("--max-tokens", type=int, default=2048)
+    feedback = command("feedback", help="record opt-in useful/wrong/outdated candidate feedback")
+    feedback.add_argument("record_id")
+    feedback.add_argument("rating", choices=("useful", "wrong", "outdated"))
+    hook = command("hook-outcome", help="record a measured outcome from an existing recall hook")
+    hook.add_argument("--success", action=argparse.BooleanOptionalAction, required=True)
+    hook.add_argument("--latency-ms", type=float)
+    hook.add_argument("--returned-bytes", type=int)
+    hook.add_argument("--result-count", type=int)
+    hook.add_argument("--fallback", action="store_true")
+    hook.add_argument("--backend", choices=("hybrid", "lexical", "hashed", "ollama", "anthropic", "heuristic", "unavailable"), default="unavailable")
+    command("mcp", help="serve read-only MCP tools on stdio with this configuration")
+    export_memory = command("export", help="emit a scoped portable memory JSON export")
+    export_memory.add_argument("--as-of")
+    export_memory.add_argument("--max-bytes", type=int, default=16384)
+    export_memory.add_argument("--max-tokens", type=int, default=2048)
     control = command("control", help="apply or preview a durable local control")
     from napmem_controls import ACTIONS
     control.add_argument("action", choices=ACTIONS)
@@ -171,8 +197,17 @@ def _enqueue(config, args):
 
 
 def _ingest(config, args):
+    if args.format != "markdown" and (args.enqueue or config.extraction != "heuristic"):
+        raise ValueError("Structured/Git adapters use direct offline ingestion; queued or model extraction accepts Markdown")
     if args.enqueue:
         return _enqueue(config, args)
+    if config.extraction == "heuristic":
+        from napmem_adapters import ingest_source
+        result = ingest_source(_distiller(config), args.input, format=args.format, scope=config.scope,
+                               session_id=args.session_id, revision=args.revision, git_path=args.git_path,
+                               allowed_roots=list(config.source_roots) or None, title=args.title)
+        result.update(pyramid=config.pyramid, extraction="heuristic")
+        return result
     distiller = _distiller(config)
     source, session, registry = _capture(config, args, distiller)
     if source is None:
@@ -295,6 +330,26 @@ def _jobs(config, args):
 
 
 def execute(config: NapMemConfig, args) -> dict[str, Any]:
+    if args.command == "export":
+        from napmem_adapters import export_memory
+        return export_memory(config.pyramid, scope=config.scope, as_of=args.as_of,
+                             max_bytes=args.max_bytes, max_tokens=args.max_tokens)
+    if args.command == "status":
+        from napmem_metrics import status_report
+        return status_report(config.pyramid, scope=config.scope, as_of=args.as_of,
+                             mirror_dir=args.mirror_dir, max_bytes=args.max_bytes, max_tokens=args.max_tokens)
+    if args.command == "feedback":
+        from napmem_metrics import MetricsStore
+        from napmem_retrieval_agent import NapMemRetrievalAgent
+        result = NapMemRetrievalAgent(config.pyramid).inspect_provenance(args.record_id, scope=config.scope)
+        if "error" in result:
+            raise ValueError("Candidate is not available in this scope")
+        return MetricsStore(config.pyramid).feedback(args.record_id, args.rating, scope=config.scope)
+    if args.command == "hook-outcome":
+        from napmem_metrics import record_hook_outcome
+        return record_hook_outcome(config.pyramid, success=args.success, latency_ms=args.latency_ms,
+                                   returned_bytes=args.returned_bytes, result_count=args.result_count,
+                                   fallback=args.fallback, backend=args.backend, scope=config.scope)
     if args.command == "diff":
         from napmem_inspector import source_diff
         from napmem_sources import read_source
@@ -359,15 +414,45 @@ def execute(config: NapMemConfig, args) -> dict[str, Any]:
     return {"mode": report["mode"], "split": report["split"], "metrics": report["metrics"], "baseline_regressions": issues}
 
 
+def _observe(config, args, result, started, *, success=True):
+    if not config.metrics_enabled or args.command not in ("query", "ingest"):
+        return
+    try:
+        from napmem_metrics import MetricsStore, hash_scope
+        mode = result.get("mode", "unavailable")
+        backend = ("ollama" if "embeddings" in mode else "hybrid" if "hybrid" in mode else
+                   "hashed" if "hashed" in mode else "lexical") if args.command == "query" else config.extraction
+        if not success:
+            backend = "unavailable"
+        fields = {"latency_ms": (time.perf_counter() - started) * 1000, "success": success,
+                  "returned_bytes": len(json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()) + 1,
+                  "backend": backend, "scope_hash": hash_scope(config.scope)}
+        if args.command == "query":
+            fields.update(result_count=len(result.get("matches", [])), empty=not result.get("matches"),
+                          fallback="fallback" in mode)
+        MetricsStore(config.pyramid).record("retrieval" if args.command == "query" else "ingest", **fields)
+    except (OSError, ValueError):
+        print("NapMem metrics could not be persisted", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    started = time.perf_counter()
+    config = None
     try:
         config = resolve_config(vars(args))
         with runtime_environment(config):
+            if args.command == "mcp":
+                from napmem_mcp_server import NapMemMCPServer
+                NapMemMCPServer(config.pyramid).serve()
+                return 0
             result = execute(config, args)
+        _observe(config, args, result, started)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False))
         return 1 if result.get("ok") is False or result.get("baseline_regressions") else 0
     except Exception as exc:
+        if config is not None:
+            _observe(config, args, {}, started, success=False)
         print(json.dumps({"error": {"type": type(exc).__name__, "message": str(exc)}}, separators=(",", ":")))
         return 2
 
