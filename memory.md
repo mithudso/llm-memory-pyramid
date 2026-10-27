@@ -2,6 +2,41 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v1.8.0 — 2026-10-27
+
+**Active task:** none — product assessment complete. TASK-230 covers evidence,
+TASK-231 the roadmap, and TASK-232 the final validation/publication receipt.
+
+**Delta:** workflow v1.7.0 → v1.8.0. Added one product assessment and one
+triggering request. Package 0.1.1, MCP server 1.1.1 and store 1.0.0 unchanged.
+
+**Completed on this checkout:**
+- Revalidated current main edd28fb against source, schema, operational limits,
+  previous audit and existing global hook documentation. Consulted primary
+  LongMemEval, contextual retrieval, MCP and SQLite documentation.
+- Ran an in-memory profile probe: contradictory preferences and a temporary
+  task all become traits at constant confidence 0.95. A paraphrased substring
+  query returns no match. This is a narrow behavior probe, not a benchmark.
+- Prepared docs/product-roadmap-2026-10-27.md with ten ranked improvements,
+  source anchors, acceptance criteria, dependencies and implementation phases.
+- Proposed evaluation, scoped/time-aware memory, hybrid bounded retrieval,
+  user corrections/forgetting, versioned evidence, transactional/resumable
+  ingestion, portable setup, an inspector, observability and client adapters.
+  No proposed feature is implemented or implicitly approved by this record.
+- Preserved the prior BLIND-AUDIT-DISSENT result. No production data, model,
+  embeddings, indexing, hooks, scheduler or deployed client operation ran.
+
+**Validation:** all 111 tests pass in the installed Python 3.12 environment.
+Ruff, static-map check, shell syntax and whitespace checks pass. Ten local
+source links resolve; the exact triggering prompt is recorded. No runtime
+source or package/protocol/schema version changed.
+
+**Delivery and remaining scope:** TASK-232 records the commit, PR, CI and
+final main synchronization. The assessment branch is
+docs/napmem-product-roadmap-20261027. No assessment content remains to write.
+The proposed product features require a subsequent implementation request;
+this record does not claim they exist or that production behavior improved.
+
 ## v1.7.0 — 2026-10-26
 
 **Active task:** none — requested source and bootstrap work published.
