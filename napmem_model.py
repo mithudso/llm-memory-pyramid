@@ -359,6 +359,11 @@ def migrate_store(data: dict[str, Any]) -> dict[str, Any]:
     result.setdefault("controls", {})
     if not isinstance(result["controls"], dict):
         raise ValueError("controls must be an object")
+    forgotten = result.get("forgotten_record_ids", [])
+    if (not isinstance(forgotten, list)
+            or any(not isinstance(identity, str) or re.fullmatch(r"[0-9a-f]{64}", identity) is None
+                   for identity in forgotten) or len(set(forgotten)) != len(forgotten)):
+        raise ValueError("forgotten_record_ids must contain unique SHA-256 identifiers")
     result["memory_records"] = [normalize_record(r) for r in result["memory_records"]]
     ids = [rid for r in result["memory_records"] for rid in [r["id"], *r["duplicates"]]]
     if len(ids) != len(set(ids)):

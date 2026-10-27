@@ -122,19 +122,28 @@ class JobQueue:
         # cannot race a new raw source payload into this database after purge.
         with store_lock(self.pyramid_path):
             snapshot, _ = read_snapshot(self.pyramid_path)
+            resolved_scope = scope
+            if resolved_scope is None and snapshot is not None:
+                resolved_scope = snapshot.get("source_scopes", {}).get(_sha(session_id))
+                if resolved_scope is None:
+                    resolved_scope = next((entry.get("scope", "legacy") for entry in snapshot.get("raw_conversations", [])
+                                           if entry.get("session_id") == session_id), "legacy")
+            resolved_scope = resolved_scope or "legacy"
+            from napmem_model import normalize_record
+            normalize_record({"id": "queue_scope", "text": "", "scope": resolved_scope})
             if snapshot is not None and (
                     source_is_excluded(snapshot, source_path, session_id=session_id)
                     or source_is_excluded(snapshot, os.path.abspath(source_path), session_id=session_id)):
                 raise ValueError("Source is excluded or permanently forgotten")
             if snapshot is not None:
                 from napmem_controls import _quote_line_hashes
-                routed_scope = scope or snapshot.get("source_scopes", {}).get(_sha(session_id), "legacy")
+                routed_scope = resolved_scope
                 forbidden = {item["text_sha256"] for item in snapshot.get("controls", {}).get("tombstones", [])
                              if item["scope"] == routed_scope}
                 if forbidden.intersection(_quote_line_hashes(source_content)):
                     raise ValueError("Source body contains a forgotten claim; redact it before queueing")
             return self._enqueue(session_id=session_id, source_path=source_path, source_content=source_content,
-                                 scope=scope, backend=backend, model=model, prompt_version=prompt_version,
+                                 scope=resolved_scope, backend=backend, model=model, prompt_version=prompt_version,
                                  allowed_roots=allowed_roots, max_attempts=max_attempts)
 
     def _enqueue(self, *, session_id, source_path, source_content, scope, backend, model,

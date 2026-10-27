@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 
 ENVIRONMENT = {
+    "metrics_enabled": "NAPMEM_METRICS",
     "pyramid": "NAPMEM_PYRAMID", "mode": "NAPMEM_MODE", "scope": "NAPMEM_SCOPE",
     "source_roots": "NAPMEM_SOURCE_ROOTS", "embedding_backend": "NAPMEM_EMBED_BACKEND",
     "extraction": "NAPMEM_EXTRACTION", "ollama_url": "NAPMEM_OLLAMA_URL",
@@ -67,6 +68,7 @@ class NapMemConfig:
     source_roots: tuple[str, ...] = ()
     embedding_backend: str = "hashed"
     extraction: str = "heuristic"
+    metrics_enabled: bool = False
     ollama_url: str | None = None
     ollama_model: str | None = None
     chat_model: str | None = None
@@ -104,6 +106,7 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
     values: dict[str, Any] = {
         "pyramid": str(user_data_dir(env) / "napmem_pyramid.json"), "mode": "offline", "scope": None,
         "source_roots": [], "embedding_backend": "hashed", "extraction": "heuristic",
+        "metrics_enabled": False,
         "ollama_url": None, "ollama_model": None, "chat_model": None, "anthropic_model": None,
     }
     origins = {key: "default" for key in values}
@@ -114,6 +117,13 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
             base = config_path.parent if origin == "file" else Path.cwd()
             if key == "pyramid":
                 value = _path(value, base, key)
+            elif key == "metrics_enabled":
+                if origin == "environment":
+                    if value.lower() not in ("1", "0", "true", "false"):
+                        raise ValueError("NAPMEM_METRICS must be 1, 0, true or false")
+                    value = value.lower() in ("1", "true")
+                if not isinstance(value, bool):
+                    raise ValueError("metrics_enabled must be a boolean")
             elif key == "source_roots":
                 if origin == "environment":
                     value = value.split(os.pathsep)
@@ -148,7 +158,8 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
 @contextmanager
 def runtime_environment(config: NapMemConfig):
     """Apply settings for this command and restore the caller's environment."""
-    settings = {"NAPMEM_EMBED_BACKEND": config.embedding_backend}
+    settings = {"NAPMEM_EMBED_BACKEND": config.embedding_backend,
+                "NAPMEM_METRICS": "1" if config.metrics_enabled else "0"}
     for field, variable in (("ollama_url", "NAPMEM_OLLAMA_URL"), ("ollama_model", "NAPMEM_OLLAMA_MODEL")):
         value = getattr(config, field)
         if value is not None:

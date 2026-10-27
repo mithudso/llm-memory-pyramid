@@ -220,8 +220,8 @@ class NapMemRetrievalAgent:
                         max_bytes: int = 16384, max_tokens: int | None = 2048) -> dict[str, Any]:
         """Expand only eligible evidence for a topic, within explicit result budgets."""
         from napmem_search import eligible_records
-        if not isinstance(topic_slug, str) or not topic_slug or len(topic_slug) > 256:
-            raise ValueError("topic_slug must be a nonempty string of at most 256 characters")
+        if not isinstance(topic_slug, str) or not topic_slug or len(topic_slug) > 512:
+            raise ValueError("topic_slug must be a nonempty string of at most 512 characters")
         if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
             raise ValueError("top_k must be a positive integer no greater than 100")
         self._refresh()
@@ -235,7 +235,10 @@ class NapMemRetrievalAgent:
                               "omitted_count": max(0, len(records) - top_k),
                               "truncated": len(records) > top_k}, max_bytes, max_tokens)
 
-    def compute_context_budget_savings(self) -> dict[str, Any]:
+    def compute_context_budget_savings(self, *, scope: str | None = None,
+                                       as_of: str | None = None, max_bytes: int = 16384,
+                                       max_tokens: int | None = 2048,
+                                       include_source_estimate: bool = True) -> dict[str, Any]:
         """
         Calculates token savings of using active NapMem retrieval vs dumping raw memory logs.
 
@@ -245,21 +248,35 @@ class NapMemRetrievalAgent:
         deleted. Missing sessions are disclosed in the result.
         """
         self._refresh()
+        from napmem_model import build_derived, parse_time
+        from napmem_search import eligible_records
+        from datetime import UTC, datetime
+        at = parse_time(as_of).isoformat() if as_of else datetime.now(UTC).isoformat()
+        records = eligible_records(self.data, scope, at)
+        derived = {"memory_records": records}
+        build_derived(derived)
         raw_text_len = 0
         available_sessions = set()
         missing_sessions = []
-        for session in self.data.get("raw_conversations", []):
+        sessions = [session for session in self.data.get("raw_conversations", [])
+                    if scope == "*" or session.get("scope", "legacy") in
+                    (("legacy", "global") if scope is None else (scope, "global"))]
+        for session in sessions if include_source_estimate else []:
             try:
                 # A source can be replaced after ingestion. Open without
                 # blocking so a FIFO cannot stall the MCP statistics tool,
                 # then verify the opened object before reading any bytes.
                 fd = os.open(session["file_path"], os.O_RDONLY | os.O_NONBLOCK)
                 try:
-                    if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    info = os.fstat(fd)
+                    if not stat.S_ISREG(info.st_mode) or info.st_nlink > 1 or info.st_size > 16 * 1024 * 1024:
                         raise OSError("Source is not a regular file")
                     with os.fdopen(fd, "r", encoding="utf-8") as f:
                         fd = -1  # the file object owns and closes this descriptor
-                        raw_text_len += len(f.read().split())
+                        content = f.read(16 * 1024 * 1024 + 1)
+                        if len(content.encode("utf-8")) > 16 * 1024 * 1024:
+                            raise OSError("Source exceeds the statistics limit")
+                        raw_text_len += len(content.split())
                 finally:
                     if fd >= 0:
                         os.close(fd)
@@ -268,7 +285,7 @@ class NapMemRetrievalAgent:
                 missing_sessions.append(session["session_id"])
 
         comparable_records = [
-            r for r in self.data.get("memory_records", [])
+            r for r in records
             if r["source_anchor"]["session_id"] in available_sessions
         ]
 
@@ -276,12 +293,15 @@ class NapMemRetrievalAgent:
         raw_tokens = int(raw_text_len * 1.33)
         distilled_records_text = " ".join([r["text"] for r in comparable_records])
         distilled_tokens = int(len(distilled_records_text.split()) * 1.33)
-        profiles_text = " ".join([p["trait"] for p in self.data.get("user_profiles", [])])
+        profiles_text = " ".join([p["trait"] for p in derived["user_profiles"]])
         profiles_tokens = int(len(profiles_text.split()) * 1.33)
 
         reduction_pct = ((raw_tokens - distilled_tokens) / max(raw_tokens, 1)) * 100
 
-        return {
+        return self._bounded({
+            "scope": scope, "as_of": at, "generation": self.data["generation"],
+            "current_records": len(records), "profiles": len(derived["user_profiles"]),
+            "comparison": "word_count_estimate; not measured request savings" if include_source_estimate else "not_requested",
             "raw_memory_estimated_tokens": raw_tokens,
             "layer_1_distilled_tokens": distilled_tokens,
             "layer_3_profile_tokens": profiles_tokens,
@@ -289,7 +309,7 @@ class NapMemRetrievalAgent:
             "context_reduction_percent": f"{reduction_pct:.1f}%",
             "sessions_compared": sorted(available_sessions),
             "sessions_missing_raw_file": missing_sessions
-        }
+        }, max_bytes, max_tokens)
 
 def main():
     parser = argparse.ArgumentParser(description="Active NapMem Memory Retrieval Agent Interface.")

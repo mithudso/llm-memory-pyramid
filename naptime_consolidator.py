@@ -393,12 +393,25 @@ class NaptimeConsolidator:
             return 0
 
         llm_done: set[str] = set()
+        from napmem_metrics import record_if_enabled
+        backends = {}
         if self.use_llm:
+            started = time.perf_counter()
             llm_done = self._extract_llm(changed)
+            backends.update({sid: "anthropic" for sid in llm_done})
+            record_if_enabled(self.pyramid_path, "extraction", stage="request", backend="anthropic",
+                              latency_ms=(time.perf_counter() - started) * 1000,
+                              result_count=len(llm_done), success=bool(llm_done))
         if self.use_ollama:
             remaining = [c for c in changed if c[0] not in llm_done]
             if remaining:
-                llm_done |= self._extract_ollama(remaining)
+                started = time.perf_counter()
+                ollama_done = self._extract_ollama(remaining)
+                llm_done |= ollama_done
+                backends.update({sid: "ollama" for sid in ollama_done})
+                record_if_enabled(self.pyramid_path, "extraction", stage="request", backend="ollama",
+                                  latency_ms=(time.perf_counter() - started) * 1000,
+                                  result_count=len(ollama_done), success=bool(ollama_done))
 
         processed = 0
         for session_id, fpath, content, mtime in changed:
@@ -429,7 +442,12 @@ class NaptimeConsolidator:
                 }
                 self.source_registry.mark_committed(session_id, self.file_hashes[fpath]["sha256"])
                 processed += 1
+                record_if_enabled(self.pyramid_path, "extraction", stage="fallback", success=True,
+                                  fallback=session_id not in llm_done and bool(self.use_llm or self.use_ollama),
+                                  backend=backends.get(session_id, "heuristic"), input_bytes=len(content.encode()),
+                                  lag_seconds=max(0, time.time() - mtime))
             except Exception:
+                record_if_enabled(self.pyramid_path, "ingest", success=False)
                 logger.exception("Ingest failed for %s; will retry next sweep", fpath)
 
         self._save_state()

@@ -5,8 +5,8 @@ Versioned log of active task, completed work, and next steps. Newest first.
 ## v2.0.0 — 2026-10-27
 
 **Active task:** implement all ten roadmap improvements in order, EPIC-235.
-TASK-236–TASK-245 track the ten stages. Stages 1–8 passed; next is TASK-244,
-observability, followed by consistent MCP contracts and source adapters.
+TASK-236–TASK-245 track the ten stages. Stages 1–9 passed; TASK-245 integrates
+consistent MCP contracts and source adapters before final delivery checks.
 
 **Delta:** workflow v1.8.0 → v2.0.0; implementation request and ordered plan
 added. Package 0.1.1 → 0.2.0 for this feature release; schema/MCP versions
@@ -16,6 +16,14 @@ will change with the corresponding implemented features.
 clean main 0790dc7 with no open owned PRs; created the tracked stages and
 tasks/plan.md; captured implementation constraints in KNOW-246. Started an
 offline benchmark author and independent read-only compatibility review.
+- Stage 9: strict opt-in local metrics, hashed candidate feedback, retention,
+  extraction stage rates and measured JSON bytes implemented. Status combines
+  source/queue freshness, retrieval fallback/quality, mirror and deletion state
+  without source reads or probes. Forgetting purges matching local feedback.
+  Existing hooks can submit measured outcomes without new hook installation.
+  Metrics 30/30, integrated CLI 25/25 and full 481-test suite pass. Subsequent
+  client integration also passes 484 full tests. Inherited job scopes now persist
+  so project status includes their backlog. No thresholds are auto-tuned.
 - Stage 8: eight scoped terminal inspector views, evidence/age/review state,
   durable correction previews, historical timeline and project handoff added.
   Bounded pagination retains complete assertions and source diffs retain whole

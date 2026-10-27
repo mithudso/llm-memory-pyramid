@@ -628,6 +628,7 @@ class MemoryPyramidDistiller:
         previous = copy.deepcopy(self.data)
         cache_state = "retained"
         job_state = {"coverage": "not_requested"}
+        metric_state = {"coverage": "not_requested"}
         try:
             receipt = apply_action(self.data, action, **arguments,
                                    expected_generation=expected_generation,
@@ -672,17 +673,17 @@ class MemoryPyramidDistiller:
                     occurrences.extend(record.get("duplicate_anchors", {}).items())
                     for identity, anchor in occurrences:
                         session, path = anchor.get("session_id"), anchor.get("file_path")
-                        selected = (identity in affected if action == "forget" else
-                                    session == (source or "").removeprefix("session:") or path == source)
+                        selected = identity in affected
                         if selected:
                             if session:
                                 sessions.add(session)
                             if path:
                                 paths.add(path)
                 # Exclusion can select a source whose only copy is still queued.
-                if source:
-                    sessions.add(source.removeprefix("session:"))
-                    paths.add(source)
+                selector = source or (value if action == "forget_session" and isinstance(value, str) else None)
+                if selector:
+                    sessions.add(selector.removeprefix("session:"))
+                    paths.add(selector)
                 try:
                     job_state = JobQueue(self.pyramid_path).purge(session_ids=sessions, source_paths=paths)
                 except (OSError, ValueError) as exc:
@@ -691,11 +692,17 @@ class MemoryPyramidDistiller:
                     # Queue failure must not prevent canonical deletion. Persist
                     # the partial coverage without recording sensitive errors.
                     job_state = {"coverage": "pending:" + type(exc).__name__}
+                try:
+                    from napmem_metrics import MetricsStore
+                    metric_state = MetricsStore(self.pyramid_path).purge(receipt["affected_ids"])
+                except (OSError, ValueError) as exc:
+                    metric_state = {"coverage": "pending:" + type(exc).__name__}
                 receipts = self.data.setdefault("deletion_receipts", [])
                 if not isinstance(receipts, list):
                     raise ValueError("deletion_receipts must be a list")
                 receipts.append({"change_id": receipt["change_id"], "action": action,
-                                 "cache": cache_state, "jobs": job_state, "mirrors": "pending_acknowledgment",
+                                 "cache": cache_state, "jobs": job_state, "metrics": metric_state,
+                                 "mirrors": "pending_acknowledgment",
                                  "originals_exports_backups": "operator_managed"})
                 self.data["deletion_receipts"] = receipts[-1000:]
             self.save()
@@ -704,7 +711,7 @@ class MemoryPyramidDistiller:
             raise
         self._semantic_index = None
         receipt.update(generation=self.data["generation"], persistence="committed",
-                       cache=cache_state, embedding_cache=cache_state, jobs=job_state,
+                       cache=cache_state, embedding_cache=cache_state, jobs=job_state, metrics=metric_state,
                        canonical_deletion_complete=(action in ("forget", "forget_session")
                                                     and not cache_state.startswith("pending:")),
                        completion_scope="canonical_store_and_adjacent_embedding_cache")
@@ -770,6 +777,23 @@ class MemoryPyramidDistiller:
                         merged["tombstones"].append(policy)
         restored["generation"] = current["generation"]
         restored["deletion_receipts"] = copy.deepcopy(current.get("deletion_receipts", []))
+        # Older control graphs may still reference a correction assertion that
+        # current forgetting removed. Remove the whole forgotten control family
+        # before validating/reapplying the merged graph.
+        policies = {(item["scope"], item["text_sha256"]) for item in merged["tombstones"]}
+        def retired(identity):
+            return hashlib.sha256(identity.encode()).hexdigest() in forgotten_ids
+        merged["assertions"] = [item for item in merged["assertions"]
+                                if not retired(item["id"]) and
+                                (item["scope"], hashlib.sha256(item["text"].lower().strip().encode()).hexdigest()) not in policies]
+        assertion_ids = {item["id"] for item in merged["assertions"]}
+        merged["corrections"] = {key: item for key, item in merged["corrections"].items()
+                                 if item["assertion_id"] in assertion_ids
+                                 and not any(retired(identity) for identity in item["original_ids"])
+                                 and (item["scope"], item["text_sha256"]) not in policies}
+        merged["overrides"] = {key: item for key, item in merged["overrides"].items()
+                               if not any(retired(identity) for identity in item["record_ids"])
+                               and (item["scope"], item["text_sha256"]) not in policies}
         self.data = restored
         apply_controls(self.data)
         self.rebuild_higher_layers()

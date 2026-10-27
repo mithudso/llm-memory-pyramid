@@ -25,6 +25,15 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(read_snapshot(path), (None, None))
         self.assertFalse(path.parent.exists())
 
+    def test_implicit_scope_queue_is_visible_in_the_projects_status(self):
+        from napmem_jobs import JobQueue
+        from napmem_metrics import status_report
+        store = MemoryPyramidDistiller(self.path)
+        store.ingest_session("a", "A", "a.md", "Project preference", scope="project:a")
+        job = JobQueue(self.path).enqueue(session_id="a", source_path="a.md", source_content="Project preference")
+        self.assertEqual(job["scope"], "project:a")
+        self.assertEqual(status_report(self.path, scope="project:a")["jobs"]["states"]["queued"], 1)
+
     def test_restore_preserves_current_forget_and_creates_a_new_generation(self):
         from napmem_snapshots import export_snapshot
         store = MemoryPyramidDistiller(self.path)

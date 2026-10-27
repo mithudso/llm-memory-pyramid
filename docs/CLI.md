@@ -47,6 +47,7 @@ scope = "project:example"
 source_roots = ["sources"]
 embedding_backend = "hashed"
 extraction = "heuristic"
+metrics_enabled = false
 ```
 
 Environment equivalents include `NAPMEM_PYRAMID`, `NAPMEM_MODE`, `NAPMEM_SCOPE`,
@@ -60,3 +61,9 @@ tested. Local/remote modes permit configured online integrations; they do not
 automatically turn them on. Ollama queries need an explicit URL and embedding
 model; chat extraction also needs an explicit chat model. Anthropic extraction
 needs the optional SDK, SDK-supported credentials and an explicit model.
+
+`status` reports local quality and freshness without probes. Opt-in `--metrics`
+and `feedback` retain bounded content-free measurements; see
+[observability](OBSERVABILITY.md). `mcp` serves the same configured store over
+stdio. `ingest --format conversation|portable|git` and `export` provide bounded
+source interoperability; see [adapters](ADAPTERS.md).

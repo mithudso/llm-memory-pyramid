@@ -317,6 +317,8 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
                                        or any(not isinstance(content, str) for content in source_contents.values())):
         raise ValueError("source_contents must map session IDs to original text strings")
     metadata = _extraction_metadata(extraction_info, list(outputs_by_session))
+    from napmem_metrics import record_if_enabled
+    metric_path = getattr(distiller, "pyramid_path", None)
     total = 0
     ingested: set[str] = set()
     for session_id, raw_text in outputs_by_session.items():
@@ -324,9 +326,14 @@ def ingest_extractions(distiller: MemoryPyramidDistiller,
         try:
             units = parse_extraction_output(raw_text)
         except ExtractionError as exc:
+            if metric_path is not None:
+                record_if_enabled(metric_path, "extraction", stage="validation", success=False)
             logger.error("Session %s: %s — skipped", session_id, exc)
             continue
         records, rejections = units_to_records(units, session_id, file_path)
+        if metric_path is not None:
+            record_if_enabled(metric_path, "extraction", stage="validation",
+                              success=bool(records), rejected_units=len(rejections), output_bytes=len(raw_text.encode()))
         for reason in rejections:
             logger.warning("Session %s: rejected unit (%s)", session_id, reason)
         if not records:

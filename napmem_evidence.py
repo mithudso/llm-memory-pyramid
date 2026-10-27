@@ -144,6 +144,11 @@ def bind_evidence(record: dict[str, Any], content: str | None, *, method: str = 
     supplied = supplied_quote
     supplied_matches = isinstance(supplied, str) and bool(supplied) and supplied in passage
     mismatch = supplied is not None and not supplied_matches
+    if mismatch:
+        # A broad source range can contain unrelated/private assertions. Never
+        # retain that passage as a replacement for a nonliteral requested quote.
+        evidence["reason"] = "source_quote_not_in_cited_range"
+        return result
     quote = supplied if supplied_matches else passage
     quote, truncated = _bounded_quote(quote)
     evidence.update(status="unverified" if mismatch else "verified",

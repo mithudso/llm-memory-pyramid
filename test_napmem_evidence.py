@@ -70,7 +70,7 @@ class TestEvidenceBinding(unittest.TestCase):
         for supplied in ("Keep Beta separate.", "Invented wording.", "", 13):
             with self.subTest(supplied=supplied):
                 bound = bind_evidence(record(source_quote=supplied), CONTENT)
-                self.assertEqual(bound["evidence"]["quote"], "- Use Vim for Alpha.\n")
+                self.assertEqual(bound["evidence"]["quote"], "")
                 self.assertEqual(bound["evidence"]["status"], "unverified")
                 self.assertEqual(bound["evidence"]["reason"], "source_quote_not_in_cited_range")
                 self.assertEqual(bound["evidence"]["assertion_support"], "unverified")

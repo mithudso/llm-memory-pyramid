@@ -27,6 +27,7 @@ memory_logs/
 *.jobs.sqlite3-journal
 *.metrics.sqlite3
 *.metrics.sqlite3-journal
+*.metrics.json
 
 # Session state
 .remember/

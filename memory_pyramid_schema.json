@@ -439,6 +439,12 @@
       },
       "description": "Content-free cache/replica deletion state. External originals, exports and backups have separate retention."
     },
+    "forgotten_record_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "description": "Hashed forgotten record-family IDs preserve privacy during older snapshot restore without affecting independent scopes."
+    },
     "evidence_redactions": {
       "type": "array",
       "items": {

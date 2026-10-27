@@ -37,6 +37,13 @@ class RetrievalContractTests(unittest.TestCase):
         self.assertEqual(len(result["matches"]), 1)
         self.assertIn("sparse", result["mode"])
 
+    def test_topic_limit_accepts_a_real_long_heading_advertised_by_mcp(self):
+        slug = "a" * 300
+        MemoryPyramidDistiller(self.path).ingest_session("long", "Long", "long.md", "# " + slug + "\nA long heading fact.")
+        result = NapMemRetrievalAgent(self.path).get_topic_track(slug)
+        self.assertEqual(result["track"]["topic_slug"], slug)
+        self.assertEqual(len(result["records"]), 1)
+
     def test_legacy_semantic_constructor_failure_stays_offline(self):
         with patch("semantic_index.SemanticIndex", side_effect=RuntimeError("offline")), patch(
                 "semantic_index.OllamaBackend.probe", side_effect=AssertionError("probe forbidden")):
