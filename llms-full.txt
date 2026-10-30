@@ -52,8 +52,9 @@ controls; deletion receipts disclose replica and backup limits.
 `napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
 Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
 targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
-`.mcp.json` runs the failover proxy: remote SSH is primary and a local mirror
-is the fallback. The local example store is separate; see `CLAUDE.md`.
+`.mcp.json` runs the server locally on `~/.napmem/napmem_pyramid.json` with
+embeddings from local Ollama (`127.0.0.1:11434`); no remote host is used. The
+example store checked into this repo is separate; see `CLAUDE.md`.
 
 ## Components
 
@@ -66,9 +67,9 @@ is the fallback. The local example store is separate; see `CLAUDE.md`.
 | `llm_extractor.py` | Production extraction: Haiku via Anthropic Batches API, schema-validated ingest |
 | `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
 | `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
-| `napmem_mcp_failover.py` | MCP proxy registered in `.mcp.json`: remote SSH server, local-mirror fallback when it is offline |
+| `napmem_mcp_failover.py` | Legacy MCP proxy (remote SSH server, local-mirror fallback); no longer registered in `.mcp.json` |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
-| `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
+| `napmem_pyramid.json` | Local dev/test example pyramid store — not used by `.mcp.json`, which targets `~/.napmem/napmem_pyramid.json` |
 | `test_napmem_pipeline.py` | Core unittest suite; run discovery for every suite |
 
 ## Documentation
@@ -118,7 +119,7 @@ python3 napmem_retrieval_agent.py --query <q> --layer all        # substring que
 python3 napmem_retrieval_agent.py --query <q> --semantic         # embedding cosine query
 python3 semantic_index.py --pyramid <p.json> --rebuild           # re-embed all records
 python3 napmem_mcp_server.py --pyramid <p.json>                  # MCP stdio server
-python3 napmem_mcp_failover.py [--status|--sync-mirror]          # MCP proxy: remote SSH, local-mirror fallback
+python3 napmem_mcp_failover.py [--status|--sync-mirror]          # legacy remote proxy (not registered)
 ```
 
 ## Architecture in one paragraph
@@ -143,24 +144,20 @@ tools in a stdlib MCP stdio server.
 
 ### Local `napmem_pyramid.json` is a dev/test store, not the production one
 
-`.mcp.json` runs `napmem_mcp_failover.py`, which points Claude Code's `napmem`
-MCP tool over SSH at the canonical production pyramid (`<remote_host>:~/.napmem/napmem_pyramid.json`;
-host from `NAPMEM_REMOTE_HOST` or `~/.napmem/remote_host`, never committed —
-~2.7k records — the same store the global `~/.claude/hooks/napmem-*.py` session
-hooks read). The `napmem_pyramid.json` / `napmem_pyramid.json.embindex.json`
-files checked into this repo are a separate, small, orphaned local store (12
-records as of 2026-08-11) — nothing wires them to the MCP server or the global
-hooks. Keep using them for local development and the `test_napmem_*.py` suites
-against a throwaway file; don't expect edits here to show up via the `napmem`
-MCP tool or vice versa.
+`.mcp.json` (and the user-level `napmem` entry in `~/.claude.json`) runs
+`napmem_mcp_server.py` directly on the production store
+`~/.napmem/napmem_pyramid.json`, with `NAPMEM_OLLAMA_URL=http://127.0.0.1:11434`.
+No remote host is involved: since 2026-10-30 NapMem is local-only. The store
+was seeded from `~/.napmem/mirror/` (2,719 records, last remote sync
+2026-08-22) and is kept current by the daily maintenance job, which runs
+`scripts/run-naptime.sh` with `NAPMEM_EXTRACTION=ollama` against local Ollama.
+The `napmem_pyramid.json` / `napmem_pyramid.json.embindex.json` files checked
+into this repo are a separate, small, orphaned local store — nothing wires
+them to the MCP server. Keep using them for local development and the
+`test_napmem_*.py` suites against a throwaway file.
 
-If the remote is unreachable at startup, or the SSH link dies mid-session,
-the proxy serves a local `napmem_mcp_server.py` on `~/.napmem/mirror/` (a
-snapshot of the canonical pyramid + embindex, refreshed in the background
-while the remote is up, or by `--sync-mirror`). It replays `initialize` and
-in-flight requests into the new backend and appends a `[napmem fallback]`
-note with the snapshot age to every tool result. The server is read-only, so
-the mirror can be stale but never divergent.
+`napmem_mcp_failover.py` (remote SSH primary, `~/.napmem/mirror/` fallback)
+remains in the repo but is no longer registered anywhere.
 
 ## Invariants — do not break
 
@@ -238,7 +235,7 @@ its generated overview, file index and root llms family with `--check`.
 
 ### Quick answers
 
-- Misbelief: The checked-in napmem_pyramid.json is the production MCP store. Actually: It is a separate development example; repository MCP configuration invokes the failover proxy. [src: CLAUDE.md#local-napmem_pyramidjson-is-a-devtest-store-not-the-production-one; .mcp.json] — ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-facts.txt:29
+- Misbelief: The checked-in napmem_pyramid.json is the production MCP store. Actually: It is a separate development example; MCP configuration targets ~/.napmem/napmem_pyramid.json locally. [src: CLAUDE.md#local-napmem_pyramidjson-is-a-devtest-store-not-the-production-one; .mcp.json] — ~/.global-ai-hub/skills.llms/mithudso-llm-memory-pyramid.repo/llms-facts.txt:29
 
 ### Indexes
 
