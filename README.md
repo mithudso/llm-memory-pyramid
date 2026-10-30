@@ -46,8 +46,9 @@ controls; deletion receipts disclose replica and backup limits.
 `napmem_mcp_server.py` exposes the retrieval tools to Claude Code / Claude
 Desktop over MCP stdio (registered in `.mcp.json`) — agents probe memory with
 targeted queries instead of loading raw logs. See [docs/MCP.md](docs/MCP.md).
-`.mcp.json` runs the failover proxy: remote SSH is primary and a local mirror
-is the fallback. The local example store is separate; see `CLAUDE.md`.
+`.mcp.json` runs the server locally on `~/.napmem/napmem_pyramid.json` with
+embeddings from local Ollama (`127.0.0.1:11434`); no remote host is used. The
+example store checked into this repo is separate; see `CLAUDE.md`.
 
 ## Components
 
@@ -60,9 +61,9 @@ is the fallback. The local example store is separate; see `CLAUDE.md`.
 | `llm_extractor.py` | Production extraction: Haiku via Anthropic Batches API, schema-validated ingest |
 | `semantic_index.py` | Embedding index: Ollama or stdlib hashed-TF backend, cosine search + semantic dedup |
 | `napmem_mcp_server.py` | Stdlib MCP stdio server exposing the retrieval tools |
-| `napmem_mcp_failover.py` | MCP proxy registered in `.mcp.json`: remote SSH server, local-mirror fallback when it is offline |
+| `napmem_mcp_failover.py` | Legacy MCP proxy (remote SSH server, local-mirror fallback); no longer registered in `.mcp.json` |
 | `memory_pyramid_schema.json` | JSON Schema for the pyramid store |
-| `napmem_pyramid.json` | Local dev/test example pyramid store — orphaned from `.mcp.json`, which targets the remote production store |
+| `napmem_pyramid.json` | Local dev/test example pyramid store — not used by `.mcp.json`, which targets `~/.napmem/napmem_pyramid.json` |
 | `test_napmem_pipeline.py` | Core unittest suite; run discovery for every suite |
 
 ## Documentation

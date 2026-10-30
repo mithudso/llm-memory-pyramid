@@ -2,7 +2,10 @@
   "mcpServers": {
     "napmem": {
       "command": "python3",
-      "args": ["napmem_mcp_failover.py"]
+      "args": ["napmem_mcp_server.py", "--pyramid", "${HOME}/.napmem/napmem_pyramid.json"],
+      "env": {
+        "NAPMEM_OLLAMA_URL": "http://127.0.0.1:11434"
+      }
     }
   }
 }
