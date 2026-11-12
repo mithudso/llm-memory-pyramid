@@ -482,3 +482,12 @@ repo):**
 - Wire `llm_extraction_prompts.py` into a real LLM extraction path (the
   distiller currently uses the heuristic stand-in extractor).
 - Consider embedding-based (semantic) dedup to complement exact-text matching.
+
+Version: 2026.11.12.2
+Delta: Preserve outstanding local changes and synchronize cross-system Git work.
+
+## 2026-11-12 — Git reconciliation
+
+Preserve the existing project-local MCP disable configuration. The server definition remains available under _disabled_mcpServers.
+
+Git reconciliation is separate from paused optimization work. Preserve generated logs, local backups and concurrent work. Verification and delivery receipts are recorded by the fleet synchronization task TASK-1968. Verification: JSON structure and retained server definitions passed. All 526 tests passed in the installed virtual environment with NAPMEM_EMBED_BACKEND=hashed and NAPMEM_MODE=offline. Remaining: verified remote delivery.
