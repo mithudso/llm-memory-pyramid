@@ -191,7 +191,7 @@ index c040892..8314d13 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
 @@ -6,7 +6,8 @@ Guidance for Claude Code when working in this repository.
- 
+
  NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
  tracks → profiles) with incremental re-ingestion, dedup with provenance, and
 -active retrieval tools. The package requires Python 3.11+ and the shared `ollama-client` library.
@@ -216,7 +216,7 @@ index 6d7b3f8..fc9409d 100644
 +.venv/bin/python -m pip install -e '.[ollama]'  # full optional-client test suite
  NAPMEM_EMBED_BACKEND=hashed .venv/bin/python -m unittest discover -s . -p "test_*.py"
  ```
- 
+
 ```
 
 21 diff lines total; truncated.
@@ -248,9 +248,9 @@ index edaea5e..f421e54 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -92,6 +92,11 @@ intervals; ingestion time does not establish real-world validity.
- 
+
  ## Deployment topology
- 
+
 +The checked-in `.mcp.json` currently starts the local stdio server with a
 +loopback Ollama override. The fleet topology below is a historical deployment
 +reference; this maintenance did not verify or activate installed services.
@@ -325,11 +325,11 @@ index 6870b18..41e0109 100644
 +++ b/docs/MCP.md
 @@ -1,6 +1,6 @@
  # MCP and client contracts
- 
+
 -Server version: 1.2.0. Protocol: 2025-06-18. Transport: UTF-8 newline-delimited
 +Server version: 1.2.1. Protocol: 2025-06-18. Transport: UTF-8 newline-delimited
  JSON-RPC over stdio, implemented with the standard library.
- 
+
  Use `napmem --pyramid /absolute/store.json mcp` for the configured portable
 ```
 
@@ -363,7 +363,7 @@ index c6a1284..079ecaa 100644
 +++ b/docs/SECURITY.md
 @@ -51,3 +51,23 @@ extractor output as untrusted data and validate against
  ## Reporting
- 
+
  See [.github/SECURITY.md](../.github/SECURITY.md) — private advisories only.
 +
 +## Current runtime and filesystem boundaries
@@ -381,9 +381,9 @@ index 3264180..ced1add 100644
 --- a/docs/TESTING.md
 +++ b/docs/TESTING.md
 @@ -25,14 +25,37 @@ not a runtime dependency.
- 
+
  ## Suites and risky paths
- 
+
 -| Suite | Observable behavior |
 -|---|---|
 -| `test_napmem_pipeline.py` | Heuristic taxonomy, exact dedup, stable IDs, duplicate promotion, provenance, derived layers, sentinel neutralization |
@@ -401,11 +401,11 @@ index ccd0445..b664759 100644
 +++ b/docs/caching-and-optimization.md
 @@ -1,29 +1,24 @@
  # Caching and optimization
- 
+
 -## Cache layers
 +The canonical JSON store is durable memory, not a disposable cache. Whole-operation
 +writer locks and generation/fingerprint checks protect same-host writers.
- 
+
 -- **Consolidator mtime cache** (`file_timestamps`, in-memory): skips
 ```
 
@@ -420,7 +420,7 @@ index 9b8ae83..65cf3e4 100644
 +++ b/docs/deployment-topology.md
 @@ -1,5 +1,10 @@
  # Deployment topology and build history
- 
+
 +Historical snapshot, recorded 2026-08-20. Current project MCP configuration
 +uses the local server and loopback endpoint; see [MCP](MCP.md). These fleet
 +claims have not been refreshed by the 2026-11-12 source audit. Commands below
@@ -439,12 +439,12 @@ index d9adc89..5f5c981 100644
 +++ b/docs/external-calls.md
 @@ -3,7 +3,7 @@
  ## Inventory
- 
+
  Every transport below is optional at runtime. Core heuristic distillation and
 -substring retrieval use no external services. File/line locations move; symbol
 +default offline hybrid retrieval use no external services. File/line locations move; symbol
  names below are stable lookup anchors.
- 
+
 ```
 
 37 diff lines total; truncated.
@@ -476,7 +476,7 @@ index 7a3a1ca..aaf87d2 100644
 --- a/docs/onboarding.md
 +++ b/docs/onboarding.md
 @@ -37,3 +37,9 @@ python3 napmem_retrieval_agent.py --pyramid /tmp/onboard.json --stats
- 
+
  `docs/codebase-overview.md` maps every file;
  `docs/high_signal_file_index.json` is the machine-readable version.
 +
@@ -495,9 +495,9 @@ index 6d34f3a..afc5e31 100644
 --- a/docs/requirements.md
 +++ b/docs/requirements.md
 @@ -29,8 +29,23 @@
- 
+
  ## Dependencies
- 
+
 -Core distillation and substring retrieval: standard library. Package install:
 -shared `ollama-client` library, pinned to a reviewed Git revision. Optional:
 +Core distillation and substring retrieval: standard library. Default package installation has no runtime dependencies. Optional:
@@ -514,9 +514,9 @@ index 8349578..286ddfb 100644
 --- a/docs/runbooks/run-naptime-consolidator.md
 +++ b/docs/runbooks/run-naptime-consolidator.md
 @@ -17,7 +17,7 @@ enables optional paraphrase folding and may contact embedding hosts.
- 
+
  ## Scheduled operation
- 
+
 -**The canonical consolidator runs on the Linux box via systemd** — see
 +**Historical fleet deployment used the Linux box via systemd** — see
  [`deploy/README.md`](../../deploy/README.md) and
@@ -535,10 +535,10 @@ index 3e69259..6303850 100755
 @@ -7,7 +7,7 @@ atomic memory records using the Document Distiller taxonomy (concept, fact, acti
  question, problem, statement, quote, idea).
  """
- 
+
 -PROMPT_VERSION = "2.0.0"
 +PROMPT_VERSION = "2.0.1"
- 
+
  EXTRACTION_SYSTEM_PROMPT = """You are an expert Document Distiller and Memory Compression Agent.
 ```
 
@@ -571,9 +571,9 @@ index 6870e68..0a47364 100644
 --- a/memory.md
 +++ b/memory.md
 @@ -2,6 +2,28 @@
- 
+
  Versioned log of active task, completed work, and next steps. Newest first.
- 
+
 +## v2.3.0 — 2026-11-12
 +
 +**Active task:** bootstrap and complete-source maintenance delivery, TASK-1750.
@@ -629,7 +629,7 @@ index 139fc79..c5ea071 100644
 +++ b/napmem_adapters.py
 @@ -22,6 +22,7 @@ import unicodedata
  from urllib.parse import quote
- 
+
  from napmem_controls import source_is_excluded
 +from napmem_storage import finite_json_float
  from napmem_model import normalize_record
@@ -672,7 +672,7 @@ index 6da3647..cbeb57e 100644
 +import threading
  from typing import Any, Mapping
  from urllib.parse import urlsplit
- 
+
 ```
 
 107 diff lines total; truncated.
@@ -705,10 +705,10 @@ index 60aaeb8..72404d0 100644
 +++ b/napmem_eval.py
 @@ -26,6 +26,7 @@ from typing import Any
  from unittest.mock import patch
- 
+
  from napmem_retrieval_agent import NapMemRetrievalAgent
 +from napmem_config import RUNTIME_LOCK
- 
+
  ROOT = Path(__file__).resolve().parent
  DEFAULT_FIXTURE = ROOT / "evaluations" / "memory_quality_v1.json"
 ```
@@ -723,7 +723,7 @@ index 6501b41..6b6c17b 100644
 --- a/napmem_evidence.py
 +++ b/napmem_evidence.py
 @@ -65,7 +65,12 @@ def _bounded_quote(quote: str) -> tuple[str, bool]:
- 
+
  def _literal_quote(evidence: dict[str, Any]) -> str | None:
      quote = evidence.get("quote")
 -    if not isinstance(quote, str) or not quote or len(quote.encode("utf-8")) > MAX_QUOTE_BYTES:
@@ -767,7 +767,7 @@ index b4c9b27..b6f4010 100644
 +PUBLIC_COLUMNS = ("id", "idempotency_key", "session_id", "source_path", "source_hash", "scope",
 +                  "backend", "model", "prompt_version", "state", "error_code", "lease_owner",
 +                  "lease_until", "attempts", "max_attempts", "created_at", "updated_at", "result_hash")
- 
+
 ```
 
 170 diff lines total; truncated.
@@ -799,9 +799,9 @@ index 487eac0..68edd1a 100755
 --- a/napmem_mcp_server.py
 +++ b/napmem_mcp_server.py
 @@ -34,7 +34,7 @@ from napmem_retrieval_agent import VALID_LAYERS, NapMemRetrievalAgent
- 
+
  logger = logging.getLogger(__name__)
- 
+
 -SERVER_INFO = {"name": "napmem", "version": "1.2.0"}
 +SERVER_INFO = {"name": "napmem", "version": "1.2.1"}
  PROTOCOL_VERSION = "2025-06-18"
@@ -895,11 +895,11 @@ index 2e5ea63..83ee9e8 100644
 +++ b/napmem_snapshots.py
 @@ -25,6 +25,7 @@ from typing import Any
  from uuid import uuid4
- 
+
  from napmem_model import migrate_store, parse_time
 +from napmem_storage import finite_json_float
- 
- 
+
+
  STORE_FILE = "napmem_pyramid.json"
 ```
 
@@ -918,7 +918,7 @@ index 85a7291..0c6fb51 100644
  import stat
 +import sys
  from typing import Any, Callable
- 
+
  from napmem_storage import atomic_write, read_snapshot, store_lock
 ```
 
@@ -990,7 +990,7 @@ index 7a1b3b7..44dfc2c 100644
 +++ b/prompts.md
 @@ -97,3 +97,13 @@ Versioned record of user requests, in order. Newest last.
      validate each stage, preserve offline boundaries, commit and publish.
- 
+
  **Delta:** v1.8.0 → v2.0.0; roadmap implementation explicitly authorized.
 +
 +## v2.3.0 — 2026-11-12
@@ -1008,7 +1008,7 @@ index b25ae27..4a1b3b7 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
- 
+
  [project]
  name = "llm-memory-pyramid"
 -version = "0.2.0"
@@ -1032,7 +1032,7 @@ index 81aca1b..3e50464 100644
  import sys
 +import os
 +import tempfile
- 
+
  ROOT = Path(__file__).resolve().parents[1]
 ```
 
@@ -1048,7 +1048,7 @@ index 3b358f3..909c006 100755
 @@ -33,8 +33,31 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
  REPO_DIR="${NAPMEM_REPO:-$(dirname "$SCRIPT_DIR")}"
  WATCH_DIR="$NAPMEM_HOME/memory_logs"
- 
+
 +case "$WATCH_DIR" in
 +  *:*) echo "run-naptime: allowed-root paths cannot contain ':'" >&2; exit 1;;
 +esac
@@ -1160,7 +1160,7 @@ index 6beb386..29fb593 100644
 --- a/test_napmem_evidence_extraction.py
 +++ b/test_napmem_evidence_extraction.py
 @@ -36,7 +36,7 @@ class RecordingDistiller:
- 
+
  class TestLiteralExtractionQuotes(unittest.TestCase):
      def test_prompt_version_and_literal_quote_contract_preserve_guarded_source_boundary(self):
 -        self.assertEqual(PROMPT_VERSION, "2.0.0")
@@ -1198,7 +1198,7 @@ index 61ed06d..329213e 100644
 --- a/test_napmem_failover.py
 +++ b/test_napmem_failover.py
 @@ -151,7 +151,7 @@ class TestFailoverProxy(unittest.TestCase):
- 
+
      def test_nonreading_backend_cannot_block_relay_or_watchdog(self):
          proxy, out = self._proxy([sys.executable, "-c", "import time; time.sleep(600)"])
 -        proxy.request_timeout = 0.1
@@ -1260,7 +1260,7 @@ index 6ed1fb5..b944486 100644
                  self.assertTrue(set(mcp.COMMON_INPUT) <= tool["inputSchema"]["properties"].keys())
 -        self.assertEqual(mcp.SERVER_INFO["version"], "1.2.0")
 +        self.assertEqual(mcp.SERVER_INFO["version"], "1.2.1")
- 
+
      def test_invalid_tool_arguments_never_load_store_and_remain_in_band_errors(self):
 ```
 
@@ -1370,8 +1370,8 @@ index e887b58..3a8df75 100644
 +++ b/test_napmem_sources.py
 @@ -86,6 +86,31 @@ class TestSourceRegistry(unittest.TestCase):
              read_source(str(path), fd_path_resolver=lambda fd: None)
- 
- 
+
+
 +    def test_recycled_inode_or_unknown_birth_never_inherits_another_source(self):
 +        old, new = self.root / "old.md", self.root / "new.md"
 +        old.write_text("old scoped source")
@@ -1388,13 +1388,13 @@ index f198f1c..3118c16 100644
 --- a/test_napmem_transactions.py
 +++ b/test_napmem_transactions.py
 @@ -11,7 +11,7 @@ from unittest.mock import patch
- 
+
  from memory_pyramid_distiller import MemoryPyramidDistiller
  from napmem_retrieval_agent import NapMemRetrievalAgent
 -from napmem_storage import StoreConflict, StoreLockTimeout, atomic_write, read_snapshot, store_lock
 +from napmem_storage import StoreConflict, atomic_write, read_snapshot, store_lock
- 
- 
+
+
 ```
 
 63 diff lines total; truncated.
