@@ -29,8 +29,23 @@
 
 ## Dependencies
 
-Core distillation and substring retrieval: standard library. Package install:
-shared `ollama-client` library, pinned to a reviewed Git revision. Optional:
+Core distillation and substring retrieval: standard library. Default package installation has no runtime dependencies. Optional:
+`ollama-client` (`.[ollama]`), pinned to a Git revision;
 `anthropic` SDK (`.[llm]`) for API extraction; configured Ollama hosts for
 chat extraction and real embeddings. Hashed-TF embeddings run offline.
 Development/CI: Ruff and GitHub Actions. No numeric coverage gate is configured.
+
+## Trusted-memory requirements
+
+- **FR-8** Filter scope, validity, review and source exclusions before ranking.
+- **FR-9** Preserve operator corrections, replay suppression, preview coverage and deletion receipts.
+- **FR-10** Keep durable source identity and extraction jobs; fence leases during canonical commits and report unknown provider outcomes without automatic resubmission.
+- **FR-11** Publish checksummed immutable snapshots; preserve newer privacy controls during restore.
+- **FR-12** Provide bounded CLI/MCP, inspector, structured/Git adapters and portable export.
+- **FR-13** Gate retrieval changes with the fixed synthetic offline regression set.
+
+Configuration files are bounded to 64 KiB; individual sources default to 2 MiB.
+Sweeps defer work after 256 changed files or 64 MiB instead of retaining unbounded
+source text. These are implementation resource bounds, not performance SLAs.
+Queue directories must belong to the current user and must not be writable by
+other users. POSIX/macOS and Linux are validated; Windows acceptance is not claimed.

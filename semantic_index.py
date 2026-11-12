@@ -270,9 +270,9 @@ class SemanticIndex:
             try:
                 with open(self.index_path, "r", encoding="utf-8") as f:
                     cache = json.load(f)
-            except (OSError, ValueError) as exc:
-                logger.warning("Discarding unreadable embedding cache %s: %s",
-                               self.index_path, exc)
+            except (OSError, ValueError, RecursionError) as exc:
+                logger.warning("Discarding unreadable embedding cache %s (%s)",
+                               self.index_path, type(exc).__name__)
                 cache = {}
             # A backend/model switch invalidates every cached vector.
             if (isinstance(cache, dict) and cache.get("model") == self.backend.model
@@ -307,7 +307,7 @@ class SemanticIndex:
         return embedded
 
     def _vectors_for(self, records: list[dict[str, Any]],
-                     dimensions: int | None = None) -> dict[str, list[float]]:
+                     dimensions: int | None = None, *, complete: bool = True) -> dict[str, list[float]]:
         """Returns {record_id: vector}, embedding only cache misses."""
         wanted: dict[str, str] = {r["id"]: _text_key(r["text"]) for r in records}
         cached = self._cache["vectors"]
@@ -342,8 +342,9 @@ class SemanticIndex:
                 for rec, vec in zip(stale, refreshed):
                     vectors[rec["id"]] = {"key": wanted[rec["id"]], "vec": vec}
         # Persist deletion-only changes too; an empty rebuild must clear disk.
-        if self._cache_dirty or vectors != cached:
-            self._cache["vectors"] = vectors
+        persisted = vectors if complete else {**cached, **vectors}
+        if self._cache_dirty or persisted != cached:
+            self._cache["vectors"] = persisted
             self.save()
             self._cache_dirty = False
         return {rid: vectors[rid]["vec"] for rid in wanted}
@@ -354,21 +355,21 @@ class SemanticIndex:
         self._vectors_for(records)
 
     def search(self, query: str, records: list[dict[str, Any]],
-               top_k: int = 5) -> list[dict[str, Any]]:
+               top_k: int = 5, *, complete: bool = True) -> list[dict[str, Any]]:
         """Top-k records by cosine similarity to the query."""
         if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
             raise ValueError("top_k must be a positive integer")
         if not records:
-            self._vectors_for([])
+            self._vectors_for([], complete=complete)
             return []
         query_vec = self._embed_checked([query])[0]
-        vectors = self._vectors_for(records, len(query_vec))
+        vectors = self._vectors_for(records, len(query_vec), complete=complete)
         scored = sorted(
-            ({"score": round(_checked_cosine(query_vec, vectors[r["id"]]), 4), "record": r}
+            ({"score": _checked_cosine(query_vec, vectors[r["id"]]), "record": r}
              for r in records),
             key=lambda s: s["score"], reverse=True,
         )
-        return scored[:top_k]
+        return [{**hit, "score": round(hit["score"], 4)} for hit in scored[:top_k]]
 
     def nearest_record_id(self, text: str, records: list[dict[str, Any]],
                           threshold: float) -> str | None:
@@ -414,10 +415,14 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 
-    with open(args.pyramid, "r", encoding="utf-8") as f:
-        records = json.load(f)["memory_records"]
-
     index = SemanticIndex(args.pyramid)
+    from napmem_storage import read_snapshot
+    with store_lock(args.pyramid):
+        store, fingerprint = read_snapshot(args.pyramid)
+        if store is None:
+            raise FileNotFoundError(args.pyramid)
+        records = store["memory_records"]
+        index._store_fingerprint = fingerprint
     print(f"Backend: {index.backend.name} ({index.backend.model})")
 
     if args.rebuild:

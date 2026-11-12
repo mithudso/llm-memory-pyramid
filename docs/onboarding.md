@@ -37,3 +37,9 @@ python3 napmem_retrieval_agent.py --pyramid /tmp/onboard.json --stats
 
 `docs/codebase-overview.md` maps every file;
 `docs/high_signal_file_index.json` is the machine-readable version.
+
+## Full integration test setup
+
+The complete discovery suite requires `python -m pip install -e '.[ollama]'` and private Git access.
+The core installation remains dependency-free. See [Testing](TESTING.md) for
+the core-only CI suite and all validation commands.

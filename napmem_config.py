@@ -12,9 +12,13 @@ import os
 from pathlib import Path
 import sys
 import tomllib
+import threading
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
+
+RUNTIME_LOCK = threading.RLock()
+MAX_CONFIG_BYTES = 65536
 
 ENVIRONMENT = {
     "metrics_enabled": "NAPMEM_METRICS",
@@ -89,8 +93,8 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
     explicit_config = bool(config_name)
     file_values: dict[str, Any] = {}
     try:
-        with config_path.open("rb") as stream:
-            raw = tomllib.load(stream)
+        from napmem_sources import read_source
+        raw = tomllib.loads(read_source(str(config_path), allowed_roots=[], max_bytes=MAX_CONFIG_BYTES)["content"])
     except FileNotFoundError:
         if explicit_config:
             raise ValueError(f"Configuration file does not exist: {config_path}") from None
@@ -114,23 +118,26 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
                              ("environment", {key: env[name] for key, name in ENVIRONMENT.items() if env.get(name)}),
                              ("cli", {key: cli[key] for key in ENVIRONMENT if cli.get(key) is not None})):
         for key, value in incoming.items():
-            base = config_path.parent if origin == "file" else Path.cwd()
-            if key == "pyramid":
-                value = _path(value, base, key)
-            elif key == "metrics_enabled":
-                if origin == "environment":
-                    if value.lower() not in ("1", "0", "true", "false"):
-                        raise ValueError("NAPMEM_METRICS must be 1, 0, true or false")
-                    value = value.lower() in ("1", "true")
-                if not isinstance(value, bool):
-                    raise ValueError("metrics_enabled must be a boolean")
-            elif key == "source_roots":
-                if origin == "environment":
-                    value = value.split(os.pathsep)
-                if not isinstance(value, (list, tuple)):
-                    raise ValueError("source_roots must be an array of paths")
-                value = [_path(item, base, "source root") for item in value]
             values[key], origins[key] = value, origin
+    for key, value in list(values.items()):
+        origin = origins[key]
+        base = config_path.parent if origin == "file" else Path.cwd()
+        if key == "pyramid":
+            value = _path(value, base, key)
+        elif key == "metrics_enabled":
+            if origin == "environment":
+                if value.lower() not in ("1", "0", "true", "false"):
+                    raise ValueError("NAPMEM_METRICS must be 1, 0, true or false")
+                value = value.lower() in ("1", "true")
+            if not isinstance(value, bool):
+                raise ValueError("metrics_enabled must be a boolean")
+        elif key == "source_roots":
+            if origin == "environment":
+                value = value.split(os.pathsep)
+            if not isinstance(value, (list, tuple)):
+                raise ValueError("source_roots must be an array of paths")
+            value = [_path(item, base, "source root") for item in value]
+        values[key], origins[key] = value, origin
     for field, choices in (("mode", ("offline", "local", "remote")),
                            ("embedding_backend", ("hashed", "ollama")),
                            ("extraction", ("heuristic", "ollama", "anthropic"))):
@@ -146,7 +153,7 @@ def resolve_config(cli: Mapping[str, Any] | None = None, *,
         normalize_record({"id": "config_scope", "text": "", "scope": values["scope"]})
     if values["ollama_url"] is not None:
         url = urlsplit(values["ollama_url"])
-        if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password:
+        if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.port == 0:
             raise ValueError("ollama_url must be an HTTP(S) endpoint without embedded credentials")
     if values["mode"] == "offline" and (values["embedding_backend"] != "hashed" or values["extraction"] != "heuristic"):
         raise ValueError("Offline mode requires hashed embeddings and heuristic extraction; select local or remote explicitly")
@@ -164,13 +171,14 @@ def runtime_environment(config: NapMemConfig):
         value = getattr(config, field)
         if value is not None:
             settings[variable] = value
-    previous = {key: os.environ.get(key) for key in settings}
-    os.environ.update(settings)
-    try:
-        yield
-    finally:
-        for key, value in previous.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+    with RUNTIME_LOCK:
+        previous = {key: os.environ.get(key) for key in settings}
+        os.environ.update(settings)
+        try:
+            yield
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value

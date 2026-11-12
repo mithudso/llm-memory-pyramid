@@ -7,8 +7,9 @@ import io
 import json
 from pathlib import Path
 import tarfile
+import subprocess
+import sys
 import tempfile
-import threading
 import unittest
 from unittest.mock import patch
 
@@ -232,13 +233,12 @@ class TestSnapshots(unittest.TestCase):
             except Exception as exc:
                 failures.append(exc)
 
-        threads = [threading.Thread(target=publish) for _ in range(3)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=3)
-        self.assertTrue(all(not thread.is_alive() for thread in threads))
-        self.assertEqual(failures, [])
+        code = ("from concurrent.futures import ThreadPoolExecutor; import sys; "
+                "from napmem_snapshots import publish_snapshot; "
+                "pool=ThreadPoolExecutor(max_workers=3); "
+                "list(pool.map(lambda _:publish_snapshot(sys.argv[1],sys.argv[2]),range(3))); pool.shutdown()")
+        subprocess.run([sys.executable, "-c", code, str(self.destination), str(mirror)],
+                       timeout=8, check=True, capture_output=True)
         self.assertEqual(snapshots.load_snapshot(mirror)["manifest"]["generation"], 4)
         self.assertEqual(len(list((mirror / "generations").iterdir())), 3)
 
@@ -252,23 +252,79 @@ class TestSnapshots(unittest.TestCase):
             snapshots.publish_snapshot(self.destination, self.root / "mirror")
 
     def test_archive_unpack_rejects_traversal_links_duplicates_and_missing_manifest(self):
-        for names in (("../escape",), (snapshots.STORE_FILE, snapshots.STORE_FILE), (snapshots.STORE_FILE,)):
+        self.export()
+        required = (snapshots.STORE_FILE, snapshots.MANIFEST_FILE)
+        for invalid in ("../escape", snapshots.STORE_FILE, "symlink", "missing"):
             archive = self.root / "bad.tar"
             with tarfile.open(archive, "w") as stream:
-                for name in names:
-                    item = tarfile.TarInfo(name)
-                    item.size = 2
-                    stream.addfile(item, io.BytesIO(b"{}"))
+                for name in required:
+                    if invalid == "missing" and name == snapshots.MANIFEST_FILE:
+                        continue
+                    stream.add(self.destination / name, arcname=name)
+                if invalid != "missing":
+                    item = tarfile.TarInfo(invalid if invalid != "symlink" else snapshots.CACHE_FILE)
+                    if invalid == "symlink":
+                        item.type, item.linkname = tarfile.SYMTYPE, "/private/synthetic"
+                        stream.addfile(item)
+                    else:
+                        item.size = 2
+                        stream.addfile(item, io.BytesIO(b"{}"))
             target = self.root / "unpacked"
-            with self.subTest(names=names), self.assertRaises(ValueError):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "member|incomplete"):
                 snapshots.unpack_snapshot(archive, target)
             self.assertEqual(list(target.iterdir()), [])
+
+    def test_copied_generation_is_authoritative_if_valid_staging_changes(self):
+        self.export()
+        newer = self.root / "newer"
+        self.source.write_text(json.dumps(data(5)))
+        snapshots.export_snapshot(self.source, newer)
+        original_read = snapshots._read
+        switched = False
+
+        def changing_read(path, *args):
+            nonlocal switched
+            if path == self.destination / snapshots.STORE_FILE and not switched:
+                switched = True
+                for name in snapshots.SNAPSHOT_FILES:
+                    if (newer / name).exists():
+                        (self.destination / name).write_bytes((newer / name).read_bytes())
+            return original_read(path, *args)
+
+        mirror = self.root / "mirror"
+        with patch.object(snapshots, "_read", side_effect=changing_read):
+            result = snapshots.publish_snapshot(self.destination, mirror)
+        self.assertEqual(result["generation"], 5)
+        self.assertEqual(snapshots.load_snapshot(mirror)["data"]["generation"], 5)
+        self.assertIn("gen-5-", snapshots.resolve_snapshot_directory(mirror).name)
+
+    def test_unpack_does_not_delete_a_foreign_file_created_during_extraction(self):
+        self.export()
+        archive = self.root / "snapshot.tar"
         with tarfile.open(archive, "w") as stream:
-            item = tarfile.TarInfo(snapshots.STORE_FILE)
-            item.type, item.linkname = tarfile.SYMTYPE, "/private/source"
-            stream.addfile(item)
-        with self.assertRaises(ValueError):
-            snapshots.unpack_snapshot(archive, target)
+            for name in (snapshots.STORE_FILE, snapshots.MANIFEST_FILE):
+                stream.add(self.destination / name, arcname=name)
+        target = self.root / "unpacked"
+        original_write = snapshots._write
+
+        def collision(path, raw):
+            if path.name == snapshots.MANIFEST_FILE:
+                path.write_bytes(b"foreign bytes")
+            return original_write(path, raw)
+
+        with patch.object(snapshots, "_write", side_effect=collision):
+            with self.assertRaises(FileExistsError):
+                snapshots.unpack_snapshot(archive, target)
+        self.assertEqual((target / snapshots.MANIFEST_FILE).read_bytes(), b"foreign bytes")
+        self.assertFalse((target / snapshots.STORE_FILE).exists())
+
+    def test_large_optional_cache_metadata_is_omitted_without_losing_store(self):
+        value = cache()
+        value["model"] = "m" * snapshots.MAX_MANIFEST_BYTES
+        self.write_cache(value)
+        result = self.export()
+        self.assertEqual(result["cache"]["status"], "absent")
+        self.assertEqual(snapshots.load_snapshot(self.destination)["data"]["generation"], 4)
 
     def test_pointer_checksum_tampering_and_traversal_are_rejected(self):
         self.export()

@@ -1,5 +1,10 @@
 # Deployment topology and build history
 
+Historical snapshot, recorded 2026-08-20. Current project MCP configuration
+uses the local server and loopback endpoint; see [MCP](MCP.md). These fleet
+claims have not been refreshed by the 2026-11-12 source audit. Commands below
+are references, not evidence that services are currently installed or healthy.
+
 The live NapMem deployment across the three-machine fleet, and the full build
 log of how it got here (all on 2026-08-20).
 

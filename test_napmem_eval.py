@@ -222,6 +222,10 @@ class TestBenchmarkContract(unittest.TestCase):
             self.assertEqual(saved["fixture_sha256"], digest)
             self.assertEqual(saved["metrics"]["query_count"], 100)
             self.assertEqual(saved["mode"], mode)
+            expected = {q["id"] for q in fixture["queries"] if q["split"] == "heldout"}
+            actual = [row["query_id"] for row in saved["results"]]
+            self.assertEqual(set(actual), expected)
+            self.assertEqual(len(actual), len(expected))
             for row in saved["results"]:
                 self.assertEqual(row["scores"], evaluation.score_query(queries[row["query_id"]],
                                  row["result_ids"], records, as_of=fixture["as_of"]))

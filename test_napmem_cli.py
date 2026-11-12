@@ -100,6 +100,7 @@ class TestCli(IsolatedEnvironment):
         with redirect_stdout(output):
             actual = napmem_cli.main(["--pyramid", str(self.store), *map(str, arguments)])
         self.assertEqual(actual, code, output.getvalue())
+        self.last_wire = output.getvalue()
         lines = output.getvalue().splitlines()
         self.assertEqual(len(lines), 1, output.getvalue())
         return json.loads(lines[0])
@@ -124,7 +125,7 @@ class TestCli(IsolatedEnvironment):
 
     def test_version_uses_installed_metadata_with_source_fallback(self):
         from importlib.metadata import PackageNotFoundError
-        for result, error, expected in (("9.8.7", None, "9.8.7"), (None, PackageNotFoundError(), "0.2.0")):
+        for result, error, expected in (("9.8.7", None, "9.8.7"), (None, PackageNotFoundError(), "0.2.1")):
             output = io.StringIO()
             with patch("importlib.metadata.version", return_value=result, side_effect=error), redirect_stdout(output):
                 with self.assertRaises(SystemExit) as exit_result:
@@ -148,8 +149,8 @@ class TestCli(IsolatedEnvironment):
 
     def test_query_honors_explicit_byte_budget(self):
         self.ingest()
-        result = self.run_cli("query", "Vim editor", "--scope", "project:a", "--max-bytes", "1024")
-        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode()), 1024)
+        self.run_cli("query", "Vim editor", "--scope", "project:a", "--max-bytes", "1024")
+        self.assertLessEqual(len(self.last_wire.encode("utf-8")), 1024)
 
     def test_default_doctor_creates_no_store_lock_queue_or_directory_and_does_not_probe(self):
         before = set(self.root.rglob("*"))
@@ -239,7 +240,12 @@ class TestCli(IsolatedEnvironment):
     def test_excluded_source_is_not_opened_again(self):
         self.run_cli("init")
         self.run_cli("control", "exclude", "--source", self.source)
-        with patch("napmem_sources.read_source", side_effect=AssertionError("excluded source opened")):
+        from napmem_sources import read_source
+        def guard(path, *args, **kwargs):
+            if Path(path) == self.source:
+                raise AssertionError("excluded source opened")
+            return read_source(path, *args, **kwargs)
+        with patch("napmem_sources.read_source", side_effect=guard):
             result = self.run_cli("ingest", self.source)
         self.assertEqual(result["status"], "excluded")
 
@@ -253,7 +259,7 @@ class TestCli(IsolatedEnvironment):
             return records
 
         with patch.object(MemoryPyramidDistiller, "extract_atomic_units", extract_then_change):
-            result = self.ingest()
+            result = self.run_cli("ingest", self.source, "--scope", "project:a", code=1)
         self.assertEqual(result["status"], "stale")
         self.assertEqual(result["reason"], "source_changed_or_unavailable")
         self.assertFalse(self.store.exists())
@@ -297,8 +303,13 @@ class TestCli(IsolatedEnvironment):
         self.assertEqual(manifest["cache"]["status"], "absent")
         self.source.write_text("# Editor\nI prefer Emacs as my editor for Alpha.\n", encoding="utf-8")
         self.ingest()
+        before_restore = {r["text"] for r in self.run_cli("query", "editor preference", "--scope", "project:a")["matches"]}
+        self.assertTrue(any("Emacs" in text for text in before_restore))
         restored = self.run_cli("snapshot", "restore", destination)
         self.assertIsInstance(restored, dict)
+        after_restore = {r["text"] for r in self.run_cli("query", "editor preference", "--scope", "project:a")["matches"]}
+        self.assertTrue(any("Vim" in text for text in after_restore))
+        self.assertFalse(any("Emacs" in text for text in after_restore))
         self.assertTrue(self.query()["matches"])
 
     def test_eval_dispatch_is_offline_and_outputs_summary_without_touching_store(self):

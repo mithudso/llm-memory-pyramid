@@ -42,6 +42,7 @@ class NapMemRetrievalAgent:
         if raw is None:
             raise FileNotFoundError(f"Pyramid file {self.pyramid_path} not found. Please initialize a store first.")
         directory = os.path.dirname(os.path.abspath(self.pyramid_path))
+        self._snapshot_required = self._snapshot_required or os.path.exists(os.path.join(directory, "manifest.json"))
         if self._snapshot_required:
             from napmem_snapshots import load_snapshot
             snapshot = load_snapshot(directory)
@@ -71,11 +72,12 @@ class NapMemRetrievalAgent:
         """Shared, scoped evidence contract. Defaults never contact a service."""
         from napmem_search import search
         self._refresh()
-        result = search(self.data, query, scope=scope, as_of=as_of, top_k=top_k,
+        snapshot = self.data
+        result = search(snapshot, query, scope=scope, as_of=as_of, top_k=top_k,
                         mode=mode, max_bytes=max_bytes, max_tokens=max_tokens,
                         backend=backend)
         selected = {record["id"] for record in result["matches"]}
-        result["profiles"] = [profile for profile in self.data.get("user_profiles", [])
+        result["profiles"] = [profile for profile in snapshot.get("user_profiles", [])
                               if profile["provenance_records"] and
                               set(profile["provenance_records"]) <= selected]
         groups = {}
@@ -154,7 +156,7 @@ class NapMemRetrievalAgent:
         try:
             from semantic_index import SemanticIndex
             index = SemanticIndex(self.pyramid_path)
-            hits = index.search(query, records, top_k=top_k)
+            hits = index.search(query, records, top_k=top_k, complete=False)
             result = {"query": query, "scope": scope, "as_of": at,
                       "mode": f"semantic:{index.backend.name}",
                       "matches": [{"score": h["score"], **h["record"]} for h in hits]}
@@ -194,6 +196,11 @@ class NapMemRetrievalAgent:
         check = deepcopy(selected)
         if as_of is None and check.get("status") == "superseded":
             check.update(status="active", valid_from=None, valid_to=None)
+        from napmem_search import _safe_source
+        excluded_raw = self.data.get("controls", {}).get("excluded_sources", [])
+        excluded = set(excluded_raw) if isinstance(excluded_raw, (list, dict)) else set()
+        if not _safe_source(record, excluded) or not _safe_source(selected, excluded):
+            return {"error": f"Record ID {record_id} not found."}
         if not visible(check, scope, as_of):
             return {"error": f"Record ID {record_id} not found in the requested scope or time."}
         anchor = selected["source_anchor"]
@@ -266,7 +273,7 @@ class NapMemRetrievalAgent:
                 # A source can be replaced after ingestion. Open without
                 # blocking so a FIFO cannot stall the MCP statistics tool,
                 # then verify the opened object before reading any bytes.
-                fd = os.open(session["file_path"], os.O_RDONLY | os.O_NONBLOCK)
+                fd = os.open(session["file_path"], os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
                 try:
                     info = os.fstat(fd)
                     if not stat.S_ISREG(info.st_mode) or info.st_nlink > 1 or info.st_size > 16 * 1024 * 1024:
@@ -276,6 +283,11 @@ class NapMemRetrievalAgent:
                         content = f.read(16 * 1024 * 1024 + 1)
                         if len(content.encode("utf-8")) > 16 * 1024 * 1024:
                             raise OSError("Source exceeds the statistics limit")
+                        expected_hash = session.get("source_sha256")
+                        if expected_hash:
+                            import hashlib
+                            if hashlib.sha256(content.encode("utf-8")).hexdigest() != expected_hash:
+                                raise OSError("Source revision differs from ingestion")
                         raw_text_len += len(content.split())
                 finally:
                     if fd >= 0:

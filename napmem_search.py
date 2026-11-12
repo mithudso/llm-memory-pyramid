@@ -11,6 +11,7 @@ from collections import Counter
 from copy import deepcopy
 from datetime import UTC, datetime
 import hashlib
+import heapq
 import json
 import math
 import re
@@ -115,29 +116,58 @@ def bounded_response(payload: dict[str, Any], *, max_bytes: int = 16384,
         raise ValueError("omitted_count must be a nonnegative integer")
     result["token_estimator"] = TOKEN_ESTIMATOR
     collections = _collections(result)
-    while True:
+    def fits():
         encoded = _account(result)
-        if len(encoded) <= max_bytes and (max_tokens is None or result["estimated_tokens"] <= max_tokens):
-            return result
-        nonempty = [(idx, items) for idx, items in enumerate(collections) if items]
-        if not nonempty:
-            raise ValueError("Response budget is too small for metadata")
-
-        def tail_rank(pair):
-            idx, items = pair
-            tail = items[-1]
-            score = tail.get("score") if isinstance(tail, dict) else None
-            if isinstance(score, (int, float)) and not isinstance(score, bool) and math.isfinite(score):
-                return score, -idx
-            return -math.inf, -idx
-
-        _, items = min(nonempty, key=tail_rank)
-        items.pop()
-        result["truncated"] = True
-        result["omitted_count"] += 1
-        if "abstention" in result and not any(collections):
-            result["abstention"] = True
-            result["status"] = "budget_exhausted"
+        return len(encoded) <= max_bytes and (max_tokens is None or result["estimated_tokens"] <= max_tokens)
+    if fits():
+        return result
+    originals = [items[:] for items in collections]
+    heap, order = [], []
+    def tail_rank(idx, position):
+        tail = originals[idx][position]
+        score = tail.get("score") if isinstance(tail, dict) else None
+        try:
+            finite = isinstance(score, (int, float)) and not isinstance(score, bool) and math.isfinite(score)
+        except OverflowError:
+            finite = False
+        return (score if finite else -math.inf, -idx, position)
+    for idx, items in enumerate(originals):
+        if items:
+            heapq.heappush(heap, tail_rank(idx, len(items) - 1))
+    while heap:
+        _, negative_idx, position = heapq.heappop(heap)
+        idx = -negative_idx
+        order.append(idx)
+        if position:
+            heapq.heappush(heap, tail_rank(idx, position - 1))
+    initial_omitted = result["omitted_count"]
+    initial_abstention = result.get("abstention")
+    had_status, initial_status = "status" in result, result.get("status")
+    def remove(count):
+        removals = Counter(order[:count])
+        for idx, items in enumerate(collections):
+            items[:] = originals[idx][:len(originals[idx]) - removals[idx]]
+        result.update(truncated=True, omitted_count=initial_omitted + count)
+        if "abstention" in result:
+            result["abstention"] = initial_abstention
+            if had_status:
+                result["status"] = initial_status
+            else:
+                result.pop("status", None)
+            if not any(collections):
+                result.update(abstention=True, status="budget_exhausted")
+        return fits()
+    if not remove(len(order)):
+        raise ValueError("Response budget is too small for metadata")
+    low, high = 1, len(order)
+    while low < high:
+        middle = (low + high) // 2
+        if remove(middle):
+            high = middle
+        else:
+            low = middle + 1
+    remove(low)
+    return result
 
 
 def _stem(token: str) -> str:
@@ -224,8 +254,11 @@ def eligible_records(data: dict[str, Any], scope: str | None, at: str) -> list[d
 
 
 def _cosine(left: list[float], right: list[float]) -> float:
-    denominator = math.sqrt(sum(x * x for x in left)) * math.sqrt(sum(x * x for x in right))
-    return sum(a * b for a, b in zip(left, right)) / denominator if denominator else 0.0
+    left_scale, right_scale = max(map(abs, left), default=0), max(map(abs, right), default=0)
+    if not left_scale or not right_scale:
+        return 0.0
+    a, b = [value / left_scale for value in left], [value / right_scale for value in right]
+    return math.fsum(x * y for x, y in zip(a, b)) / (math.hypot(*a) * math.hypot(*b))
 
 
 def _backend_scores(backend: Any, query: str, records: list[dict[str, Any]]) -> list[float]:
@@ -351,9 +384,12 @@ def search(data: dict[str, Any], query: str, *, scope: str | None = None,
         if mode == "substring":
             meaningful = exact_texts[idx]
         searchable = (record["text"] + " " + " ".join([record["id"], *record.get("duplicates", [])])).casefold()
-        if required_literals and not all(literal in searchable for literal in required_literals):
+        if required_literals and not all((re.search(r"(?<!\w)" + re.escape(literal) + r"(?!\w)", searchable)
+                                             if any(char.isdigit() for char in literal) or "_" in literal or "/" in literal
+                                             else literal in searchable) for literal in required_literals):
             continue
-        if fragment and len(query_terms) >= 3 and not query_terms.issubset(set(doc_tokens[idx])) and not exact_ids[idx]:
+        if (fragment and len(query_terms) >= 3 and not query_terms.issubset(set(doc_tokens[idx])) and not exact_ids[idx]
+                and not (backend is not None and actual_mode.endswith(":injected-embeddings") and vector[idx] >= .65)):
             continue
         if not (meaningful or exact_ids[idx]):
             continue

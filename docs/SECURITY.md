@@ -51,3 +51,23 @@ extractor output as untrusted data and validate against
 ## Reporting
 
 See [.github/SECURITY.md](../.github/SECURITY.md) — private advisories only.
+
+## Current runtime and filesystem boundaries
+
+The project MCP configuration selects local stdio and loopback Ollama. Optional
+legacy CLI configurations can still target remote services. The fleet examples
+above are historical; configuration determines actual egress. Source labels now
+share the prompt's untrusted-data region. Sentinel redaction is conservative:
+a redacted marker cannot prove an original literal quotation, and the binder
+leaves mismatching evidence unverified. Prompt guards do not prove model obedience.
+
+Job SQLite paths must be regular singly-linked files inside a user-owned directory
+that other users cannot write. The opener retains its checked descriptor through
+SQLite open and checks path identity before SQL. Same-user writers and arbitrary
+operator changes to the directory remain inside the filesystem trust boundary.
+Raw source reads compare size, mtime and ctime. Rename inference requires matching
+creation identity; unknown or reused identity never inherits another source's scope.
+
+Proxy request count, pending bytes, local/remote response time and real output-pipe
+writes are bounded. Provider/SSH error bodies do not enter the new failure logs.
+No new reporting deadline, legal assurance, license or compliance claim is made.

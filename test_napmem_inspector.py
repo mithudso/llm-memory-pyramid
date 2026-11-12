@@ -114,6 +114,8 @@ class InspectorTests(unittest.TestCase):
         self.assertEqual([r["record_id"] for r in self.inspect()["records"]], ["new"])
         historic = inspect_store(self.path, view="current", scope="project:a", as_of=JAN)
         self.assertEqual([r["record_id"] for r in historic["records"]], ["old"])
+        boundary = inspect_store(self.path, view="current", scope="project:a", as_of=JUN)
+        self.assertEqual([r["record_id"] for r in boundary["records"]], ["new"])
         timeline = self.inspect("timeline", max_tokens=None)["records"]
         self.assertEqual({r["record_id"] for r in timeline}, {"old", "new", "deleted"})
         old = next(r for r in timeline if r["record_id"] == "old")

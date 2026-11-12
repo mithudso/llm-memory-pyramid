@@ -42,7 +42,10 @@ def parse_time(value: str | datetime, field: str = "timestamp") -> datetime:
         raise ValueError(f"{field} must be a timezone-aware ISO timestamp") from exc
     if result.tzinfo is None or result.utcoffset() is None:
         raise ValueError(f"{field} must include a timezone")
-    return result.astimezone(UTC)
+    try:
+        return result.astimezone(UTC)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError(f"{field} is outside the supported UTC range") from exc
 
 
 def _inferred_kind(record: dict[str, Any]) -> str:
@@ -227,8 +230,10 @@ def _profile_evidence_supported(record: dict[str, Any]) -> bool:
     if evidence.get("source_kind") == "operator":
         from napmem_evidence import verify_evidence
         return verify_evidence(record).get("status") == "verified"
-    quote = evidence.get("quote")
-    return (evidence.get("assertion_support") == "verbatim" and isinstance(quote, str)
+    from napmem_evidence import _literal_quote, _support
+    quote = _literal_quote(evidence)
+    return (_support(record, quote or "") == "verbatim"
+            and evidence.get("assertion_support") == "verbatim" and isinstance(quote, str)
             and bool(quote) and evidence.get("quote_sha256") == hashlib.sha256(quote.encode()).hexdigest()
             and isinstance(evidence.get("source_sha256"), str)
             and bool(re.fullmatch(r"[0-9a-f]{64}", evidence["source_sha256"])))
@@ -311,6 +316,8 @@ def apply_supersession(data: dict[str, Any]) -> None:
                 raise ValueError("Supersession cannot cross explicit subjects")
             incoming[old_id] += 1
             successors[rid].append(old_id)
+            if new["review_status"] == "rejected" or new["status"] in ("deleted", "quarantined"):
+                continue
             change = changes.setdefault(old_id, {"status": old["status"]
                                        if old["status"] in ("deleted", "expired", "quarantined") else "superseded"})
             if new["valid_from"]:

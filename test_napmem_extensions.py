@@ -452,11 +452,14 @@ class TestGuardedRead(unittest.TestCase):
     def test_fifo_refused_not_hung(self):
         """A FIFO planted in the watch dir must be refused, not block the
         daemon forever at open()."""
-        from naptime_consolidator import _read_file_guarded
         fifo = os.path.join(self.watch, "hang.md")
         os.mkfifo(fifo)
-        with self.assertRaises(PermissionError):
-            _read_file_guarded(fifo, [self.root])
+        code = ("import sys; from naptime_consolidator import _read_file_guarded;\n"
+                "try: _read_file_guarded(sys.argv[1],[sys.argv[2]])\n"
+                "except PermissionError: raise SystemExit(0)\n"
+                "raise SystemExit('FIFO was accepted')")
+        subprocess.run([sys.executable, "-c", code, fifo, self.root], timeout=3,
+                       check=True, capture_output=True)
 
     def test_degenerate_roots_env_refused(self):
         """':::' must not silently equal 'off' (fail-open on a typo)."""

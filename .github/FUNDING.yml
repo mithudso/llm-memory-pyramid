@@ -1,9 +1,7 @@
-# These are supported funding model platforms
-
+# Existing maintainer funding destinations; no payment is performed here.
 github: mithudso
 patreon: mithudso
-venmo: @Mitchphudson
-paypal: https://www.paypal.com/ncp/payment/8WLQPBK6PHFX2
-cashapp: 
-buy_me_a_coffee: https://buymeacoffee.com/mitchphudsi
-
+buy_me_a_coffee: mitchphudsi
+custom:
+  - "https://venmo.com/Mitchphudson"
+  - "https://www.paypal.com/ncp/payment/8WLQPBK6PHFX2"

@@ -94,8 +94,8 @@ def ollama_available(hosts: list[tuple[str, str]] | None = None) -> bool:
             names = _client_for(url).list_models(url, timeout=PROBE_TIMEOUT_S)
         except (OllamaUnavailable, OSError, ValueError):
             continue
-        if any(n == model or n.split(":")[0] == model.split(":")[0]
-               for n in names):
+        wanted = model if ":" in model else model + ":latest"
+        if any((name if ":" in name else name + ":latest") == wanted for name in names):
             return True
     return False
 

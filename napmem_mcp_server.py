@@ -34,7 +34,7 @@ from napmem_retrieval_agent import VALID_LAYERS, NapMemRetrievalAgent
 
 logger = logging.getLogger(__name__)
 
-SERVER_INFO = {"name": "napmem", "version": "1.2.0"}
+SERVER_INFO = {"name": "napmem", "version": "1.2.1"}
 PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 MAX_LINE_BYTES = 16 * 1024 * 1024  # cap inbound request lines (OOM guard)
@@ -250,13 +250,19 @@ def _payload_json(payload):
 
 def _prune_payload(payload):
     # Derived prose loses its evidence when a record is omitted; discard it first.
+    if payload.get("track") and isinstance(payload.get("records"), list):
+        payload["track"] = None
+        payload["truncated"] = True
+        return True
     collections = []
     for key in ("profiles", "tracks", "matches", "records", "sessions_missing", "sessions_compared"):
         value = payload.get(key)
         if isinstance(value, list) and value:
             collections.append(value)
         elif key == "matches" and isinstance(value, dict):
-            collections.extend(items for _, items in sorted(value.items()) if isinstance(items, list) and items)
+            order = {"user_profiles": 0, "topic_tracks": 1, "memory_records": 2}
+            collections.extend(items for _, items in sorted(value.items(), key=lambda item: (order.get(item[0], 3), item[0]))
+                               if isinstance(items, list) and items)
     if not collections:
         return False
     collections[0].pop()

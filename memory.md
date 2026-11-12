@@ -2,6 +2,29 @@
 
 Versioned log of active task, completed work, and next steps. Newest first.
 
+## v2.3.0 — 2026-11-12
+
+**Task scope:** bootstrap and complete-source maintenance delivery, TASK-1750.
+Package0.2.0→0.2.1; MCP1.2.0→1.2.1; prompt2.0.0→2.0.1.
+
+Assertion-context reconciliation preserves IDs on reordered unchanged inputs.
+Corrections reject fingerprint cycles and preserve unrelated raw metadata.
+Provider submission ambiguity remains non-retryable; current leases fence
+canonical commits. Source creation identity guards rename reuse. Snapshot
+publication uses the copied manifest and cleanup owns only created files.
+Resource, validation, replay, shell-quoting and evidence checks were tightened.
+Regression tests use synthetic stores and whole-process network denial.
+
+The maintained wiki, full suite map, manifest/external-call audits, static maps
+and optimizer report document scope and limits. No live corpus, embeddings,
+services, deployment or package publishing occurred. Registry registration is
+delegated to the parent maintenance coordinator. Remote delivery/CI are recorded
+in the PR and external machine receipt; this log does not assert a queued merge.
+
+**Delivery record:** the PR and external machine receipt identify final CI,
+merge verification and safe cleanup. No product roadmap feature or model-quality
+improvement is claimed.
+
 ## v2.2.0 — 2026-10-27
 
 **Delta:** v2.1.0 → v2.2.0; merged delivery and developer-install parity.

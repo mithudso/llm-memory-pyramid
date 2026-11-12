@@ -6,7 +6,8 @@ Guidance for Claude Code when working in this repository.
 
 NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
 tracks → profiles) with incremental re-ingestion, dedup with provenance, and
-active retrieval tools. The package requires Python 3.11+ and the shared `ollama-client` library.
+active retrieval tools. The package requires Python 3.11+. The core has no runtime dependencies;
+`ollama-client` and `anthropic` are optional extras.
 The heuristic distiller, substring retrieval and MCP transport use the standard
 library. Anthropic extraction is an optional extra; Ollama extraction and
 embeddings contact configured hosts only when those paths run.
@@ -113,6 +114,12 @@ remains in the repo but is no longer registered anywhere.
 - Update `memory.md` (work log) and `prompts.md` (request log) each session;
   increment their workflow version and delta. Bump `pyproject.toml` for source
   changes; workflow, package, store and protocol versions have separate scopes.
+
+## Maintained wiki
+
+[Project wiki](docs/wiki/README.md) indexes verified commands, API guides,
+operations, tests and the maintenance audit. Current source controls the facts;
+historical deployment receipts do not establish current fleet health.
 
 ## Docs map
 

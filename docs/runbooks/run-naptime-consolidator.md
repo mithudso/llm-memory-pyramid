@@ -17,7 +17,7 @@ enables optional paraphrase folding and may contact embedding hosts.
 
 ## Scheduled operation
 
-**The canonical consolidator runs on the Linux box via systemd** — see
+**Historical fleet deployment used the Linux box via systemd** — see
 [`deploy/README.md`](../../deploy/README.md) and
 [deployment-topology.md](../deployment-topology.md). Run exactly one
 consolidator per pyramid store fleet-wide. The launchd variant below remains
@@ -70,8 +70,8 @@ python3 napmem_retrieval_agent.py --stats           # session list should includ
 |---|---|---|
 | "Skipping memory file ... OSError" | File deleted mid-scan / unreadable | None — by design; fix permissions if persistent |
 | "Skipping non-UTF-8 memory file" | Binary or wrongly-encoded file in watch dir | Convert to UTF-8 or remove |
-| File never picked up | Not `.md`, or mtime unchanged | Rename to `.md` / `touch` the file |
-| Two consolidators on one store | Lost updates (last write wins) | Run exactly one per store |
+| File never picked up | Not `.md`, refused source, or unchanged content | Inspect source scope/read guard and content digest |
+| Two consolidators on one store | Competing mirror discovery or repeated work | Keep one canonical scheduler; wrapper and writer locks serialize local work |
 
 ## Safety
 
@@ -86,3 +86,14 @@ before retrying. Keep a backup; do not remove production state to test recovery.
 If SSH fails, the MCP proxy can serve a stale local mirror; verify the age note.
 Escalate repeated validation or write failures to the operator with metadata
 only, never source memory or credentials.
+
+## Wrapper concurrency and bounded work
+
+The wrapper holds an inherited POSIX file lock across mirroring and the sweep;
+another invocation reports that the lock is owned and exits without starting
+another sweep. Mounted twins cannot revoke a local mirror. Colliding real source
+names gain a source-path hash suffix. Colon-bearing allowed-root paths are refused
+because the legacy colon-separated configuration cannot represent them safely.
+A failed `--once` sweep returns a nonzero exit. Large sweeps defer remaining sources
+without advancing their committed watermarks. These source changes do not install
+or activate a scheduler; inspect target-host configuration separately.

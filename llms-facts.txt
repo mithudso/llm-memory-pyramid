@@ -1,6 +1,6 @@
 # NapMem sourced facts
 
-- The package requires Python 3.11+ and ollama-client; Anthropic is optional. [src: pyproject.toml]
+- The core package requires Python 3.11+; Ollama and Anthropic clients are optional extras. [src: pyproject.toml]
 - The pyramid has four layers: raw sessions, atomic records, tracks and profiles. [src: README.md]
 - Stable record IDs survive re-ingestion and duplicate anchors remain resolvable. [src: CLAUDE.md]
 - Layers 2–3 derive from Layer 1; store writes use atomic replacement. [src: CLAUDE.md]

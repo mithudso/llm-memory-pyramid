@@ -97,3 +97,13 @@ Versioned record of user requests, in order. Newest last.
     validate each stage, preserve offline boundaries, commit and publish.
 
 **Delta:** v1.8.0 → v2.0.0; roadmap implementation explicitly authorized.
+
+## v2.3.0 — 2026-11-12
+
+Requested full repo-bootstrapper and code-deep-optimizer maintenance for the
+personally owned llm-memory-pyramid repository, complete maintained-source
+coverage and adversarial verification, followed by commit/push/PR/CI/merge and
+safe cleanup. Preserve other work, production/customer data, services and frozen
+embeddings. Use an isolated worktree, static maps only, command-scoped mixed-hook
+filtering and a machine receipt outside the repository. No new policies,
+licenses, model benchmarks or private-content publication are authorized.

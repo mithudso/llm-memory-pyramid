@@ -9,7 +9,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `.env.example` | Documentation only: programs do not automatically load dotenv files. |
 | `.gitattributes` | Repository configuration or supporting file |
 | `.github/CODEOWNERS` | Default owner for everything in the repo |
-| `.github/FUNDING.yml` | These are supported funding model platforms |
+| `.github/FUNDING.yml` | Existing maintainer funding destinations; no payment is performed here. |
 | `.github/ISSUE_TEMPLATE/bug_report.md` | Repository configuration or supporting file |
 | `.github/ISSUE_TEMPLATE/feature_request.md` | Repository configuration or supporting file |
 | `.github/PULL_REQUEST_TEMPLATE.md` | Repository configuration or supporting file |
@@ -29,7 +29,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `GEMINI.md` | GEMINI.md |
 | `LICENSE` | Repository configuration or supporting file |
 | `README.md` | llm-memory-pyramid |
-| `deploy/README.md` | Deployment units |
+| `deploy/README.md` | Deployment reference |
 | `deploy/napmem-consolidator.service` | One sweep per activation; the .timer drives the cadence. |
 | `deploy/napmem-consolidator.timer` | OnCalendar (not monotonic OnUnitActiveSec) so Persistent=true actually |
 | `docs/ADAPTERS.md` | Source adapters and portable export |
@@ -52,6 +52,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/bootstrap-prompt.md` | Bootstrap prompt: recreate the NapMem memory pyramid + semantic indexing |
 | `docs/caching-and-optimization.md` | Caching and optimization |
 | `docs/code-deep-optimizer-2026-10-26.md` | Code-deep-optimizer review — 2026-10-26 |
+| `docs/code-deep-optimizer-2026-11-12.md` | Code deep optimizer — 2026-11-12 |
 | `docs/codebase-overview.md` | Generated complete repository file map |
 | `docs/deployment-topology.md` | Deployment topology and build history |
 | `docs/external-calls.md` | External calls |
@@ -60,12 +61,17 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `docs/known-issues.md` | Known issues |
 | `docs/logging.md` | Logging |
 | `docs/onboarding.md` | Onboarding |
+| `docs/optimizer-findings-2026-11-12.json` | JSON configuration, schema, index or example data |
 | `docs/product-roadmap-2026-10-27.md` | NapMem product improvement roadmap |
 | `docs/repo-bootstrap-audit-2026-10-26.md` | Repository bootstrap audit — 2026-10-26 |
+| `docs/repo-bootstrap-audit-2026-11-12.md` | Repository bootstrap audit — 2026-11-12 |
 | `docs/requirements.md` | Requirements |
 | `docs/runbooks/run-naptime-consolidator.md` | Runbook: run the naptime consolidator |
 | `docs/security-review-ledger.md` | Security review ledger |
 | `docs/semantic-indexing-and-hooks-reference.md` | Semantic indexing, hooks, and scripts — full reference |
+| `docs/source-audit-coverage-2026-11-12.json` | JSON configuration, schema, index or example data |
+| `docs/tool-inventory.json` | JSON configuration, schema, index or example data |
+| `docs/wiki/README.md` | NapMem project wiki |
 | `evaluations/baseline_hashed_heldout_v1.json` | JSON configuration, schema, index or example data |
 | `evaluations/baseline_substring_heldout_v1.json` | JSON configuration, schema, index or example data |
 | `evaluations/hybrid_final_regression_v2.json` | JSON configuration, schema, index or example data |
@@ -121,6 +127,7 @@ Every tracked or non-ignored file appears below. Local runtime and virtual-envir
 | `test_napmem_inspector.py` | Offline operator inspection, provenance boundaries and exact budgets. |
 | `test_napmem_jobs.py` | Offline durable queue, lease, cloud-resume and atomic-commit tests. |
 | `test_napmem_lifecycle.py` | Integration gates for compatible scoped assertion ingestion. |
+| `test_napmem_maintenance.py` | Synthetic adversarial maintenance regressions; no providers or live stores. |
 | `test_napmem_mcp_contract.py` | Typed MCP contracts, strict pre-load validation and complete wire budgets. |
 | `test_napmem_metrics.py` | Content-free local metrics, retention and strictly read-only status tests. |
 | `test_napmem_model.py` | Pure scoped assertion, migration and derived-view tests. |

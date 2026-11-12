@@ -1,0 +1,366 @@
+{
+  "scope": "owner corroboration of original per-file Medium+ groups; Low/Nit observations retained in immutable local reports",
+  "findings": [
+    {
+      "path": ".github/FUNDING.yml",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20132: YAML reserved scalar and unsupported funding keys; preserve destinations in supported custom links."
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1: forks cannot access private deploy key; core-only fork job plus full trusted integration matrix."
+    },
+    {
+      "path": "llm_extraction_prompts.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F2: metadata moved into source boundary. F1 declined: redacted delimiter text intentionally cannot become verified literal evidence."
+    },
+    {
+      "path": "llm_extractor.py",
+      "high": 0,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20133: failure exit, bounded file capture and surrogate rejection; original input handoff preserved."
+    },
+    {
+      "path": "memory_pyramid_distiller.py",
+      "high": 1,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20133: context-aware occurrence reservations, bounded CLI input and set-based foreign-anchor membership."
+    },
+    {
+      "path": "memory_pyramid_schema.json",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20132: duplicate assertion context and verified-evidence binding fields constrained; runtime still verifies actual support."
+    },
+    {
+      "path": "napmem_adapters.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F2: exponential then binary budget probes avoid initial half-store envelope. F3 N/A: POSIX-only subprocess pipes."
+    },
+    {
+      "path": "napmem_cli.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1: stale/failed result exits1 and records unsuccessful operation."
+    },
+    {
+      "path": "napmem_config.py",
+      "high": 0,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1/F2/F4: merge before validation, bounded nonblocking config read, shared runtime RLock."
+    },
+    {
+      "path": "napmem_controls.py",
+      "high": 1,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20134: reject fingerprint cycles; scope raw pruning; complete affected-ID previews; linear family/cycle traversal."
+    },
+    {
+      "path": "napmem_eval.py",
+      "high": 1,
+      "medium": 4,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20135: finite gates/tolerance, nested validation, bounded grades, serialized evaluation, fixed @5 cutoff."
+    },
+    {
+      "path": "napmem_evidence.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1: reject malformed surrogate quote before strict encoding."
+    },
+    {
+      "path": "napmem_inspector.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1/F3: preserve LF-delimited source bytes; reject character oversize before encoding."
+    },
+    {
+      "path": "napmem_jobs.py",
+      "high": 2,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20134: unknown submissions cannot retry, checked FD retained with trusted parent/inode validation, canonical lease fence, payload-free metadata SELECT."
+    },
+    {
+      "path": "napmem_mcp_failover.py",
+      "high": 2,
+      "medium": 5,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20137: unique replay IDs, malformed-code safety, pending/deadline/output bounds, finite config, shell argv quoting and sanitized diagnostics."
+    },
+    {
+      "path": "napmem_mcp_server.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1: remove derived prose before atomic supporting records when budgets prune."
+    },
+    {
+      "path": "napmem_metrics.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20132: validate feedback ID before hashing; catch metadata lstat errors. Low connection-closure improvement also applied."
+    },
+    {
+      "path": "napmem_model.py",
+      "high": 1,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20133: evidence must support assertion text, ineligible successors cannot retire accepted assertions, UTC overflow becomes ValueError."
+    },
+    {
+      "path": "napmem_retrieval_agent.py",
+      "high": 0,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1/F2/F4: manifest appearance tightens verification, raw stats require original hash/no symlink, query captures one generation reference."
+    },
+    {
+      "path": "napmem_search.py",
+      "high": 0,
+      "medium": 4,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F2\u20135: exact numeric/path literals, semantic fragment acceptance, scale-safe cosine, bounded-response removal plan. F1 retracted: sparse hybrid is existing default contract."
+    },
+    {
+      "path": "napmem_snapshots.py",
+      "high": 1,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20134: copied manifest authoritative, oversized optional cache metadata omitted, cleanup owns created files, pointer staging resolved once."
+    },
+    {
+      "path": "napmem_sources.py",
+      "high": 0,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20133: resolver/observer share creation identity, refuse recycled/unknown birth rename inheritance, compare ctime during capture. Windows claim N/A; ImportError still fails closed."
+    },
+    {
+      "path": "napmem_storage.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20132: reject JSON exponent overflow; release thread mutex even when fd/unlock cleanup fails."
+    },
+    {
+      "path": "naptime_consolidator.py",
+      "high": 0,
+      "medium": 4,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20134: heuristic async cannot collect cloud jobs, count committed work, aggregate sweep bounds, failed once exits nonzero. Windows claim N/A."
+    },
+    {
+      "path": "ollama_extractor.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1: exact configured model tags with implicit latest normalization only."
+    },
+    {
+      "path": "scripts/repo_docs.py",
+      "high": 1,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20133: binary asset description, contained no-symlink atomic UTF-8 output; JSON corpus never parsed."
+    },
+    {
+      "path": "scripts/run-naptime.sh",
+      "high": 0,
+      "medium": 4,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F1\u20134: mounted keep precedes revocation, collision suffixes preserve both sources, colon roots refused, inherited whole-wrapper lock."
+    },
+    {
+      "path": "semantic_index.py",
+      "high": 0,
+      "medium": 4,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "F2\u20135: rank unrounded scores, discard deep corrupt cache, scoped candidates preserve other cache entries, CLI binds records/fingerprint under lock. F1 retracted: legacy explicit semantic auto backend is supported."
+    },
+    {
+      "path": "test_napmem_adapters.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: activate Git attributes/filter drivers; require complete nonempty budget export."
+    },
+    {
+      "path": "test_napmem_cli.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: inspect actual wire bytes and exact restored content; stale exit contract updated."
+    },
+    {
+      "path": "test_napmem_eval.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: require every heldout ID exactly once in frozen baseline."
+    },
+    {
+      "path": "test_napmem_evidence.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: FIFO adversary uses terminable child deadline."
+    },
+    {
+      "path": "test_napmem_evidence_extraction.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: existing mutable-source fixture plus builtins/io/os read guards."
+    },
+    {
+      "path": "test_napmem_extensions.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: FIFO adversary uses terminable child deadline."
+    },
+    {
+      "path": "test_napmem_failover.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: valid oversized archive with exact receive error; concurrent writers have distinguishable generations."
+    },
+    {
+      "path": "test_napmem_inspector.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: exact half-open JUN transition assertion."
+    },
+    {
+      "path": "test_napmem_lifecycle.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: complete historical and current result sets after replay/reload."
+    },
+    {
+      "path": "test_napmem_mcp_contract.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: all source-read entrypoints guarded; each privacy marker checked independently."
+    },
+    {
+      "path": "test_napmem_metrics.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1 F2: SQLite authorizer forbids source/result payload reads for metadata status."
+    },
+    {
+      "path": "test_napmem_model.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: missing/unsupported assertion evidence is covered by new maintenance profile regressions rather than duplicate tests here."
+    },
+    {
+      "path": "test_napmem_optional_client.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: exact immutable40-hex private dependency pin, not substring."
+    },
+    {
+      "path": "test_napmem_retrieval_contract.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: zero backend calls for invalid queries; authorized foreign provenance positive control."
+    },
+    {
+      "path": "test_napmem_safety.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: explicit child comparison cannot be removed by PYTHONOPTIMIZE."
+    },
+    {
+      "path": "test_napmem_snapshots.py",
+      "high": 0,
+      "medium": 2,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: malicious archives contain otherwise-valid required members; concurrent-publisher deadlock case runs in terminable child."
+    },
+    {
+      "path": "test_napmem_sources.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: unchanged synchronous model output positive control paired with stale-source rejection."
+    },
+    {
+      "path": "test_napmem_transactions.py",
+      "high": 0,
+      "medium": 3,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: exact survivor sets; unconditional child cleanup; hard lock-timeout subprocess."
+    },
+    {
+      "path": "test_napmem_trusted_loop.py",
+      "high": 0,
+      "medium": 1,
+      "status": "repaired or covered; explicit declined/N/A subfindings noted",
+      "adjudication": "T1: stale Vim/Nano assertions absent across full returned payload after changes."
+    },
+    {
+      "path": "test_napmem_maintenance.py",
+      "high": 0,
+      "medium": 3,
+      "stage": "new-source diagnostic",
+      "status": "repaired",
+      "adjudication": "Valid renewal lease/control, canonical shlex serialization for untrusted paths, and exact model-tag positive control added."
+    }
+  ],
+  "blind_gate1": [
+    {
+      "severity": "Medium",
+      "finding": "collection loses provider handle",
+      "status": "repaired red/green"
+    },
+    {
+      "severity": "Medium",
+      "finding": "model CLI bypasses source owner",
+      "status": "repaired red/green; durable variant also repaired"
+    }
+  ],
+  "blind_gate2": [
+    {
+      "severity": "Medium",
+      "finding": "provenance source-safety mismatch",
+      "status": "post-gate repair; no third gate"
+    },
+    {
+      "severity": "Medium",
+      "finding": "expired extraction publishes ready result",
+      "status": "post-gate repair; no third gate"
+    }
+  ]
+}

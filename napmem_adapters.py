@@ -22,6 +22,7 @@ import unicodedata
 from urllib.parse import quote
 
 from napmem_controls import source_is_excluded
+from napmem_storage import finite_json_float
 from napmem_model import normalize_record
 from napmem_search import TOKEN_ESTIMATOR, _account, bounded_response, eligible_records
 from napmem_sources import MAX_SOURCE_BYTES, SourceRegistry, normalized_path, read_source
@@ -63,7 +64,7 @@ def _strict_json(content):
         raise ValueError("Source JSON cannot contain nonfinite numbers")
 
     try:
-        return json.loads(content, object_pairs_hook=object_pairs, parse_constant=invalid_constant)
+        return json.loads(content, object_pairs_hook=object_pairs, parse_constant=invalid_constant, parse_float=finite_json_float)
     except RecursionError as error:
         raise ValueError("Source JSON nesting exceeds the supported limit") from error
 
@@ -330,7 +331,14 @@ def export_memory(pyramid_path, *, scope=None, as_of=None, max_bytes=16384, max_
     # Validate budgets and establish that metadata alone fits. Search over
     # complete groups rather than leaving evidence for removed assertions.
     bounded_response(envelope(0), max_bytes=max_bytes, max_tokens=max_tokens)
-    lower, upper = 0, len(candidates)
+    def fits(count):
+        candidate = envelope(count)
+        candidate["token_estimator"] = TOKEN_ESTIMATOR
+        encoded = _account(candidate)
+        return len(encoded) <= max_bytes and (max_tokens is None or candidate["estimated_tokens"] <= max_tokens)
+    lower, upper = 0, min(1, len(candidates))
+    while upper < len(candidates) and fits(upper):
+        lower, upper = upper, min(2 * upper, len(candidates))
     while lower < upper:
         count = (lower + upper + 1) // 2
         candidate = envelope(count)

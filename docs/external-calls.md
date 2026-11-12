@@ -3,7 +3,7 @@
 ## Inventory
 
 Every transport below is optional at runtime. Core heuristic distillation and
-substring retrieval use no external services. File/line locations move; symbol
+default offline hybrid retrieval use no external services. File/line locations move; symbol
 names below are stable lookup anchors.
 
 | Source and trigger | Target/transport | Outcome logging and failure policy | Offline tests / persisted verification |
@@ -37,3 +37,23 @@ constructs its client without an `ant auth login` profile adapter. SSH uses the
 operator's SSH configuration. Ollama endpoints can be remote and may use
 plain HTTP; trust and protect that network or select the hashed backend.
 Never commit credentials or memory payloads to the environment template.
+
+## Complete maintained transport families (2026-11-12)
+
+| Family / exact anchors | Egress and bounds | Failure / retry / tests |
+|---|---|---|
+| `llm_extractor.extract_direct`, `extract_batch`, `napmem_jobs.submit/collect` | Explicit Anthropic source prompts, SDK HTTPS;2MiB source, bounded batch result/polling | Unknown post-intent submission stays `SubmissionOutcomeUnknown`, no automatic resubmit; mocked SDK tests and lease-fenced atomic commit |
+| `napmem_cli._ingest` / `naptime_consolidator._make_client`, `_durable_sweep` | Explicit cloud mode only; heuristic async never collects cloud work;256 files/64MiB sweep cap | Safe exception classes; stale/failed CLI exits nonzero; source-revision recheck; fake SDK tests |
+| `ollama_extractor._client_for`, `ollama_available`, `extract_ollama` | Explicit extraction mode, shared HTTP client; exact model tag, per-call timeout | Host failover and heuristic fallback; model-list/chat fakes; no local inference in tests |
+| `semantic_index.OllamaBackend`, `select_backend`; explicit semantic CLI/dedup | Query/record embedding HTTP only in selected legacy/semantic path | Shared client and hashed fallback; strict vector validation/cache generation/hash checks; mocked backends |
+| `napmem_mcp_failover.primary_cmd`, `remote_snapshot_cmd`, `probe_remote`, `_receive_snapshot` | SSH remote Python and snapshot stdout; shell-quoted argv, finite timeouts, bounded archive/stderr | Sanitized warning text; failed transfer preserves active snapshot; fake children/valid oversized archive tests |
+| `napmem_mcp_failover.Backend`, `Proxy` | Local/remote subprocess stdio, no shell in local spawn;64 pending/32MiB, local+remote deadlines,1s binary-output stall limit | Unique internal replay IDs; bounded restarts/errors; malformed response cannot silently lose pending request; fixture subprocess tests |
+| `napmem_adapters._git` / Git source ingestion | Git subprocess local object database, bounded stdout/stderr/deadline; no shell/filter/textconv execution | Pinned immutable commit/blob provenance; activated malicious-driver fixture proves no execution |
+| `scripts/run-naptime.sh` | POSIX local discovery/mirror + Python child; inherited whole-run lock, root validation and collision suffixes | Only extracted mirror function tested on synthetic trees; entire scheduled wrapper never executed in maintenance |
+| `scripts/repo_docs.census` | Read-only `git ls-files` subprocess; no runtime imports or corpus parsing | Static maps, binary descriptions, contained atomic UTF-8 output; check mode writes nothing |
+| Test subprocess families | Python fake MCP/CLI/Git/lock/FIFO fixtures and extracted mirror shell | All descendants OS-isolated; scratch data/config/cache/auth/models; hard timeouts and process cleanup |
+| CI dependency installation | GitHub Actions/PyPI and pinned private shared library before test isolation | Exact Actions SHAs and private-client SHA; fork PR cannot consume deploy-key secret; package metadata queries only |
+
+See [tool inventory](tool-inventory.json). No generic runtime execution registry,
+dashboard, central error service or new MCP administration tools were added.
+These remain architecture exceptions, not claims of full mdb-tam parity.

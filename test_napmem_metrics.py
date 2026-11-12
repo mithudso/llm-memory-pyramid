@@ -341,7 +341,17 @@ class StatusTests(MetricsCase):
         self.write_store()
         queue = self.make_jobs([("queued", None), ("submitted", "global"), ("failed", None), ("stale", None), ("queued", "project:PRIVATE")])
         before = queue.read_bytes(), queue.stat().st_mode, sorted(p.name for p in self.path.parent.iterdir())
-        result = status_report(self.path)
+        connect = sqlite3.connect
+        def metadata_connection(*args, **kwargs):
+            db = connect(*args, **kwargs)
+            def authorize(action, table, column, database, trigger):
+                if action == sqlite3.SQLITE_READ and column in ("source_text", "result_text"):
+                    return sqlite3.SQLITE_DENY
+                return sqlite3.SQLITE_OK
+            db.set_authorizer(authorize)
+            return db
+        with mock.patch("napmem_metrics.sqlite3.connect", side_effect=metadata_connection):
+            result = status_report(self.path)
         jobs = result["jobs"]
         self.assertEqual(jobs["states"]["queued"], 1)
         self.assertEqual(jobs["states"]["failed"], 1)

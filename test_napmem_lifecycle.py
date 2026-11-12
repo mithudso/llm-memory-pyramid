@@ -93,4 +93,6 @@ class LifecycleIntegrationTests(unittest.TestCase):
         self.store.ingest_session("a", "A", "a.md", "# Removed from mutable file")
         loaded = MemoryPyramidDistiller(self.path)
         self.assertEqual(len(loaded.data["memory_records"]), 2)
-        self.assertEqual(effective_records(loaded.data, "project:a", "2026-01-15T00:00:00Z")[0]["id"], first["id"])
+        self.assertEqual([r["id"] for r in effective_records(loaded.data, "project:a", "2026-01-15T00:00:00Z")], [first["id"]])
+        current = effective_records(loaded.data, "project:a", "2026-02-15T00:00:00Z")
+        self.assertEqual([r["text"] for r in current], ["I prefer VS Code."])

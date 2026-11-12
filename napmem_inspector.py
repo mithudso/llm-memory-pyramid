@@ -275,9 +275,12 @@ def source_diff(old_content: str, new_content: str, *, max_bytes: int = 8192,
     """
     _integer(context, "context", 0, 50)
     for content in (old_content, new_content):
-        if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_DIFF_SOURCE_BYTES:
+        if not isinstance(content, str) or len(content) > MAX_DIFF_SOURCE_BYTES or len(content.encode("utf-8")) > MAX_DIFF_SOURCE_BYTES:
             raise ValueError("diff inputs must be strings of at most 2 MiB each")
-    old_lines, new_lines = old_content.splitlines(keepends=True), new_content.splitlines(keepends=True)
+    def lf_lines(content):
+        parts = content.split("\n")
+        return [part + "\n" for part in parts[:-1]] + ([parts[-1]] if parts[-1] else [])
+    old_lines, new_lines = lf_lines(old_content), lf_lines(new_content)
     if max(len(old_lines), len(new_lines)) > MAX_DIFF_LINES:
         raise ValueError(f"diff inputs must have at most {MAX_DIFF_LINES} lines each")
     lines = difflib.unified_diff(old_lines, new_lines, fromfile="before", tofile="after", n=context)

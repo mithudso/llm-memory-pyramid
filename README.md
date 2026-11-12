@@ -26,6 +26,7 @@ python3 -m venv .venv
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json demo
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json query "preferred editor" --scope project:napmem-demo-alpha
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json doctor
+.venv/bin/python -m pip install -e '.[ollama]'  # full optional-client test suite
 NAPMEM_EMBED_BACKEND=hashed .venv/bin/python -m unittest discover -s . -p "test_*.py"
 ```
 
@@ -67,6 +68,8 @@ example store checked into this repo is separate; see `CLAUDE.md`.
 | `test_napmem_pipeline.py` | Core unittest suite; run discovery for every suite |
 
 ## Documentation
+
+Start with the maintained [project wiki](docs/wiki/README.md).
 
 - [Architecture](docs/ARCHITECTURE.md) · [Components](docs/COMPONENTS.md) · [Development](docs/DEVELOPMENT.md)
 - [Installation](docs/INSTALLATION.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md)
