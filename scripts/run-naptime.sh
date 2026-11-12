@@ -33,7 +33,30 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="${NAPMEM_REPO:-$(dirname "$SCRIPT_DIR")}"
 WATCH_DIR="$NAPMEM_HOME/memory_logs"
 
+case "$WATCH_DIR" in
+  *:*) echo "run-naptime: allowed-root paths cannot contain ':'" >&2; exit 1;;
+esac
 mkdir -p "$WATCH_DIR"
+
+# Hold one inherited POSIX file lock across mirror discovery and the sweep.
+# Re-execution preserves the descriptor; no daemon or service is installed.
+if [ "${1:-}" != "--napmem-wrapper-locked" ]; then
+  exec python3 - "$0" "$NAPMEM_HOME" <<'LOCK_PY'
+import fcntl, os, stat, sys
+path = os.path.join(sys.argv[2], "naptime-wrapper.lock")
+fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+info = os.fstat(fd)
+if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+    raise SystemExit("run-naptime: unsafe wrapper lock")
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    print("run-naptime: another sweep owns the wrapper lock", file=sys.stderr)
+    raise SystemExit(0)
+os.set_inheritable(fd, True)
+os.execv("/bin/bash", ["bash", sys.argv[1], "--napmem-wrapper-locked"])
+LOCK_PY
+fi
 
 # --- Allowed roots (exfiltration guard) ------------------------------------
 # The watch dir itself is a vetted root so plain files dropped directly into
@@ -51,13 +74,22 @@ resolve() { readlink -f -- "$1" 2>/dev/null || echo "$1"; }
 
 ALLOWED_ROOTS="$(resolve "$WATCH_DIR")"
 for root in "$HOME/.claude" "$HOME/.gemini" /Volumes/mitch/.claude /Volumes/mitch/.gemini; do
-  [ -d "$root" ] && ALLOWED_ROOTS="$ALLOWED_ROOTS:$(resolve "$root")"
+  if [ -d "$root" ]; then
+    resolved_root="$(resolve "$root")"
+    case "$resolved_root" in
+      *:*) echo "run-naptime: allowed-root paths cannot contain ':'" >&2; exit 1;;
+    esac
+    ALLOWED_ROOTS="$ALLOWED_ROOTS:$resolved_root"
+  fi
 done
 export NAPMEM_ALLOWED_ROOTS="$ALLOWED_ROOTS"
 
 # --- Mirror agent memory files as uniquely-named symlinks ------------------
 mirror() {  # mirror <src> <link-name> [keep-existing]
   local src="$1" link="$WATCH_DIR/$2" keep="${3:-}"
+  if [ -n "$keep" ] && { [ -e "$link" ] || [ -L "$link" ]; }; then
+    return 0  # A mounted twin never revokes the local owner's existing mirror.
+  fi
   case "$src" in *sync-conflict*) return 0;; esac  # skip Syncthing conflict copies
   local real
   real="$(readlink -f -- "$src" 2>/dev/null)" || return 0
@@ -79,14 +111,20 @@ mirror() {  # mirror <src> <link-name> [keep-existing]
     fi
     return 0
   fi
-  if [ -n "$keep" ] && { [ -e "$link" ] || [ -L "$link" ]; }; then
-    return 0  # mounted twin: local mirror already owns this name
-  fi
   if [ -e "$link" ] && [ ! -L "$link" ]; then
     # A plain file an operator dropped into the watch dir owns its name —
     # never clobber it with a mirror link.
     echo "run-naptime: name collision with operator file, skipping: $link" >&2
     return 0
+  fi
+  if [ -L "$link" ] && [ ! -d "$link" ] && [ "$(readlink -- "$link")" != "$src" ]; then
+    local suffix
+    suffix="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])' "$src")"
+    link="${link%.md}__${suffix}.md"
+    if [ -e "$link" ] && [ ! -L "$link" ]; then
+      echo "run-naptime: name collision with operator file, skipping: $link" >&2
+      return 0
+    fi
   fi
   if [ ! -L "$link" ] || [ "$(readlink -- "$link")" != "$src" ]; then
     ln -sfn -- "$src" "$link"  # replace directory symlinks; never follow them

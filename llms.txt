@@ -10,6 +10,7 @@
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): Development
 - [docs/TESTING.md](docs/TESTING.md): Testing
 - [docs/known-issues.md](docs/known-issues.md): Known issues
+- [docs/wiki/README.md](docs/wiki/README.md): NapMem project wiki
 
 ## Source and validation
 - [.github/workflows/ci.yml](.github/workflows/ci.yml): GitHub Actions validation workflow
@@ -53,6 +54,7 @@
 - [test_napmem_inspector.py](test_napmem_inspector.py): Offline operator inspection, provenance boundaries and exact budgets.
 - [test_napmem_jobs.py](test_napmem_jobs.py): Offline durable queue, lease, cloud-resume and atomic-commit tests.
 - [test_napmem_lifecycle.py](test_napmem_lifecycle.py): Integration gates for compatible scoped assertion ingestion.
+- [test_napmem_maintenance.py](test_napmem_maintenance.py): Synthetic adversarial maintenance regressions; no providers or live stores.
 - [test_napmem_mcp_contract.py](test_napmem_mcp_contract.py): Typed MCP contracts, strict pre-load validation and complete wire budgets.
 - [test_napmem_metrics.py](test_napmem_metrics.py): Content-free local metrics, retention and strictly read-only status tests.
 - [test_napmem_model.py](test_napmem_model.py): Pure scoped assertion, migration and derived-view tests.

@@ -207,6 +207,11 @@
       "summary": "Integration gates for compatible scoped assertion ingestion."
     },
     {
+      "path": "test_napmem_maintenance.py",
+      "signal": "high",
+      "summary": "Synthetic adversarial maintenance regressions; no providers or live stores."
+    },
+    {
       "path": "test_napmem_mcp_contract.py",
       "signal": "high",
       "summary": "Typed MCP contracts, strict pre-load validation and complete wire budgets."

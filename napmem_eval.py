@@ -26,6 +26,7 @@ from typing import Any
 from unittest.mock import patch
 
 from napmem_retrieval_agent import NapMemRetrievalAgent
+from napmem_config import RUNTIME_LOCK
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_FIXTURE = ROOT / "evaluations" / "memory_quality_v1.json"
@@ -51,7 +52,7 @@ def _date(value: str) -> datetime:
 def load_fixture(path: str | Path = DEFAULT_FIXTURE) -> dict[str, Any]:
     """Load and validate a versioned, explicitly split fixture without I/O side effects."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if data.get("synthetic") is not True:
+    if not isinstance(data, dict) or data.get("synthetic") is not True:
         raise ValueError("Evaluation requires an explicitly synthetic fixture")
     _date(data["as_of"])
     records = {record["id"]: record for record in data["records"]}
@@ -87,9 +88,9 @@ def load_fixture(path: str | Path = DEFAULT_FIXTURE) -> dict[str, Any]:
             raise ValueError("Invalid expected evidence IDs")
         if set(case.get("relevance", {})) - set(expected):
             raise ValueError("Relevance grades must refer to expected IDs")
-        if any(not isinstance(grade, int) or isinstance(grade, bool) or grade < 1
+        if any(not isinstance(grade, int) or isinstance(grade, bool) or not 1 <= grade <= 16
                for grade in case.get("relevance", {}).values()):
-            raise ValueError("Relevance grades must be positive integers")
+            raise ValueError("Relevance grades must be integers between 1 and 16")
         _date(case.get("as_of") or data["as_of"])
         for rid in expected:
             if not _scope_allowed(records[rid], case.get("scope")):
@@ -130,10 +131,12 @@ def score_query(case: dict[str, Any], result_ids: list[str],
     returned ID outside this query's labels; it does not measure generated text.
     Safety counts cover the complete returned list, even beyond rank five.
     """
-    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
-        raise ValueError("k must be a positive integer")
+    if isinstance(k, bool) or not isinstance(k, int) or k != 5:
+        raise ValueError("Fixed at_5 metrics require k=5")
     expected = set(case["expected_ids"])
     grades = {rid: case.get("relevance", {}).get(rid, 1) for rid in expected}
+    if any(isinstance(grade, bool) or not isinstance(grade, int) or not 1 <= grade <= 16 for grade in grades.values()):
+        raise ValueError("Relevance grades must be integers between 1 and 16")
     ranked = result_ids[:k]
     seen: set[str] = set()
     gains = []
@@ -180,6 +183,8 @@ def extract_result_ids(response: dict[str, Any]) -> list[str]:
         if not isinstance(hit, dict):
             raise ValueError("Evidence must contain record objects")
         record = hit.get("record", hit)
+        if not isinstance(record, dict):
+            raise ValueError("Evidence record must be an object")
         rid = record.get("id", record.get("record_id"))
         if not isinstance(rid, str):
             raise ValueError("Evidence record lacks an ID")
@@ -234,7 +239,7 @@ def evaluate(mode: str = "substring", split: str = "heldout", *,
     records = {r["id"]: r for r in fixture["records"]}
     cases = [q for q in fixture["queries"] if split == "all" or q["split"] == split]
     rows = []
-    with tempfile.TemporaryDirectory(prefix="napmem-eval-") as temporary, ExitStack() as stack:
+    with RUNTIME_LOCK, tempfile.TemporaryDirectory(prefix="napmem-eval-") as temporary, ExitStack() as stack:
         # Existing semantic_search honors this setting before selecting a backend.
         stack.enter_context(patch.dict(os.environ, {"NAPMEM_EMBED_BACKEND": "hashed"}))
         stack.enter_context(patch("socket.create_connection", side_effect=RuntimeError("Offline evaluation forbids network access")))
@@ -293,6 +298,14 @@ def evaluate(mode: str = "substring", split: str = "heldout", *,
 
 def compare_baseline(report: dict[str, Any], baseline: dict[str, Any], *, tolerance: float = 1e-12) -> list[str]:
     """Return quality regressions against a compatible report; ignore timing and byte variation."""
+    if (isinstance(tolerance, bool) or not isinstance(tolerance, (float, int))
+            or not 0 <= tolerance <= 1 or not math.isfinite(tolerance)):
+        raise ValueError("tolerance must be finite and between 0 and 1")
+    for candidate in (report, baseline):
+        for metrics in [candidate["metrics"], *candidate["by_category"].values()]:
+            for value in metrics.values():
+                if isinstance(value, (int, float)) and (not -1e308 <= value <= 1e308 or not math.isfinite(value)):
+                    raise ValueError("Evaluation metrics must be finite")
     for field in ("fixture_sha256", "split", "top_k", "as_of"):
         if report.get(field) != baseline.get(field):
             return [f"Incompatible baseline: {field} differs"]

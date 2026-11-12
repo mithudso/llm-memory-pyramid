@@ -345,9 +345,24 @@ class MemoryPyramidDistiller:
         Legacy duplicate IDs with no recorded anchor are unresolvable dangling
         references and are dropped wherever found.
         """
-        new_by_text: dict[str, dict[str, Any]] = {}
+        new_by_text: dict[str, list[dict[str, Any]]] = {}
         for unit in new_records:
-            new_by_text.setdefault(unit["text"].lower().strip(), unit)
+            new_by_text.setdefault(unit["text"].lower().strip(), []).append(unit)
+        # Reserve context-equivalent matches before a changed-context record can
+        # consume another assertion's identical text. IDs describe occurrences.
+        by_identity = {}
+        for unit in new_records:
+            by_identity.setdefault(_text_identity(unit), deque()).append(unit)
+        reserved = {}
+        reserved_units = set()
+        for prior in self.data["memory_records"]:
+            candidates = by_identity.get(_text_identity(prior))
+            if prior["source_anchor"].get("session_id") == session_id and candidates:
+                unit = candidates.popleft()
+                reserved[prior["id"]] = unit
+                reserved_units.add(unit["id"])
+        fallback_units = {text: deque(unit for unit in units if unit["id"] not in reserved_units)
+                          for text, units in new_by_text.items()}
         consumed_ids = set()
         # Same-session duplicate IDs stripped from ANY session's canonical:
         # if the re-ingested content re-asserts that text, the unit must
@@ -368,19 +383,23 @@ class MemoryPyramidDistiller:
                 anchor = anchors.get(duplicate_id, {})
                 if anchor.get("session_id") == session_id:
                     duplicate_text = anchor.get("paraphrase_text", rec["text"])
-                    reclaimable.setdefault(duplicate_text.lower().strip(), deque()).append(
+                    reclaimable.setdefault((_assertion_key(anchor.get("assertion", {})), duplicate_text.lower().strip()), deque()).append(
                         (duplicate_id, copy.deepcopy(anchor.get("assertion", {}))))
             foreign = [
                 d for d in rec.get("duplicates", [])
                 if anchors.get(d, {}).get("session_id") not in (session_id, None)
             ]
+            foreign_ids = set(foreign)
             if rec["source_anchor"]["session_id"] != session_id:
                 if len(foreign) != len(rec.get("duplicates", [])):
                     rec["duplicates"] = foreign
-                    rec["duplicate_anchors"] = {d: a for d, a in anchors.items() if d in foreign}
+                    rec["duplicate_anchors"] = {d: a for d, a in anchors.items() if d in foreign_ids}
                 kept.append(rec)
                 continue
-            match = new_by_text.get(rec["text"].lower().strip())
+            match = reserved.get(rec["id"])
+            if match is None:
+                candidates = fallback_units.get(rec["text"].lower().strip())
+                match = candidates.popleft() if candidates else None
             if match is not None and match["id"] not in consumed_ids:
                 old_text = rec["text"]
                 proof_changed = (rec.get("evidence", {}).get("source_sha256") !=
@@ -463,7 +482,7 @@ class MemoryPyramidDistiller:
         max_reclaimed = 0
         prefix = f"rec_{session_id}_"
         for unit in remaining:
-            prior_ids = reclaimable.get(unit["text"].lower().strip())
+            prior_ids = reclaimable.get((_assertion_key(unit), unit["text"].lower().strip()))
             prior = prior_ids.popleft() if prior_ids else None
             if prior is not None:
                 reclaimed, prior_context = prior
@@ -850,8 +869,12 @@ def main():
         if not os.path.exists(args.input):
             print(f"Error: input file not found: {args.input}", file=sys.stderr)
             sys.exit(1)
-        with open(args.input, "r", encoding="utf-8") as f:
-            content = f.read()
+        from napmem_sources import read_source
+        try:
+            content = read_source(args.input, allowed_roots=[])["content"]
+        except (OSError, ValueError) as exc:
+            print(f"Error: input rejected ({type(exc).__name__})", file=sys.stderr)
+            raise SystemExit(1) from exc
         # Derive the default session ID from the input BASENAME (mirroring the
         # consolidator). Caveat: two different files sharing a basename map to
         # the same session and replace each other's records — warn when the

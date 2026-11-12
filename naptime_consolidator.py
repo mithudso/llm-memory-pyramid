@@ -67,7 +67,7 @@ def _fd_true_path(fd: int) -> str | None:
         if hasattr(fcntl, "F_GETPATH"):
             raw = fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024))
             return raw.split(b"\x00", 1)[0].decode()
-    except (OSError, ValueError, UnicodeDecodeError):
+    except (ImportError, OSError, ValueError, UnicodeDecodeError):
         pass
     try:
         return os.readlink(f"/proc/self/fd/{fd}")
@@ -99,6 +99,9 @@ def _resolve_allowed_roots(watch_dir: str) -> list[str]:
             f"{ALLOWED_ROOTS_ENV}={raw!r} yields no roots; use 'off' to disable the guard")
     return roots
 
+
+MAX_SWEEP_FILES = 256
+MAX_SWEEP_BYTES = 64 * 1024 * 1024
 
 class NaptimeConsolidator:
     def __init__(self, watch_dir: str, pyramid_path: str = "napmem_pyramid.json",
@@ -201,6 +204,7 @@ class NaptimeConsolidator:
     def _collect_changed(self) -> list[tuple[str, str, str, float]]:
         """Returns (session_id, fpath, content, mtime) for changed .md files."""
         changed = []
+        changed_bytes = 0
         os.makedirs(self.watch_dir, exist_ok=True)
         with self.distiller.transaction():
             sources = list(self.distiller.data["raw_conversations"])
@@ -240,7 +244,11 @@ class NaptimeConsolidator:
                     self.file_hashes[fpath] = {"mtime": mtime, "sha256": digest}
                     self.source_registry.mark_committed(session_id, digest)
                     continue
+                if len(changed) >= MAX_SWEEP_FILES or changed_bytes + snapshot["size"] > MAX_SWEEP_BYTES:
+                    logger.warning("Sweep input budget reached; deferring %s", session_id)
+                    continue
                 changed.append((session_id, fpath, content, mtime))
+                changed_bytes += snapshot["size"]
             except (OSError, ValueError) as exc:
                 if self._refused.get(fpath) != mtime:
                     logger.error("Skipping memory file %s: %s", fpath, exc)
@@ -460,7 +468,7 @@ class NaptimeConsolidator:
         from llm_extraction_prompts import PROMPT_VERSION
         queue = JobQueue(self.pyramid_path)
         backend = "anthropic" if self.use_llm else "heuristic"
-        if queue.list("submitted"):
+        if self.use_llm and queue.list("submitted"):
             if self._client is None:
                 from llm_extractor import _make_client
                 self._client = _make_client()
@@ -478,8 +486,9 @@ class NaptimeConsolidator:
                                 scope=entry.get("scope"), backend=backend,
                                 model=DEFAULT_MODEL if backend == "anthropic" else None,
                                 prompt_version=PROMPT_VERSION, allowed_roots=self.allowed_roots)
+            # Queued is pending work, not a committed consolidation.
             if job["enqueued"]:
-                touched.add(session_id)
+                logger.info("Queued extraction for %s", session_id)
         if backend == "heuristic":
             queue.run(self.distiller)
             receipts = queue.commit_ready(self.distiller, source_reader=lambda job: self.source_registry.read_current(
@@ -506,8 +515,8 @@ class NaptimeConsolidator:
         while ticks < max_ticks:
             try:
                 self.scan_and_consolidate()
-            except Exception:
-                logger.exception("Sweep failed; continuing on next tick")
+            except Exception as exc:
+                logger.error("Sweep failed (%s); continuing on next tick", type(exc).__name__)
             ticks += 1
             if ticks < max_ticks:
                 time.sleep(poll_interval_sec)
@@ -533,8 +542,15 @@ def main():
                                        extraction=args.extraction,
                                        semantic_dedup=args.semantic_dedup,
                                        async_batches=args.async_batches)
-    max_ticks = 1 if args.once else args.max_ticks
-    consolidator.run_loop(poll_interval_sec=args.interval, max_ticks=max_ticks)
+    if args.once:
+        try:
+            consolidator.scan_and_consolidate()
+        except Exception as exc:
+            logger.error("Sweep failed (%s)", type(exc).__name__)
+            return 1
+    else:
+        consolidator.run_loop(poll_interval_sec=args.interval, max_ticks=args.max_ticks)
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

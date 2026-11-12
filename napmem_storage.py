@@ -94,13 +94,24 @@ def store_lock(path, timeout: float = 10):
         yield
     finally:
         held.pop(canonical, None)
-        if fd is not None:
-            try:
-                if locked:
-                    release()
-            finally:
-                os.close(fd)
-        mutex.release()
+        try:
+            if fd is not None:
+                try:
+                    if locked:
+                        release()
+                finally:
+                    os.close(fd)
+        finally:
+            mutex.release()
+
+
+def finite_json_float(value):
+    """Reject exponent overflow as well as explicit JSON nonfinite constants."""
+    import math
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError("Nonfinite JSON values are not valid store data")
+    return result
 
 
 def _reject_constant(value):
@@ -143,7 +154,7 @@ def read_snapshot(path) -> tuple[dict | None, str | None]:
     if payload is None:
         return None, None
     try:
-        data = json.loads(payload.decode("utf-8"), parse_constant=_reject_constant)
+        data = json.loads(payload.decode("utf-8"), parse_constant=_reject_constant, parse_float=finite_json_float)
     except (UnicodeError, ValueError, RecursionError) as exc:
         raise ValueError("Store is not a valid UTF-8 JSON object") from exc
     if not isinstance(data, dict):

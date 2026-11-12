@@ -242,13 +242,15 @@ def _controls(data: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Malformed operator assertion evidence")
         assertion_ids.add(rid)
         assertion_parents[rid] = normalized["corrects"]
+    checked = set()
     for rid in assertion_parents:
         seen = set()
-        while rid in assertion_parents:
+        while rid in assertion_parents and rid not in checked:
             if rid in seen:
                 raise ValueError("Correction cycle detected")
             seen.add(rid)
             rid = assertion_parents[rid]
+        checked.update(seen)
     for fp, correction in result["corrections"].items():
         if (not _digest(fp) or not isinstance(correction, dict) or set(correction) != _CORRECTION_FIELDS
                 or not isinstance(correction["assertion_id"], str)
@@ -344,8 +346,12 @@ def _family(data: dict[str, Any], controls: dict[str, Any], record_id: str) -> s
     graph: dict[str, set[str]] = defaultdict(set)
 
     def connect(ids):
-        for rid in ids:
-            graph[rid].update(ids)
+        if not ids:
+            return
+        hub = ids[0]
+        graph[hub].update(ids)
+        for rid in ids[1:]:
+            graph[rid].add(hub)
 
     for record in data.get("memory_records", []):
         connect([record["id"], *record.get("duplicates", [])])
@@ -510,9 +516,12 @@ def _context(data, action, record_id, value, source, at):
         target = records[record_id]
         if target["text"].lower().strip() == value.lower().strip():
             raise ValueError("Correction must change the normalized assertion text")
+        if fingerprint({**target, "text": value}) in controls["corrections"]:
+            raise ValueError("Correction cycle: cannot reintroduce previously corrected text")
         affected = sorted(family | {record_id})
     else:
-        affected = [record_id]
+        target_fp = fingerprint(records[record_id])
+        affected = sorted(rid for rid, item in records.items() if fingerprint(item) == target_fp)
     if action == "expire":
         expiry = parse_time(value if value is not None else moment, "expiry").isoformat()
         normalize_record({**records[record_id], "valid_to": expiry})
@@ -545,10 +554,10 @@ def preview_action(data: dict[str, Any], action: str, *, record_id: str | None =
     return preview
 
 
-def _prune_raw(data):
+def _prune_raw(data, selected_sessions):
     sessions = {item["source_anchor"].get("session_id")
                 for record in data.get("memory_records", []) for item in _occurrences(record)}
-    data["raw_conversations"] = [raw for raw in data.get("raw_conversations", []) if raw.get("session_id") in sessions]
+    data["raw_conversations"] = [raw for raw in data.get("raw_conversations", []) if raw.get("session_id") in sessions or raw.get("session_id") not in selected_sessions]
 
 
 def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = None,
@@ -643,7 +652,7 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
         target = records[record_id]
         fp = fingerprint(target)
         override = controls["overrides"].setdefault(fp, {"record_ids": [], "scope": target["scope"], "text_sha256": _text_hash(target)})
-        override["record_ids"] = sorted(set(override["record_ids"]) | {record_id})
+        override["record_ids"] = sorted(set(override["record_ids"]) | set(affected))
         if action in ("pin", "unpin"):
             override["pinned"] = action == "pin"
             changed_fields = ["pinned"]
@@ -656,7 +665,12 @@ def apply_action(data: dict[str, Any], action: str, *, record_id: str | None = N
         hashes.add(fp)
     redacted = _apply(working, controls)
     if action in ("forget", "forget_session", "exclude"):
-        _prune_raw(working)
+        selected_sessions = {records[rid]["source_anchor"].get("session_id") for rid in affected if rid in records}
+        if action in ("exclude", "forget_session"):
+            selector_controls = {"excluded_sources": {normalized_source: True}}
+            selected_sessions.update(raw.get("session_id") for raw in working.get("raw_conversations", [])
+                                     if _excluded(selector_controls, {"source_anchor": raw}))
+        _prune_raw(working, selected_sessions)
     controls["journal"].append({"action": action, "id": change_id, "at": moment,
                                 "affected_ids": sorted(set(affected)), "hashes": sorted(hashes),
                                 "fields": sorted(changed_fields)})

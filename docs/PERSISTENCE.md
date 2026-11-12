@@ -38,3 +38,22 @@ All persisted JSON and queue files use private permissions. Atomic replacement
 includes file fsync; a directory-sync failure after replacement is reported as
 a durability limitation because the commit is already visible. Original raw
 files are never deleted by memory controls.
+
+## Maintenance boundaries
+
+Correction text cannot form a fingerprint cycle (A→B→A). Preview IDs include every
+occurrence affected by a scoped text override. Deleting one source preserves
+unrelated raw-session metadata, including sessions with no extracted records.
+
+Source rename recognition now also requires creation identity: native birth time
+on macOS, or Linux statx `STATX_BTIME` where available. Existing registries gain this
+metadata when a known path is observed. If it is unknown, a renamed file gets a new
+identity; use explicit session mapping where continuity is required. Device/inode
+alone cannot distinguish a recycled inode. Creation time is metadata evidence,
+not a cryptographic guarantee against a privileged filesystem adversary.
+
+An expired or replaced job lease cannot mutate canonical memory. Commit holds the
+queue write fence during the canonical write, following store→queue lock order.
+`SubmissionOutcomeUnknown` cannot retry automatically. Queue parents must be owned
+by the current user and not writable by others. Operator/provider reconciliation
+remains necessary after an ambiguous paid submission.

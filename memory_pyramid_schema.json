@@ -171,7 +171,221 @@
                 },
                 "assertion": {
                   "type": "object",
-                  "description": "The duplicate occurrence context, including its scope, validity, review and evidence. Promotion adopts this context."
+                  "description": "The duplicate occurrence context, including its scope, validity, review and evidence. Promotion adopts this context.",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "concept",
+                        "fact",
+                        "actionable",
+                        "question",
+                        "problem",
+                        "statement",
+                        "quote",
+                        "idea"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "salience": {
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "canonical": {
+                      "type": "string"
+                    },
+                    "topic_slug": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "memory_kind": {
+                      "type": "string",
+                      "enum": [
+                        "preference",
+                        "constraint",
+                        "decision",
+                        "observation",
+                        "task",
+                        "idea",
+                        "lesson",
+                        "goal",
+                        "workflow"
+                      ]
+                    },
+                    "subject": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "superseded",
+                        "expired",
+                        "deleted",
+                        "quarantined"
+                      ]
+                    },
+                    "review_status": {
+                      "type": "string",
+                      "enum": [
+                        "unreviewed",
+                        "pending",
+                        "approved",
+                        "rejected"
+                      ]
+                    },
+                    "authority": {
+                      "type": "string"
+                    },
+                    "supersedes": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "description": "Literal quote and exact ingestion revision binding. Verified quotation does not prove paraphrase truth. High-trust profiles require reviewed support.",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "unverified",
+                            "changed",
+                            "missing"
+                          ]
+                        },
+                        "source_kind": {
+                          "type": "string"
+                        },
+                        "source_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_revision": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "quote": {
+                          "type": "string"
+                        },
+                        "quote_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "line_range": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "quote_truncated": {
+                          "type": "boolean"
+                        },
+                        "assertion_support": {
+                          "type": "string",
+                          "enum": [
+                            "verbatim",
+                            "unverified"
+                          ]
+                        },
+                        "extraction": {
+                          "type": "object"
+                        }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "status": {
+                                "const": "verified"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "quote",
+                              "source_sha256",
+                              "source_kind"
+                            ],
+                            "properties": {
+                              "quote": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "source_sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "observed_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "valid_from": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "valid_to": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "last_verified_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  }
                 }
               },
               "required": [
@@ -322,7 +536,38 @@
               "extraction": {
                 "type": "object"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "verified"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "quote",
+                    "source_sha256",
+                    "source_kind"
+                  ],
+                  "properties": {
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            ]
           },
           "observed_at": {
             "type": [
@@ -442,7 +687,10 @@
     "forgotten_record_ids": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
       "description": "Hashed forgotten record-family IDs preserve privacy during older snapshot restore without affecting independent scopes."
     },
     "evidence_redactions": {

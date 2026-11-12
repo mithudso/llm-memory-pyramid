@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from memory_pyramid_distiller import MemoryPyramidDistiller
 from napmem_retrieval_agent import NapMemRetrievalAgent
-from napmem_storage import StoreConflict, StoreLockTimeout, atomic_write, read_snapshot, store_lock
+from napmem_storage import StoreConflict, atomic_write, read_snapshot, store_lock
 
 
 class TransactionTests(unittest.TestCase):
@@ -209,22 +209,41 @@ class TransactionTests(unittest.TestCase):
         script = ("import sys; from memory_pyramid_distiller import MemoryPyramidDistiller; "
                   "n=sys.argv[2]; MemoryPyramidDistiller(sys.argv[1]).ingest_session('p'+n,'Process','p'+n+'.md','Process fact '+n)")
         env = {**os.environ, "NAPMEM_EMBED_BACKEND": "hashed"}
-        children = [subprocess.Popen([sys.executable, "-c", script, self.path, str(n)],
+        children = []
+        def reap(child):
+            if child.poll() is None:
+                child.terminate()
+            try:
+                child.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.communicate(timeout=2)
+        for number in range(4):
+            child = subprocess.Popen([sys.executable, "-c", script, self.path, str(number)],
                                      env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    for n in range(4)]
+            children.append(child)
+            self.addCleanup(reap, child)
         for child in children:
-            _, error = child.communicate(timeout=15)
+            _, error = child.communicate(timeout=10)
             self.assertEqual(child.returncode, 0, error.decode())
         loaded = MemoryPyramidDistiller(self.path)
         self.assertEqual(len(loaded.data["memory_records"]), 12)
         self.assertEqual(loaded.data["generation"], 12)
+        self.assertEqual({row["text"] for row in loaded.data["memory_records"]},
+                         {f"Thread fact {n}" for n in range(8)} | {f"Process fact {n}" for n in range(4)})
+        self.assertEqual({row["source_anchor"]["session_id"] for row in loaded.data["memory_records"]},
+                         {f"t{n}" for n in range(8)} | {f"p{n}" for n in range(4)})
 
     def test_lock_is_reentrant_and_has_a_deadline_for_other_threads(self):
-        with store_lock(self.path), store_lock(self.path):
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(self._try_lock)
-                with self.assertRaises(StoreLockTimeout):
-                    future.result(timeout=2)
+        code = ("import sys; from concurrent.futures import ThreadPoolExecutor; "
+                "from napmem_storage import store_lock,StoreLockTimeout;\n"
+                "def attempt():\n with store_lock(sys.argv[1],timeout=.05): pass\n"
+                "with store_lock(sys.argv[1]),store_lock(sys.argv[1]):\n"
+                " with ThreadPoolExecutor(max_workers=1) as pool:\n"
+                "  try: pool.submit(attempt).result(timeout=2)\n"
+                "  except StoreLockTimeout: pass\n"
+                "  else: raise AssertionError('lock did not time out')")
+        subprocess.run([sys.executable, "-c", code, self.path], timeout=4, check=True, capture_output=True)
         self.assertTrue(Path(self.path + ".lock").exists())
 
     def _try_lock(self):

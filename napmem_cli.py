@@ -31,7 +31,7 @@ def build_parser():
     try:
         installed_version = version("llm-memory-pyramid")
     except PackageNotFoundError:
-        installed_version = "0.2.0"
+        installed_version = "0.2.1"
     parser.add_argument("--version", action="version", version=installed_version)
     _common(parser)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -180,6 +180,10 @@ def _capture(config, args, distiller):
     if not getattr(args, "session_id", None):
         entry = registry.observe(source, scope=config.scope, legacy_sources=distiller.data["raw_conversations"])
         session = entry["session_id"]
+    from napmem_adapters import _check_owner
+    registered = registry.lookup(session_id=session)
+    previous = registered.get("previous_path") if registered and registered["path"] == path else None
+    _check_owner(distiller, session, path, previous)
     return source, session, registry
 
 
@@ -256,6 +260,10 @@ def _ingest(config, args):
                 stale = "source_missing_or_unreadable"
         if stale:
             return {"status": "stale", "reason": stale, "session_id": session, "ingested": 0}
+        from napmem_adapters import _check_owner
+        registered = registry.lookup(session_id=session)
+        previous = registered.get("previous_path") if registered and registered["path"] == source["path"] else None
+        _check_owner(distiller, session, source["path"], previous)
         count = distiller.ingest_session_records(session, title, source["path"], records,
                                                   scope=config.scope, source_content=source["content"], extraction_info=info)
     if not getattr(args, "session_id", None):
@@ -447,9 +455,10 @@ def main(argv: list[str] | None = None) -> int:
                 NapMemMCPServer(config.pyramid).serve()
                 return 0
             result = execute(config, args)
-        _observe(config, args, result, started)
+        failed = result.get("ok") is False or bool(result.get("baseline_regressions")) or result.get("status") in ("stale", "failed")
+        _observe(config, args, result, started, success=not failed)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False))
-        return 1 if result.get("ok") is False or result.get("baseline_regressions") else 0
+        return 1 if failed else 0
     except Exception as exc:
         if config is not None:
             _observe(config, args, {}, started, success=False)

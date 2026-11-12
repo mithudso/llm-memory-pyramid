@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parent
 class TestPromptAndMirrorSafety(unittest.TestCase):
     def test_unmatched_bracket_run_has_bounded_processing(self):
         code = ('from llm_extraction_prompts import _neutralize_sentinel; '
-                'value = "<" * 600000; assert _neutralize_sentinel(value) == value')
+                'value = "<" * 600000; result = _neutralize_sentinel(value); '
+                'result == value or (_ for _ in ()).throw(AssertionError("changed source"))')
         # A child deadline catches the former quadratic regex without leaving
         # a wedged test worker. The corrected path takes far below one second.
         subprocess.run([sys.executable, '-c', code], cwd=ROOT,

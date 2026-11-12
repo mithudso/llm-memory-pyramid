@@ -7,6 +7,7 @@ import hashlib
 import os
 from pathlib import Path
 import stat
+import sys
 from typing import Any, Callable
 
 from napmem_storage import atomic_write, read_snapshot, store_lock
@@ -19,12 +20,53 @@ def normalized_path(path: str) -> str:
     return os.path.abspath(os.path.normpath(os.fspath(path)))
 
 
+
+def _birthtime_ns(info, *, fd=None, path=None):
+    """Read creation identity without file content; unavailable means unknown.
+
+    Linux statx's fixed UAPI places its 16-byte creation timestamp at 0x50
+    in a 256-byte result. See include/uapi/linux/stat.h; require STATX_BTIME.
+    """
+    native = getattr(info, "st_birthtime_ns", None)
+    if native is not None:
+        return native
+    native_seconds = getattr(info, "st_birthtime", None)
+    if native_seconds is not None:
+        return round(native_seconds * 1_000_000_000)
+    if not sys.platform.startswith("linux"):
+        return None
+    import ctypes
+    import struct
+    statx_btime, at_empty_path = 0x800, 0x1000
+    result_bytes, birth_offset = 256, 0x50
+    try:
+        function = ctypes.CDLL(None, use_errno=True).statx
+        function.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_uint, ctypes.c_void_p)
+        function.restype = ctypes.c_int
+        result = ctypes.create_string_buffer(result_bytes)
+        if function(fd if fd is not None else -100, b"" if fd is not None else os.fsencode(path),
+                    at_empty_path if fd is not None else 0, statx_btime, result) != 0:
+            return None
+        if not struct.unpack_from("=I", result.raw)[0] & statx_btime:
+            return None
+        seconds, nanoseconds = struct.unpack_from("=qI", result.raw, birth_offset)
+        return seconds * 1_000_000_000 + nanoseconds
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+
+
+def _same_file_identity(entry, device, inode, birth):
+    return (birth is not None and entry.get("birthtime_ns") is not None
+            and entry.get("device") == device and entry.get("inode") == inode
+            and entry["birthtime_ns"] == birth)
+
+
 def _fd_path(fd: int) -> str | None:
     try:
         import fcntl
         if hasattr(fcntl, "F_GETPATH"):
             return fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024)).split(b"\0", 1)[0].decode("utf-8")
-    except (OSError, ValueError, UnicodeDecodeError):
+    except (ImportError, OSError, ValueError, UnicodeDecodeError):
         pass
     try:
         return os.readlink(f"/proc/self/fd/{fd}")
@@ -69,12 +111,12 @@ def read_source(path: str, allowed_roots: list[str] | None = None, *,
         if len(raw) > max_bytes:
             raise ValueError(f"Source exceeds {max_bytes}-byte limit")
         after = os.fstat(fd)
-        if (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
+        if (before.st_mtime_ns, before.st_ctime_ns, before.st_size) != (after.st_mtime_ns, after.st_ctime_ns, after.st_size):
             raise ValueError("Source changed during guarded read")
         content = raw.decode("utf-8")
         return {"path": path, "content": content, "sha256": hashlib.sha256(raw).hexdigest(),
                 "device": before.st_dev, "inode": before.st_ino, "mtime": before.st_mtime,
-                "size": len(raw)}
+                "size": len(raw), "birthtime_ns": _birthtime_ns(before, fd=fd)}
     finally:
         os.close(fd)
 
@@ -120,6 +162,16 @@ class SourceRegistry:
         known = next((entry for entry in entries if entry["path"] == path), None)
         if known:
             return known["session_id"]
+        try:
+            details = os.stat(path)
+        except OSError:
+            details = None
+        if details is not None:
+            birth = _birthtime_ns(details, path=path)
+            renamed = [entry for entry in entries if not os.path.exists(entry["path"])
+                       and _same_file_identity(entry, details.st_dev, details.st_ino, birth)]
+            if len(renamed) == 1:
+                return renamed[0]["session_id"]
         legacy = next((entry for entry in legacy_sources or []
                        if normalized_path(entry.get("file_path", "")) == path), None)
         if legacy:
@@ -144,7 +196,7 @@ class SourceRegistry:
             if entry is None:
                 candidates = [item for item in data["sources"] if item["path"] not in live
                               and not os.path.exists(item["path"])
-                              and item.get("device") == snapshot["device"] and item.get("inode") == snapshot["inode"]]
+                              and _same_file_identity(item, snapshot["device"], snapshot["inode"], snapshot.get("birthtime_ns"))]
                 if len(candidates) == 1:
                     entry = candidates[0]
                     entry["previous_path"] = entry["path"]
@@ -166,6 +218,8 @@ class SourceRegistry:
                          "scope": scope or legacy.get("scope", "legacy")}
                 data["sources"].append(entry)
             entry.update({field: snapshot[field] for field in ("sha256", "device", "inode", "mtime", "size")})
+            if "birthtime_ns" in snapshot:
+                entry["birthtime_ns"] = snapshot["birthtime_ns"]
             entry["status"] = "present"
             if scope is not None:
                 entry["scope"] = scope

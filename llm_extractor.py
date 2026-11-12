@@ -59,6 +59,10 @@ def parse_extraction_output(raw_text: str) -> list[dict[str, Any]]:
     code fence around the array (models occasionally add one despite the
     return-only-JSON instruction) but nothing else.
     """
+    try:
+        raw_text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ExtractionError("Extractor output must be valid UTF-8") from exc
     text = raw_text.strip()
     fence = CODE_FENCE_RE.match(text)
     if fence:
@@ -83,6 +87,10 @@ def validate_unit(unit: Any) -> str | None:
     text = unit.get("text")
     if not isinstance(text, str) or not text.strip():
         return "missing or empty text"
+    try:
+        json.dumps(unit, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:
+        return "invalid Unicode in extraction unit"
     if unit.get("salience") not in SALIENCE_LEVELS:
         return "invalid salience"
     anchor = unit.get("source_anchor")
@@ -376,8 +384,12 @@ def main():
         if not os.path.exists(path):
             print(f"Error: input file not found: {path}", file=sys.stderr)
             sys.exit(1)
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
+        from napmem_sources import read_source
+        try:
+            content = read_source(path, allowed_roots=[], max_bytes=4 * MAX_INPUT_CHARS)["content"]
+        except (OSError, ValueError) as exc:
+            logger.error("Input rejected (%s)", type(exc).__name__)
+            return 1
         session_id = f"sess_{os.path.splitext(os.path.basename(path))[0]}"
         if session_id in file_paths:
             # Session ids derive from basenames: a/notes.md + b/notes.md would
@@ -399,6 +411,9 @@ def main():
             print(f"=== {session_id} ===\n{prompt}\n")
         return
 
+    if not prompts:
+        logger.error("No eligible extraction inputs")
+        return 1
     client = _make_client()
     if args.no_batch:
         outputs = {}
@@ -415,9 +430,11 @@ def main():
         try:
             outputs = extract_batch(client, prompts, args.model)
         except (ExtractionError, anthropic.APIError, OSError) as exc:
-            logger.error("Batch extraction failed: %s", exc)
+            logger.error("Batch extraction failed (%s)", type(exc).__name__)
             outputs = {}
 
+    if not outputs:
+        return 1
     distiller = MemoryPyramidDistiller(pyramid_path=args.pyramid,
                                        semantic_dedup=args.semantic_dedup)
     total, ingested = ingest_extractions(
@@ -426,7 +443,8 @@ def main():
                          "model": args.model, "prompt_version": PROMPT_VERSION})
     print(f"Ingested {total} LLM-extracted unit(s) from {len(ingested)} session(s) "
           f"into {args.pyramid}")
+    return 0 if len(ingested) == len(prompts) else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

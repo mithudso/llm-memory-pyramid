@@ -27,7 +27,9 @@ class RetrievalContractTests(unittest.TestCase):
             self.assertIn("Vim", json.dumps(result))
             self.assertNotIn("Emacs", json.dumps(result))
             self.assertNotIn("project:b", json.dumps(result))
-        self.assertIn("error", self.agent.inspect_provenance("rec_b_001", scope="project:a"))
+        rid = next(r["id"] for r in self.agent.data["memory_records"] if r["scope"] == "project:b")
+        self.assertNotIn("error", self.agent.inspect_provenance(rid, scope="project:b"))
+        self.assertIn("error", self.agent.inspect_provenance(rid, scope="project:a"))
 
     def test_default_hybrid_never_selects_or_probes_an_online_backend(self):
         with patch.dict("os.environ", {"NAPMEM_EMBED_BACKEND": "ollama"}), patch(
@@ -60,12 +62,15 @@ class RetrievalContractTests(unittest.TestCase):
             self.agent.query("editor", scope="project:a", max_bytes=12)
 
     def test_invalid_query_and_counts_never_reach_a_backend(self):
+        from unittest.mock import Mock
+        backend = Mock()
         for value in (True, False, 0, -1, 101, "4"):
             with self.subTest(value=value), self.assertRaises(ValueError):
-                self.agent.query("editor", top_k=value)
+                self.agent.query("editor", top_k=value, backend=backend)
         for query in (None, "", " " * 3, "x" * 2049):
             with self.subTest(query=repr(query)[:20]), self.assertRaises(ValueError):
-                self.agent.query(query)
+                self.agent.query(query, backend=backend)
+        backend.embed.assert_not_called()
 
     def test_short_query_keeps_its_distinguishing_qualifier(self):
         result = self.agent.query("editor Sublime", scope="project:a")

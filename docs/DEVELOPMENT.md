@@ -57,3 +57,9 @@ directly). Core pipeline needs none.
   renames; legacy direct module calls still use basename-derived IDs.
 - **Consolidator skips a file** — non-`.md` extensions are ignored; unreadable
   or non-UTF-8 files are logged and skipped.
+
+## Full integration test setup
+
+The complete discovery suite requires `python -m pip install -e '.[ollama]'` and private Git access.
+The core installation remains dependency-free. See [Testing](TESTING.md) for
+the core-only CI suite and all validation commands.

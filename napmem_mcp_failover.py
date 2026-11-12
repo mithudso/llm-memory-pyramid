@@ -52,6 +52,9 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import math
+import io
+from uuid import uuid4
 import threading
 import time
 from pathlib import Path
@@ -75,6 +78,19 @@ HOST_FILE = Path.home() / ".napmem" / "remote_host"
 REPLAY_INIT_ID = "__napmem_failover_init__"
 MAX_LOCAL_RESTARTS = 2
 WATCHDOG_TICK_S = 1.0
+MAX_PENDING_REQUESTS = 64
+MAX_PENDING_BYTES = 2 * MAX_LINE_BYTES
+OUTPUT_WRITE_TIMEOUT_S = 1.0
+
+
+def _positive_timeout(variable, default):
+    try:
+        value = float(os.environ.get(variable, str(default)))
+    except ValueError as exc:
+        raise ValueError(f"{variable} must be finite, positive and at most one day") from exc
+    if not math.isfinite(value) or not 0 < value <= 86400:
+        raise ValueError(f"{variable} must be finite, positive and at most one day")
+    return value
 MIRROR_FILES = ("napmem_pyramid.json", "napmem_pyramid.json.embindex.json")
 
 
@@ -102,7 +118,7 @@ def mirror_pyramid() -> Path:
 
 
 def ssh_base(host: str) -> list[str]:
-    timeout = os.environ.get("NAPMEM_SSH_TIMEOUT", "5")
+    timeout = max(1, math.ceil(_positive_timeout("NAPMEM_SSH_TIMEOUT", 5)))
     return ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={timeout}",
             # Detect a vanished box in ~30s instead of hanging on TCP.
             "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=2", host]
@@ -111,9 +127,11 @@ def ssh_base(host: str) -> list[str]:
 def primary_cmd(host: str) -> list[str]:
     repo = os.environ.get("NAPMEM_REMOTE_REPO", "$HOME/dev/llm-memory-pyramid")
     pyr = remote_pyramid()
-    return ssh_base(host) + [
-        f'cd "{repo}" && NAPMEM_PYRAMID="{pyr}" python3 napmem_mcp_server.py --pyramid "{pyr}"'
-    ]
+    runner = ("import os,runpy,sys; repo,pyramid=sys.argv[1:3]; "
+              "os.chdir(os.path.expanduser(os.path.expandvars(repo))); "
+              "sys.argv=['napmem_mcp_server.py','--pyramid',os.path.expanduser(os.path.expandvars(pyramid))]; "
+              "runpy.run_path('napmem_mcp_server.py',run_name='__main__')")
+    return ssh_base(host) + [shlex.join(["python3", "-c", runner, repo, pyr])]
 
 
 def fallback_cmd() -> list[str]:
@@ -133,7 +151,7 @@ def fallback_env() -> dict[str, str]:
 
 
 def probe_remote(host: str) -> bool:
-    timeout = float(os.environ.get("NAPMEM_SSH_TIMEOUT", "5"))
+    timeout = _positive_timeout("NAPMEM_SSH_TIMEOUT", 5)
     try:
         proc = subprocess.run(ssh_base(host) + ["true"], stdin=subprocess.DEVNULL,
                               capture_output=True, timeout=timeout + 5, check=False)
@@ -213,7 +231,7 @@ def _receive_snapshot(host: str, destination: Path, *, timeout: float = 300) -> 
             output.flush()
             os.fsync(output.fileno())
         if proc.wait(timeout=max(.1, deadline - time.monotonic())) != 0:
-            raise RuntimeError(errors.decode("utf-8", "replace").strip() or "Remote snapshot export failed")
+            raise RuntimeError(f"Remote snapshot export failed (exit {proc.returncode})")
     finally:
         if proc.poll() is None:
             proc.kill()
@@ -240,7 +258,7 @@ def sync_mirror(host: str) -> bool:
         logger.info("Mirrored complete generation %s", manifest["generation"])
         return True
     except (OSError, RuntimeError, ValueError, TypeError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
-        logger.warning("Mirror snapshot refresh failed: %s", exc)
+        logger.warning("Mirror snapshot refresh failed (%s)", type(exc).__name__)
         return False
 
 
@@ -393,7 +411,7 @@ class FailoverProxy:
         self.local_restarts = 0
         self.backend: Backend | None = None
         self.closing = False
-        self.request_timeout = float(os.environ.get("NAPMEM_REMOTE_REQUEST_TIMEOUT", "60"))
+        self.request_timeout = _positive_timeout("NAPMEM_REMOTE_REQUEST_TIMEOUT", 60)
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -414,13 +432,13 @@ class FailoverProxy:
         while not self.closing:
             time.sleep(WATCHDOG_TICK_S)
             with self.lock:
-                if self.mode != "remote" or not self.pending or self.backend is None:
+                if self.mode not in ("remote", "local") or not self.pending or self.backend is None:
                     continue
                 oldest = min(sent for _l, _m, sent in self.pending.values())
                 if time.monotonic() - oldest < self.request_timeout:
                     continue
-                logger.warning("Remote request unanswered for %.0fs; treating remote as hung",
-                               self.request_timeout)
+                logger.warning("%s request unanswered for %.1fs; treating backend as hung",
+                               self.mode, self.request_timeout)
                 proc = self.backend.proc
             try:
                 proc.kill()
@@ -471,13 +489,17 @@ class FailoverProxy:
         # flight (it gets resent with the rest of pending below).
         if self.init_line and self.init_key not in self.pending:
             msg = json.loads(self.init_line)
-            msg["id"] = REPLAY_INIT_ID
-            self.replay_ids.add(_id_key(REPLAY_INIT_ID))
+            replay_id = REPLAY_INIT_ID + "_" + uuid4().hex
+            while _id_key(replay_id) in self.pending:
+                replay_id = REPLAY_INIT_ID + "_" + uuid4().hex
+            msg["id"] = replay_id
+            self.replay_ids = {_id_key(replay_id)}
             self.backend.send(json.dumps(msg))
             if self.initialized_seen:
                 self.backend.send(json.dumps({"jsonrpc": "2.0",
                                               "method": "notifications/initialized"}))
-        for line, _method, _sent in list(self.pending.values()):
+        for key, (line, method, _sent) in list(self.pending.items()):
+            self.pending[key] = (line, method, time.monotonic())
             if not self.backend.send(line):
                 # Let the reader report one exit and retry/fail the pending set.
                 self.backend.proc.kill()
@@ -503,8 +525,42 @@ class FailoverProxy:
         with self.out_lock:
             binary = getattr(self.stdout, "buffer", None)
             if binary is not None:
-                binary.write(line.encode("utf-8"))
-                binary.flush()
+                try:
+                    fd = binary.fileno()
+                except (AttributeError, io.UnsupportedOperation):
+                    binary.write(line.encode("utf-8"))
+                    binary.flush()
+                    return
+                previous_blocking = os.get_blocking(fd)
+                deadline = time.monotonic() + OUTPUT_WRITE_TIMEOUT_S
+                try:
+                    os.set_blocking(fd, False)
+                    remaining = memoryview(line.encode("utf-8"))
+                    while remaining:
+                        timeout = deadline - time.monotonic()
+                        if timeout <= 0:
+                            raise TimeoutError("Client output stalled")
+                        _, writable, _ = select.select([], [fd], [], min(timeout, .1))
+                        if not writable:
+                            continue
+                        try:
+                            written = os.write(fd, remaining)
+                        except BlockingIOError:
+                            continue
+                        if not written:
+                            raise BrokenPipeError("Client output closed")
+                        remaining = remaining[written:]
+                except OSError:
+                    self.closing = True
+                    logger.error("Client output unavailable; closing proxy")
+                    if self.backend is not None:
+                        try:
+                            self.backend.proc.kill()
+                        except OSError:
+                            pass
+                    raise
+                finally:
+                    os.set_blocking(fd, previous_blocking)
             else:
                 self.stdout.write(line)
                 self.stdout.flush()
@@ -544,10 +600,19 @@ class FailoverProxy:
                     return
         dead = None
         with self.lock:
+            if self.closing:
+                return
             if isinstance(msg, dict):
                 method = msg.get("method")
                 if "id" in msg and isinstance(method, str):
                     key = _id_key(msg["id"])
+                    if key in self.pending or key in self.replay_ids:
+                        self._emit({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32600, "message": "Request ID is already in use"}})
+                        return
+                    if (len(self.pending) >= MAX_PENDING_REQUESTS
+                            or sum(len(entry[0].encode("utf-8")) for entry in self.pending.values()) + len(stripped.encode("utf-8")) > MAX_PENDING_BYTES):
+                        self._emit({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32000, "message": "Too many pending requests"}})
+                        return
                     self.pending[key] = (stripped, method, time.monotonic())
                     if method == "initialize":
                         self.init_line, self.init_key = stripped, key
@@ -578,12 +643,14 @@ class FailoverProxy:
                 raise ValueError("Invalid backend JSON") from exc
             method = None
             request = None
+            pending_key = None
             if isinstance(msg, dict) and "id" in msg and "method" not in msg:
                 key = _id_key(msg["id"])
                 if key in self.replay_ids:
                     self.replay_ids.discard(key)
                     return
-                entry = self.pending.pop(key, None)
+                entry = self.pending.get(key)
+                pending_key = key if entry else None
                 method = entry[1] if entry else None
                 request = json.loads(entry[0]) if entry else None
             if method == "tools/call" and isinstance(msg, dict):
@@ -611,7 +678,7 @@ class FailoverProxy:
                         code = supplied.get("code") if isinstance(supplied, dict) else None
                         messages = {"INVALID_TOOL_ARGUMENTS": "Unknown tool or invalid tool arguments",
                                     "MEMORY_UNAVAILABLE": "Requested memory is unavailable"}
-                        code = code if code in messages else "TOOL_FAILED"
+                        code = code if isinstance(code, str) and code in messages else "TOOL_FAILED"
                         payload = {"error": {"code": code, "message": messages.get(code, "Memory tool could not complete")}}
                         extras = []
                     if self.mode == "local":
@@ -647,8 +714,12 @@ class FailoverProxy:
                             "code": code, "message": messages.get(code, "Backend request failed")}}
                     msg = limit_wire_response(msg, max_bytes=maximum, max_tokens=tokens)
                 self._emit(msg)
+                if pending_key is not None:
+                    self.pending.pop(pending_key, None)
                 return
-        self._emit(msg)
+            self._emit(msg)
+            if pending_key is not None:
+                self.pending.pop(pending_key, None)
 
     def serve(self, stdin=None):
         stdin = stdin or sys.stdin

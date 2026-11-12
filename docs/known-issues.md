@@ -26,3 +26,20 @@ fleet health; installed acceptance records its exact runtime separately.
 - **No speculative dashboard or service migration.** This release keeps JSON
   canonical and adds stdlib SQLite for jobs. It does not add a hosted service,
   graph database or competing Stele task interface.
+
+## Maintenance choices and unverified surfaces
+
+- Creation identity can be unavailable on older filesystems or old registry rows.
+  Rename inference then fails conservatively; explicit session mapping is required.
+- Synthetic frozen heldout results are regression evidence. Earlier feature work
+  inspected that split, so they do not provide a new blind quality estimate.
+- Optional Anthropic is intentionally not version-locked. Its supported version
+  range and transitive advisory coverage remain maintainer choices; sampled public
+  metadata is not a complete dependency safety attestation.
+- The generic mdb-tam operation registry, centralized error JSONL service, dashboard
+  cards, remediation engine and global skill installation remain accepted
+  architecture/scope exceptions. Existing CLI/MCP, queue receipts and stdlib logs
+  describe actual behavior. Full mdb-tam service parity is not claimed.
+- Private-client integration CI requires repository credentials. Forks run core
+  tests and fresh offline installation; the full optional-client matrix runs on
+  trusted branches. No pull-request-target execution or secret exposure is added.

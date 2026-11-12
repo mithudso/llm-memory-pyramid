@@ -67,3 +67,10 @@ and `feedback` retain bounded content-free measurements; see
 [observability](OBSERVABILITY.md). `mcp` serves the same configured store over
 stdio. `ingest --format conversation|portable|git` and `export` provide bounded
 source interoperability; see [adapters](ADAPTERS.md).
+
+Stale or failed ingestion returns exit 1 and failed ingest telemetry. Invalid
+configuration/arguments return exit 2. Excluded sources remain an explicit successful
+no-op. Configuration precedence applies before validating overwritten values;
+TOML reads are bounded and nonblocking. Public `score_query` reports fixed @5
+metrics and requires `k=5`; eval relevance grades are bounded 1–16 and gate metrics
+and tolerance must be finite.

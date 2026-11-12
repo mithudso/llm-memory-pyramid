@@ -1,0 +1,982 @@
+{
+  "base_sha": "7367fa42056a360df653b3480f3c6a582318c0f3",
+  "maintained_source_count": 70,
+  "audited_count": 70,
+  "coverage_claim": "Every maintained source/config/test path received one-file diagnostics. Hash chains distinguish baseline diagnostics, two blind gates, and focused post-gate diffs. This is not a claim that final code passed a clean blind gate.",
+  "files": [
+    {
+      "path": ".editorconfig",
+      "diagnostic_sha256": "d36890762ceee5761fa35705553db0b68951f883fba88a07492209ea2b961762",
+      "diagnostic_report_sha256": "2d5a4c89ba611a78d06b8d0b00d5c287b506b99ad9b3f28169ca3423255c088f",
+      "blind_gate_1": "d36890762ceee5761fa35705553db0b68951f883fba88a07492209ea2b961762",
+      "blind_gate_2": "d36890762ceee5761fa35705553db0b68951f883fba88a07492209ea2b961762",
+      "current_sha256": "d36890762ceee5761fa35705553db0b68951f883fba88a07492209ea2b961762",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 228
+    },
+    {
+      "path": ".env.example",
+      "diagnostic_sha256": "d60c2e35c2bdc229ce3fd59e6a1c5db484844aa69d8ec0315f3c09695482eb7a",
+      "diagnostic_report_sha256": "e7e5bcf5a1e6b5f3436e64d4858b14ba47e3ae64727dc43c33574cfd86f45f6f",
+      "blind_gate_1": "d60c2e35c2bdc229ce3fd59e6a1c5db484844aa69d8ec0315f3c09695482eb7a",
+      "blind_gate_2": "d60c2e35c2bdc229ce3fd59e6a1c5db484844aa69d8ec0315f3c09695482eb7a",
+      "current_sha256": "d60c2e35c2bdc229ce3fd59e6a1c5db484844aa69d8ec0315f3c09695482eb7a",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 1881
+    },
+    {
+      "path": ".gitattributes",
+      "diagnostic_sha256": "cb1a508e4e88914a7d9b230d7dc23a56f7db7664d8d8f33d78816474383055e4",
+      "diagnostic_report_sha256": "8b87eb8e376de4c95b8187c11813af85bb9db6e816bca8b3a81065b02a3db3b9",
+      "blind_gate_1": "cb1a508e4e88914a7d9b230d7dc23a56f7db7664d8d8f33d78816474383055e4",
+      "blind_gate_2": "cb1a508e4e88914a7d9b230d7dc23a56f7db7664d8d8f33d78816474383055e4",
+      "current_sha256": "cb1a508e4e88914a7d9b230d7dc23a56f7db7664d8d8f33d78816474383055e4",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 51
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "diagnostic_sha256": "ad502be19e2926ebba8dfb841dd3b81e1d8ef362c6e2972db81c255860fee2dd",
+      "diagnostic_report_sha256": "b7bcc46318bb98198382382eee524d907cb5352161bf24d8a03596d2b2d942ef",
+      "blind_gate_1": "ad502be19e2926ebba8dfb841dd3b81e1d8ef362c6e2972db81c255860fee2dd",
+      "blind_gate_2": "ad502be19e2926ebba8dfb841dd3b81e1d8ef362c6e2972db81c255860fee2dd",
+      "current_sha256": "ad502be19e2926ebba8dfb841dd3b81e1d8ef362c6e2972db81c255860fee2dd",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 55
+    },
+    {
+      "path": ".github/FUNDING.yml",
+      "diagnostic_sha256": "86010f755b9ffe541315030e3dd9c627d9e5a8f9d5ceb83acaaf0638029d2032",
+      "diagnostic_report_sha256": "03044a60ed6e35521edc75510cea1d2daf8376d3861d3f7e5c9827cc28a087b9",
+      "blind_gate_1": "dfca7586b1f4e7cb2b24a570114f5c0de50f8228dcde917b36e350d286d87d59",
+      "blind_gate_2": "dfca7586b1f4e7cb2b24a570114f5c0de50f8228dcde917b36e350d286d87d59",
+      "current_sha256": "dfca7586b1f4e7cb2b24a570114f5c0de50f8228dcde917b36e350d286d87d59",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 238
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "diagnostic_sha256": "6f409c7eb1720adce645ef906344afa8b333abb1e6f9f5b3de826da4ec314842",
+      "diagnostic_report_sha256": "8fe13fd7b5752a1f99faf2a65650e40fa5f2f691d25e09e3c2ba1e62818a1a97",
+      "blind_gate_1": "6f409c7eb1720adce645ef906344afa8b333abb1e6f9f5b3de826da4ec314842",
+      "blind_gate_2": "6f409c7eb1720adce645ef906344afa8b333abb1e6f9f5b3de826da4ec314842",
+      "current_sha256": "6f409c7eb1720adce645ef906344afa8b333abb1e6f9f5b3de826da4ec314842",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 195
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "diagnostic_sha256": "03ef8eb8352e55042573161b27f45593ca9bb3599b75b78d851ea3df1a84b301",
+      "diagnostic_report_sha256": "07985b29f0b94c09d126a2962352ca47a2b1d0331880a27dc27428a8deaf837f",
+      "blind_gate_1": "5bea38f5dea32936da01f2a4ff4baef1220cc062cd2c40153336fec1faee1e01",
+      "blind_gate_2": "b34544825ff0fd873db0e9a34be6edccba69b6bafeff13332f13cd2ad7df95c7",
+      "current_sha256": "b34544825ff0fd873db0e9a34be6edccba69b6bafeff13332f13cd2ad7df95c7",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7902
+    },
+    {
+      "path": ".gitignore",
+      "diagnostic_sha256": "49099dd4984f1a0e6a7d33f7455832afb9496c77e6491a806cd7c376a96a04ab",
+      "diagnostic_report_sha256": "eed5c486e6c58ab95c104dbdf74189aa18fbac1901ee07e48c464f6399d6c51c",
+      "blind_gate_1": "49099dd4984f1a0e6a7d33f7455832afb9496c77e6491a806cd7c376a96a04ab",
+      "blind_gate_2": "49099dd4984f1a0e6a7d33f7455832afb9496c77e6491a806cd7c376a96a04ab",
+      "current_sha256": "49099dd4984f1a0e6a7d33f7455832afb9496c77e6491a806cd7c376a96a04ab",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 501
+    },
+    {
+      "path": ".mcp.json",
+      "diagnostic_sha256": "18d28ea9504549e42823f00948f349b6bf580c4f14ca9dfcbba6c0c5d1b2a57f",
+      "diagnostic_report_sha256": "17c6aa870e6a84916c44cacc82c35573f89a256a270ed5f58345462751d919d3",
+      "blind_gate_1": "18d28ea9504549e42823f00948f349b6bf580c4f14ca9dfcbba6c0c5d1b2a57f",
+      "blind_gate_2": "18d28ea9504549e42823f00948f349b6bf580c4f14ca9dfcbba6c0c5d1b2a57f",
+      "current_sha256": "18d28ea9504549e42823f00948f349b6bf580c4f14ca9dfcbba6c0c5d1b2a57f",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 245
+    },
+    {
+      "path": ".vscode/extensions.json",
+      "diagnostic_sha256": "3d3911b6374e7b77eba25ca572dcb547ed7dbcfe81f437ccaf8813ce5d2037eb",
+      "diagnostic_report_sha256": "346f34ee970c197d07bd37de76d6a07db4edd150967104f2dcff17de8b98877c",
+      "blind_gate_1": "3d3911b6374e7b77eba25ca572dcb547ed7dbcfe81f437ccaf8813ce5d2037eb",
+      "blind_gate_2": "3d3911b6374e7b77eba25ca572dcb547ed7dbcfe81f437ccaf8813ce5d2037eb",
+      "current_sha256": "3d3911b6374e7b77eba25ca572dcb547ed7dbcfe81f437ccaf8813ce5d2037eb",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 119
+    },
+    {
+      "path": ".vscode/launch.json",
+      "diagnostic_sha256": "618aa7b0663fe87652b41cbb63cf34f561f4004eab25588ae2ddd5f7840a4d32",
+      "diagnostic_report_sha256": "72b827093cdf1d86efd27699d672d1510e7d7757a4cc8fc081771aafab0dc5f6",
+      "blind_gate_1": "618aa7b0663fe87652b41cbb63cf34f561f4004eab25588ae2ddd5f7840a4d32",
+      "blind_gate_2": "618aa7b0663fe87652b41cbb63cf34f561f4004eab25588ae2ddd5f7840a4d32",
+      "current_sha256": "618aa7b0663fe87652b41cbb63cf34f561f4004eab25588ae2ddd5f7840a4d32",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 775
+    },
+    {
+      "path": ".vscode/settings.json",
+      "diagnostic_sha256": "518e1dc564e4d313d7f04604f4afee074df8b5bff4ec707406da2182175bc959",
+      "diagnostic_report_sha256": "0d35984e2b18b3da2e2fdd64502a48c1b1d321ae1ba0c4f2bc171fccc67f59fe",
+      "blind_gate_1": "518e1dc564e4d313d7f04604f4afee074df8b5bff4ec707406da2182175bc959",
+      "blind_gate_2": "518e1dc564e4d313d7f04604f4afee074df8b5bff4ec707406da2182175bc959",
+      "current_sha256": "518e1dc564e4d313d7f04604f4afee074df8b5bff4ec707406da2182175bc959",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 271
+    },
+    {
+      "path": "deploy/napmem-consolidator.service",
+      "diagnostic_sha256": "4d7b1da84c2985fa16b5e43ed20e65fb1c6140637dac4a48a72109e1076a1258",
+      "diagnostic_report_sha256": "de876401244704c4d006a92ff9fbca78c8103e166eed1d9735f9a03fa721dba1",
+      "blind_gate_1": "4d7b1da84c2985fa16b5e43ed20e65fb1c6140637dac4a48a72109e1076a1258",
+      "blind_gate_2": "4d7b1da84c2985fa16b5e43ed20e65fb1c6140637dac4a48a72109e1076a1258",
+      "current_sha256": "4d7b1da84c2985fa16b5e43ed20e65fb1c6140637dac4a48a72109e1076a1258",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 680
+    },
+    {
+      "path": "deploy/napmem-consolidator.timer",
+      "diagnostic_sha256": "e2dd677eaf56a7f93359b281f915963ba48bbdfcbfb809f3a1fa71b2854bd796",
+      "diagnostic_report_sha256": "cbf77263e43d98954a546072d6e0c3f5c80d696a1ffbf9245c4dc4af0bab707b",
+      "blind_gate_1": "e2dd677eaf56a7f93359b281f915963ba48bbdfcbfb809f3a1fa71b2854bd796",
+      "blind_gate_2": "e2dd677eaf56a7f93359b281f915963ba48bbdfcbfb809f3a1fa71b2854bd796",
+      "current_sha256": "e2dd677eaf56a7f93359b281f915963ba48bbdfcbfb809f3a1fa71b2854bd796",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 302
+    },
+    {
+      "path": "llm_extraction_prompts.py",
+      "diagnostic_sha256": "2361b192b404c731bc11689cd9b0e25be941f2410bff35c731cb0cb86db0ab88",
+      "diagnostic_report_sha256": "d054d102da4358767dff60a7572e4ded11a2957c7a1c3c515a2b5710f1fc67c3",
+      "blind_gate_1": "0d82b6567b7e52bf81dbf739ae5d853efb1f63ed78933d17607de2393c5e37b8",
+      "blind_gate_2": "0d82b6567b7e52bf81dbf739ae5d853efb1f63ed78933d17607de2393c5e37b8",
+      "current_sha256": "0d82b6567b7e52bf81dbf739ae5d853efb1f63ed78933d17607de2393c5e37b8",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 4917
+    },
+    {
+      "path": "llm_extractor.py",
+      "diagnostic_sha256": "3e555f7caa80f2ee6bcd1cbf9461e45f2037f7b4962f56b9979cf1a8be28b8dd",
+      "diagnostic_report_sha256": "494381c81949a958dbb1bed78446ddda7fa336489381de0389f632af90d5e175",
+      "blind_gate_1": "8a7ff4c4e816c00c9c1dc3c92ce91971e93a4d1d97c6b3e50363693b5242b844",
+      "blind_gate_2": "8a7ff4c4e816c00c9c1dc3c92ce91971e93a4d1d97c6b3e50363693b5242b844",
+      "current_sha256": "8a7ff4c4e816c00c9c1dc3c92ce91971e93a4d1d97c6b3e50363693b5242b844",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 21235
+    },
+    {
+      "path": "memory_pyramid_distiller.py",
+      "diagnostic_sha256": "c61a7db717f9a3d500e8c61480c6d8e421aeee1121448a9a64bb29f27ce40048",
+      "diagnostic_report_sha256": "60609182367c0ec36bb683d4059597ef069e7ae76dc769a0fe8fd108b9d8977f",
+      "blind_gate_1": "4f2d9472441d279bcfd78abfde64c000bea292fe11ccfb356b4f2a595c35909f",
+      "blind_gate_2": "4f2d9472441d279bcfd78abfde64c000bea292fe11ccfb356b4f2a595c35909f",
+      "current_sha256": "4f2d9472441d279bcfd78abfde64c000bea292fe11ccfb356b4f2a595c35909f",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 48382
+    },
+    {
+      "path": "memory_pyramid_schema.json",
+      "diagnostic_sha256": "9b7c7e5e3e12bfef7f419ae5159e8790f3339a59594ba925436030a07d554c08",
+      "diagnostic_report_sha256": "7879f16a4a1475f3fbbc972fc7ab9cd3e2e9a90fa6f751ebc373396fc81c4949",
+      "blind_gate_1": "77ce80ed2a73f932c27d4e8a7bc10dcdf62c1f8115d086a361a466a85be31aab",
+      "blind_gate_2": "77ce80ed2a73f932c27d4e8a7bc10dcdf62c1f8115d086a361a466a85be31aab",
+      "current_sha256": "77ce80ed2a73f932c27d4e8a7bc10dcdf62c1f8115d086a361a466a85be31aab",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 20242
+    },
+    {
+      "path": "napmem_adapters.py",
+      "diagnostic_sha256": "4943094cafe9daaccff9f04db7dde0fef6c135895f1283e0b81e125b2b6db798",
+      "diagnostic_report_sha256": "195d98f391b490fdc28a67fbe8ea35c8e2802de9ac8c27838f2139cf9f3bdbe4",
+      "blind_gate_1": "67a755514ba9f23b066a24a1cfb652ab7b6b9ec2e3f25f5011c282a87fd80e28",
+      "blind_gate_2": "67a755514ba9f23b066a24a1cfb652ab7b6b9ec2e3f25f5011c282a87fd80e28",
+      "current_sha256": "67a755514ba9f23b066a24a1cfb652ab7b6b9ec2e3f25f5011c282a87fd80e28",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 18440
+    },
+    {
+      "path": "napmem_cli.py",
+      "diagnostic_sha256": "fa34b4a9e7817e65cc7837bc85466ee636d0e2f185656b189bfaa28046944ba1",
+      "diagnostic_report_sha256": "4a19cf2fab0eb7cba3edfb55499ff212f1204ccefdb427086071364171918f84",
+      "blind_gate_1": "13c3a93da732f6d14d58d09b029d020a1a2101376809b18c8786ce7c6aba2e04",
+      "blind_gate_2": "fdc51b275b6fe2cf751d61edea6cdc7b37a2f826f0fecde2675f4a93a7fa2c4d",
+      "current_sha256": "fdc51b275b6fe2cf751d61edea6cdc7b37a2f826f0fecde2675f4a93a7fa2c4d",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 25687
+    },
+    {
+      "path": "napmem_config.py",
+      "diagnostic_sha256": "65094f365ea63821460bddbba32fe6bff515aa20656420bc93082f36fa5f92f2",
+      "diagnostic_report_sha256": "5e2cdc7521511b004f17267501b2ccdf6f0de6086162708ab42af224f32357ba",
+      "blind_gate_1": "82abeed65c66787822a65900c116417c12b017c766c31856e3e2ad9aa11b0985",
+      "blind_gate_2": "82abeed65c66787822a65900c116417c12b017c766c31856e3e2ad9aa11b0985",
+      "current_sha256": "82abeed65c66787822a65900c116417c12b017c766c31856e3e2ad9aa11b0985",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 8781
+    },
+    {
+      "path": "napmem_controls.py",
+      "diagnostic_sha256": "59d0e02bdc2f89b6a9bb9a8b635d1a94d8f39942287a0e4b032e443032c006d5",
+      "diagnostic_report_sha256": "edc659021ea4f3104b3f16bc58fabb4e96a3d90e1808c1b359b1947b1599df97",
+      "blind_gate_1": "fa750af5b616f8dfa60134c5b92d625dd8552f3587c60a29f4a6125b014954bd",
+      "blind_gate_2": "fa750af5b616f8dfa60134c5b92d625dd8552f3587c60a29f4a6125b014954bd",
+      "current_sha256": "fa750af5b616f8dfa60134c5b92d625dd8552f3587c60a29f4a6125b014954bd",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 36722
+    },
+    {
+      "path": "napmem_eval.py",
+      "diagnostic_sha256": "abd7b0fc26f63175f8f72256668c4123bc8147257d38127b4da24af1a182b2e0",
+      "diagnostic_report_sha256": "50711c2525f6262f86ff594268fd9a6e0cb9d4ddb82d023eb213b41ba73b430d",
+      "blind_gate_1": "b0c4c2c5705b5ffdad667d7cd4f4c3d897d819da2fb6ae48df6dc191dd219450",
+      "blind_gate_2": "b0c4c2c5705b5ffdad667d7cd4f4c3d897d819da2fb6ae48df6dc191dd219450",
+      "current_sha256": "b0c4c2c5705b5ffdad667d7cd4f4c3d897d819da2fb6ae48df6dc191dd219450",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 19964
+    },
+    {
+      "path": "napmem_evidence.py",
+      "diagnostic_sha256": "85b09592a5091793fb2c768370274420e4789be128ff246b54963f413bcfe7cb",
+      "diagnostic_report_sha256": "3c352ea635a30b74f48cd9facbfe2c0773c338e604c994e459a38f1cb6546a29",
+      "blind_gate_1": "cb5afbedecdba1371264f05a646f28393ae7928bc943b94a493f621df40aa290",
+      "blind_gate_2": "cb5afbedecdba1371264f05a646f28393ae7928bc943b94a493f621df40aa290",
+      "current_sha256": "cb5afbedecdba1371264f05a646f28393ae7928bc943b94a493f621df40aa290",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 15215
+    },
+    {
+      "path": "napmem_inspector.py",
+      "diagnostic_sha256": "d28ef183768fb94b08251d8cebc8e9872388a5fca7d3180a341ce2cf234d2038",
+      "diagnostic_report_sha256": "04421c2e18cdf762db2d4baae8313c578bffe68ed70574305639350f8befc9af",
+      "blind_gate_1": "9a79fb5c93d350bff4d780f419059c65f5fdff5b23a56adcbc3c333b437c38b5",
+      "blind_gate_2": "9a79fb5c93d350bff4d780f419059c65f5fdff5b23a56adcbc3c333b437c38b5",
+      "current_sha256": "9a79fb5c93d350bff4d780f419059c65f5fdff5b23a56adcbc3c333b437c38b5",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 17012
+    },
+    {
+      "path": "napmem_jobs.py",
+      "diagnostic_sha256": "a38f8d4e047b2b7e6cc5ce4e1af20c00e0b46587496489175dfb88f42d972fd7",
+      "diagnostic_report_sha256": "30c47f5175183a8cfff61c5082a9ca3f6e92b7f068378832cba8aab3749a5b43",
+      "blind_gate_1": "6404643e05542b3e746e9a693f1cb29714ee472a89b42d7cebf4e4cbe3078e6a",
+      "blind_gate_2": "b0195b0bf69b86ca631c7292ec6dcc9f336afaced70fcd31c2c272b691942a86",
+      "current_sha256": "0c5f5fa93dfd197d7f862ebf7bda94d73bb0289549e5579760fe7dfcb30d2492",
+      "current_review": "owner post-gate diff review and normal-suite regression verification; no third blind gate",
+      "bytes": 30604
+    },
+    {
+      "path": "napmem_mcp_failover.py",
+      "diagnostic_sha256": "449371665a3db46b62a7a0cc27697967c4544ae8d4f2a5138ef14037f63a1c26",
+      "diagnostic_report_sha256": "c289a1d4a117c27c20dd1d62bf8d8294aec2ce6d86698f8b979393eef352d441",
+      "blind_gate_1": "3070c2158b8549911cab87871d88964c3b7213b6041a0a46c90dbd7b6bd9f993",
+      "blind_gate_2": "3070c2158b8549911cab87871d88964c3b7213b6041a0a46c90dbd7b6bd9f993",
+      "current_sha256": "3070c2158b8549911cab87871d88964c3b7213b6041a0a46c90dbd7b6bd9f993",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 34865
+    },
+    {
+      "path": "napmem_mcp_server.py",
+      "diagnostic_sha256": "11f9ba05adc11370c77bfbdcd632807d75970b86d4364bc7f52370c5e225043f",
+      "diagnostic_report_sha256": "97a7c624df5ba761eb5de7939239daa56b1d29919241a9d23734e3f432d845bf",
+      "blind_gate_1": "76a3294d7330ba41f0c95cca105c3ff0ffc9787886128b247f4418ddab4d316b",
+      "blind_gate_2": "76a3294d7330ba41f0c95cca105c3ff0ffc9787886128b247f4418ddab4d316b",
+      "current_sha256": "76a3294d7330ba41f0c95cca105c3ff0ffc9787886128b247f4418ddab4d316b",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 28493
+    },
+    {
+      "path": "napmem_metrics.py",
+      "diagnostic_sha256": "8cb726b4682a0a4e734a7e493d6a08300862c9ddadd52fa4e43214134736223e",
+      "diagnostic_report_sha256": "475b26922d65510b64a525b1941fd7ce64172a29ecd417edc597b5f530cca7c8",
+      "blind_gate_1": "6a62170b0b3289d6fa817aa0b6971cc662dffb770e401c9998bc13fec7fd1eec",
+      "blind_gate_2": "6a62170b0b3289d6fa817aa0b6971cc662dffb770e401c9998bc13fec7fd1eec",
+      "current_sha256": "6a62170b0b3289d6fa817aa0b6971cc662dffb770e401c9998bc13fec7fd1eec",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 31442
+    },
+    {
+      "path": "napmem_model.py",
+      "diagnostic_sha256": "a3742acbd0d1b4c9d55a4a74bce09e389d79e2f9caba9496062c490aba85289f",
+      "diagnostic_report_sha256": "f2117bb389e96248dc5f7fe2908964e40d08ef24bb087334f38ec1c90c5a38f0",
+      "blind_gate_1": "b07c5e5be101dc0ac2fc0177550440826d84f37962d49128719b14afe1dc8c47",
+      "blind_gate_2": "b07c5e5be101dc0ac2fc0177550440826d84f37962d49128719b14afe1dc8c47",
+      "current_sha256": "b07c5e5be101dc0ac2fc0177550440826d84f37962d49128719b14afe1dc8c47",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 20047
+    },
+    {
+      "path": "napmem_retrieval_agent.py",
+      "diagnostic_sha256": "120fa81b137ad568e49906bf63c427c3d7c410ca19d5fe76c8eb02610d16bc99",
+      "diagnostic_report_sha256": "7a43b5acfb8e41a404cd90f7a7c41fa8fe2f87a630daf365c0d13470134426fa",
+      "blind_gate_1": "a4db296de0640058a90ea567558c3ed9a967a62bf6beb01115d43d1c55c0b0f7",
+      "blind_gate_2": "a4db296de0640058a90ea567558c3ed9a967a62bf6beb01115d43d1c55c0b0f7",
+      "current_sha256": "03c2e5eb84cfc0685c43cc3a3144c54efe953aba6ab859e298aa776ff6c190b5",
+      "current_review": "owner post-gate diff review and normal-suite regression verification; no third blind gate",
+      "bytes": 20902
+    },
+    {
+      "path": "napmem_search.py",
+      "diagnostic_sha256": "15f2d3b7db6b1c4e1029e61f770cda9b6252c23d6659b86d7d1aa1c07badd0e7",
+      "diagnostic_report_sha256": "9fa5e72f5eee9ad5e6e057827451c9db67f12090238f8f19ad1d5887bf66b1cd",
+      "blind_gate_1": "d34eca752074e7c1cab01f1beb1b1d5461723b34821d3db87a2c6861be13fc5e",
+      "blind_gate_2": "d34eca752074e7c1cab01f1beb1b1d5461723b34821d3db87a2c6861be13fc5e",
+      "current_sha256": "d34eca752074e7c1cab01f1beb1b1d5461723b34821d3db87a2c6861be13fc5e",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 22077
+    },
+    {
+      "path": "napmem_snapshots.py",
+      "diagnostic_sha256": "54d3fb3c62bf85997e3bca931acc9798e8601a35a9f2c829e07bf73a0db3c582",
+      "diagnostic_report_sha256": "729160f063b6bcba2e180972ef0c5c98876ff2e56fc6ea946ae3718d4b65844c",
+      "blind_gate_1": "5b33f1daa72fec2089acce07f6dc535077de97eecda11379aa73ea75b023a86a",
+      "blind_gate_2": "5b33f1daa72fec2089acce07f6dc535077de97eecda11379aa73ea75b023a86a",
+      "current_sha256": "5b33f1daa72fec2089acce07f6dc535077de97eecda11379aa73ea75b023a86a",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 18797
+    },
+    {
+      "path": "napmem_sources.py",
+      "diagnostic_sha256": "8213bee307e78f66fc4e60f889969ea4c3039c4165d8ab9f9468cda5815e11a3",
+      "diagnostic_report_sha256": "397cfa2f0e54ef972d68d139ca28536a733cf7f16e5d4c084020a2bb19950cae",
+      "blind_gate_1": "874d98f66f6eea985a48f9599b1a9970ef351ff99df14168855afc7c95ee4e73",
+      "blind_gate_2": "874d98f66f6eea985a48f9599b1a9970ef351ff99df14168855afc7c95ee4e73",
+      "current_sha256": "874d98f66f6eea985a48f9599b1a9970ef351ff99df14168855afc7c95ee4e73",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12568
+    },
+    {
+      "path": "napmem_storage.py",
+      "diagnostic_sha256": "2816aa4d86d3f803cc582f478f5100c8159809ca548bf498459b955b68128e8b",
+      "diagnostic_report_sha256": "d561c3f37ebfd1caccfc3ba1d4aafccba75d2b7ffd3e5464fe21adcb9499b28e",
+      "blind_gate_1": "017c01cf65549ff3e07b915a0890b137684d059298033bce11bb5a06bea39c06",
+      "blind_gate_2": "017c01cf65549ff3e07b915a0890b137684d059298033bce11bb5a06bea39c06",
+      "current_sha256": "017c01cf65549ff3e07b915a0890b137684d059298033bce11bb5a06bea39c06",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7672
+    },
+    {
+      "path": "naptime_consolidator.py",
+      "diagnostic_sha256": "21dd15f6244d387b0864408661547c1b40c8871df7a16e1ea7e3f22fc380f598",
+      "diagnostic_report_sha256": "35073836679947a919d4dbe5f57679abc07e612588938553dc6dc59ecf7688dd",
+      "blind_gate_1": "fc26685d8443b3bdaf5c04b85e845f0ea746a4941e4578dbc55dd38aa28d5869",
+      "blind_gate_2": "fc26685d8443b3bdaf5c04b85e845f0ea746a4941e4578dbc55dd38aa28d5869",
+      "current_sha256": "fc26685d8443b3bdaf5c04b85e845f0ea746a4941e4578dbc55dd38aa28d5869",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 28868
+    },
+    {
+      "path": "ollama_extractor.py",
+      "diagnostic_sha256": "768f963c9f586892a0bd2c7307841a9cf9aff845232643d31fdb937f430fb4e1",
+      "diagnostic_report_sha256": "81995b8db89f748b619229bc08f1ea67d39a395950f3e3b30c878cbbc0ef3c01",
+      "blind_gate_1": "556ac6fdd1c5ce071fde1c7881131b62e9e98c46913769b467e8670d1f82c025",
+      "blind_gate_2": "556ac6fdd1c5ce071fde1c7881131b62e9e98c46913769b467e8670d1f82c025",
+      "current_sha256": "556ac6fdd1c5ce071fde1c7881131b62e9e98c46913769b467e8670d1f82c025",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 9073
+    },
+    {
+      "path": "pyproject.toml",
+      "diagnostic_sha256": "7ac646c32811b95647ecafd666bca3bf00fc940207b1352eaafb4b3b8292aafb",
+      "diagnostic_report_sha256": "b889055f2cb4870cf1012f7ecd78dc386f1a3eeefccc22d8345989b98041a19d",
+      "blind_gate_1": "6c7db13cb77b939cd34c25eaf0554e873ac8f1abe04c940182f3dc45b0f289c1",
+      "blind_gate_2": "6c7db13cb77b939cd34c25eaf0554e873ac8f1abe04c940182f3dc45b0f289c1",
+      "current_sha256": "6c7db13cb77b939cd34c25eaf0554e873ac8f1abe04c940182f3dc45b0f289c1",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 1314
+    },
+    {
+      "path": "scripts/repo_docs.py",
+      "diagnostic_sha256": "67504d7ac08c7eecd106e58db38f2de7dde642a46973937bd5190731e17784cc",
+      "diagnostic_report_sha256": "ac73b076c31d8faf889bd02a53459b55dfaac2165cf8f384839093a9f9cbbf6e",
+      "blind_gate_1": "6a6bf629c8530d829954fbb68cf379cb9d249011c42c609d010f2e3132343126",
+      "blind_gate_2": "6a6bf629c8530d829954fbb68cf379cb9d249011c42c609d010f2e3132343126",
+      "current_sha256": "6a6bf629c8530d829954fbb68cf379cb9d249011c42c609d010f2e3132343126",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7590
+    },
+    {
+      "path": "scripts/run-naptime.sh",
+      "diagnostic_sha256": "6882754c2ebf7739a6437b9d603d46be09a7d48a017354f600b291a201c8ced4",
+      "diagnostic_report_sha256": "00a98af9aace80de751c4bd85d0a1de1603d20fadfd1723cc73cb19d412d7f75",
+      "blind_gate_1": "0dd2cc5722ff629a915f252fc062a0e7e09bdb8e518ed94848fc60a3aa28bffa",
+      "blind_gate_2": "0dd2cc5722ff629a915f252fc062a0e7e09bdb8e518ed94848fc60a3aa28bffa",
+      "current_sha256": "0dd2cc5722ff629a915f252fc062a0e7e09bdb8e518ed94848fc60a3aa28bffa",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7309
+    },
+    {
+      "path": "semantic_index.py",
+      "diagnostic_sha256": "8a4f7851fbcbcfe6b87d47a9f3163cae2331e378487a4c8859abd52f06be9b88",
+      "diagnostic_report_sha256": "f442ecb0a91b2af24d8246516953f0612f7db0957f72721acbd3e51449870f92",
+      "blind_gate_1": "711c9fdc2c3424533d7df1dfeef2fd4ecf4ce56634c76441231c38edbba6e8c8",
+      "blind_gate_2": "711c9fdc2c3424533d7df1dfeef2fd4ecf4ce56634c76441231c38edbba6e8c8",
+      "current_sha256": "711c9fdc2c3424533d7df1dfeef2fd4ecf4ce56634c76441231c38edbba6e8c8",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 19751
+    },
+    {
+      "path": "test_napmem_adapters.py",
+      "diagnostic_sha256": "6d62e527da251b25c392f9c828613a79fd5ba04df816e757feee28ad55a4fe56",
+      "diagnostic_report_sha256": "4ff8de2961ff100551fd296accd07a21827bd29a81a0906d41c32252c45b654d",
+      "blind_gate_1": "8fb83771a76e1110b6a08602428584034bd432343b320279f8fe2d86ca1bbf09",
+      "blind_gate_2": "8fb83771a76e1110b6a08602428584034bd432343b320279f8fe2d86ca1bbf09",
+      "current_sha256": "8fb83771a76e1110b6a08602428584034bd432343b320279f8fe2d86ca1bbf09",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 22441
+    },
+    {
+      "path": "test_napmem_cli.py",
+      "diagnostic_sha256": "1837f686d5963cbe09d237a0a05daf1619faafe44acff8aaaa062d99ab89d819",
+      "diagnostic_report_sha256": "40ca29b886eb8e28e46b812bf5216bfb01035dba16cbf295f7152696753370ca",
+      "blind_gate_1": "9034b2a3c6c59ad8793b8a17f4d846938d4c1e6241ab001eedafb2a1d06d90d3",
+      "blind_gate_2": "9034b2a3c6c59ad8793b8a17f4d846938d4c1e6241ab001eedafb2a1d06d90d3",
+      "current_sha256": "9034b2a3c6c59ad8793b8a17f4d846938d4c1e6241ab001eedafb2a1d06d90d3",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 17064
+    },
+    {
+      "path": "test_napmem_controls.py",
+      "diagnostic_sha256": "ff37829e2fb531801f5aefbf592f55bc6e39c38c6394f94851ad1e3f97d1310e",
+      "diagnostic_report_sha256": "d662ddad4228497fc97efe9855a6a37fc0f9089cccdfa99889c68e6f21b40c63",
+      "blind_gate_1": "ff37829e2fb531801f5aefbf592f55bc6e39c38c6394f94851ad1e3f97d1310e",
+      "blind_gate_2": "ff37829e2fb531801f5aefbf592f55bc6e39c38c6394f94851ad1e3f97d1310e",
+      "current_sha256": "ff37829e2fb531801f5aefbf592f55bc6e39c38c6394f94851ad1e3f97d1310e",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 19637
+    },
+    {
+      "path": "test_napmem_controls_integration.py",
+      "diagnostic_sha256": "745092b3c2c27df18c3d888b7c50e7cb36223549c60508d1eb677100a723147b",
+      "diagnostic_report_sha256": "29c0133f37e2cae6a2c508adc8ac5d99a110a082a8e9ffa7a7b6dc790f4c23ff",
+      "blind_gate_1": "745092b3c2c27df18c3d888b7c50e7cb36223549c60508d1eb677100a723147b",
+      "blind_gate_2": "745092b3c2c27df18c3d888b7c50e7cb36223549c60508d1eb677100a723147b",
+      "current_sha256": "745092b3c2c27df18c3d888b7c50e7cb36223549c60508d1eb677100a723147b",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 5385
+    },
+    {
+      "path": "test_napmem_eval.py",
+      "diagnostic_sha256": "83f9575670641a4d6708d7d2c771def0ee2da71f01205b2cad9eab6a01400397",
+      "diagnostic_report_sha256": "5ff4783c820f696e1886a0f024e22809b85d7d5eaef28da35bf038835d746743",
+      "blind_gate_1": "f9f4b42e4c8cf43444ff632f6ebee929ea025b818d282837fe07b01e259f6b6a",
+      "blind_gate_2": "f9f4b42e4c8cf43444ff632f6ebee929ea025b818d282837fe07b01e259f6b6a",
+      "current_sha256": "f9f4b42e4c8cf43444ff632f6ebee929ea025b818d282837fe07b01e259f6b6a",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12582
+    },
+    {
+      "path": "test_napmem_evidence.py",
+      "diagnostic_sha256": "87fadadf98550feaf36653265668d25cf93b8a3e0c18ec9efdbfebc03f00e846",
+      "diagnostic_report_sha256": "f005448a06c38ea07d9e053611d3c7cbc5ffe747c64948c77aca192b7a290da2",
+      "blind_gate_1": "72694d66efefd30cbbcaa1293149729a3fba11312c6ddf884838cdd5268d9b04",
+      "blind_gate_2": "72694d66efefd30cbbcaa1293149729a3fba11312c6ddf884838cdd5268d9b04",
+      "current_sha256": "72694d66efefd30cbbcaa1293149729a3fba11312c6ddf884838cdd5268d9b04",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 18506
+    },
+    {
+      "path": "test_napmem_evidence_extraction.py",
+      "diagnostic_sha256": "579b3b70b55c05c2dc4cba038b747a1eb0feccaf8afcabe9a1d5b7897bf4adb5",
+      "diagnostic_report_sha256": "e479481cf847e8ac22b3ca02021b50093a19a9bae9a4fa32949f86d92d3b8836",
+      "blind_gate_1": "5ca68f5fd07c02380bbc9a292acb0cff4ba0108278ba1ff5deb28f6fba1521ce",
+      "blind_gate_2": "5ca68f5fd07c02380bbc9a292acb0cff4ba0108278ba1ff5deb28f6fba1521ce",
+      "current_sha256": "5ca68f5fd07c02380bbc9a292acb0cff4ba0108278ba1ff5deb28f6fba1521ce",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 15844
+    },
+    {
+      "path": "test_napmem_evidence_forget.py",
+      "diagnostic_sha256": "2981a2bd5de1258ebf63cc5e1f6ebe660f0b2ef66a3c72645451d462a5fa2176",
+      "diagnostic_report_sha256": "19bb92acfa1c86fde4309df3a74005ee8c8da31843e58a5f022fa117680c10c5",
+      "blind_gate_1": "2981a2bd5de1258ebf63cc5e1f6ebe660f0b2ef66a3c72645451d462a5fa2176",
+      "blind_gate_2": "2981a2bd5de1258ebf63cc5e1f6ebe660f0b2ef66a3c72645451d462a5fa2176",
+      "current_sha256": "2981a2bd5de1258ebf63cc5e1f6ebe660f0b2ef66a3c72645451d462a5fa2176",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12616
+    },
+    {
+      "path": "test_napmem_extensions.py",
+      "diagnostic_sha256": "584a0c5d9a22d81af1957dd163496a24096c14e3ccc604eeed5994f387acb365",
+      "diagnostic_report_sha256": "4ae3bc77a28b0d00588258a2bb10a239e20706bc096f9a58029c449d71c58332",
+      "blind_gate_1": "29aafd3d46fe35223caa4b14c9ec28a04621fbb8abd480092e1428fa3ba57191",
+      "blind_gate_2": "29aafd3d46fe35223caa4b14c9ec28a04621fbb8abd480092e1428fa3ba57191",
+      "current_sha256": "29aafd3d46fe35223caa4b14c9ec28a04621fbb8abd480092e1428fa3ba57191",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 51788
+    },
+    {
+      "path": "test_napmem_failover.py",
+      "diagnostic_sha256": "0dc6c0a561b2897750cb7ecca8bdfdf7895e2c121f650e5a365ebac68e6095af",
+      "diagnostic_report_sha256": "4f22b5c15db034abd91ecdf26652bf761b16bae6738071f63649f2318e55abba",
+      "blind_gate_1": "8e35955106cd81fbb0f9d2eeb733000b170d96e146a54da875c6999bd45620b2",
+      "blind_gate_2": "8e35955106cd81fbb0f9d2eeb733000b170d96e146a54da875c6999bd45620b2",
+      "current_sha256": "8e35955106cd81fbb0f9d2eeb733000b170d96e146a54da875c6999bd45620b2",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 23005
+    },
+    {
+      "path": "test_napmem_inspector.py",
+      "diagnostic_sha256": "b4e2ea986ef8d7c67701df9bf39b438dd6a26dd32c3a83cc867508e175b6fb1a",
+      "diagnostic_report_sha256": "a994631c3e7a279409c73a007dcfff7302400ddfa57dd64665c94fc43abb645f",
+      "blind_gate_1": "b0b207e8808dfd9ff106cb880539d00a228d524eae1e1bf2d28b2df577305b8b",
+      "blind_gate_2": "b0b207e8808dfd9ff106cb880539d00a228d524eae1e1bf2d28b2df577305b8b",
+      "current_sha256": "b0b207e8808dfd9ff106cb880539d00a228d524eae1e1bf2d28b2df577305b8b",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 23215
+    },
+    {
+      "path": "test_napmem_jobs.py",
+      "diagnostic_sha256": "c44e63d8171872c1a418ab3550bec591d0b6878dafe8497be2a7cae64e56760a",
+      "diagnostic_report_sha256": "7a5c807c52bfef9c4e5b7d700877b412353cc42c8d90e972ea79ec76a8997289",
+      "blind_gate_1": "c44e63d8171872c1a418ab3550bec591d0b6878dafe8497be2a7cae64e56760a",
+      "blind_gate_2": "c44e63d8171872c1a418ab3550bec591d0b6878dafe8497be2a7cae64e56760a",
+      "current_sha256": "c44e63d8171872c1a418ab3550bec591d0b6878dafe8497be2a7cae64e56760a",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12896
+    },
+    {
+      "path": "test_napmem_lifecycle.py",
+      "diagnostic_sha256": "8d263ca25c43f823a250808295bc7777bccd4a809787c1a9825298848f2ce8ef",
+      "diagnostic_report_sha256": "c9d92d05865266e165da40f46a01b6a90f2aa3333ccabdda58051e83dec53e07",
+      "blind_gate_1": "f19ded148e34ccf9a650f900aa1ae0ce62434a8913ea7b0bb38b854f168208ef",
+      "blind_gate_2": "f19ded148e34ccf9a650f900aa1ae0ce62434a8913ea7b0bb38b854f168208ef",
+      "current_sha256": "f19ded148e34ccf9a650f900aa1ae0ce62434a8913ea7b0bb38b854f168208ef",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 5599
+    },
+    {
+      "path": "test_napmem_maintenance.py",
+      "diagnostic_sha256": "a397c55fd7772a0649e2748132d1808696015af8277ba16e47fd2314ff23a513",
+      "diagnostic_report_sha256": "65818fd43c039daa9808956904753904c751e5da907311516bacb48662831b9e",
+      "blind_gate_1": "3ff7601856936b1f9a4d5d7415737398959cd9d402f2892f4bf6fe80792e54f1",
+      "blind_gate_2": "fcd9d47a85a6c4f65c8d2ffc50b0d46e9e3d4a65c08f81f248908cbc475949ad",
+      "current_sha256": "3478a754c55966b13c2f1beeb677817edc4148c11f1d088ea0dd415c043ba802",
+      "current_review": "owner post-gate diff review and normal-suite regression verification; no third blind gate",
+      "bytes": 24925
+    },
+    {
+      "path": "test_napmem_mcp_contract.py",
+      "diagnostic_sha256": "614eb397002edd5eb1df4d38ca04eacbf2f9b7b2225c5bd4818816db11989c19",
+      "diagnostic_report_sha256": "407b44475453c698629f40e283cfc5d3140e3df6846401acc8021d8d09cd6e3d",
+      "blind_gate_1": "ee8de4526abe03ad495a3f9fca2e524e8624ec743d3f5b942410868376c0beca",
+      "blind_gate_2": "ee8de4526abe03ad495a3f9fca2e524e8624ec743d3f5b942410868376c0beca",
+      "current_sha256": "ee8de4526abe03ad495a3f9fca2e524e8624ec743d3f5b942410868376c0beca",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 21843
+    },
+    {
+      "path": "test_napmem_metrics.py",
+      "diagnostic_sha256": "6e40dc85f5634ce643181d4f2b4b1b05889ccd465525f29cc96e4ddcd986350f",
+      "diagnostic_report_sha256": "6da8ea65e137dc0196a394c35404bccbf88fe28c1d6d2f0756bd0b85331385d3",
+      "blind_gate_1": "fdade5f1ac070ffad841ada38dff5ec3ec1217d4e8a41d732db0a092f292d882",
+      "blind_gate_2": "fdade5f1ac070ffad841ada38dff5ec3ec1217d4e8a41d732db0a092f292d882",
+      "current_sha256": "fdade5f1ac070ffad841ada38dff5ec3ec1217d4e8a41d732db0a092f292d882",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 27279
+    },
+    {
+      "path": "test_napmem_model.py",
+      "diagnostic_sha256": "47f2202781ddd1edf293774da810cbdd2a0cca49655be8a7910540f46da07939",
+      "diagnostic_report_sha256": "300ded11d21534adae51bc54152b2385813b93b2701a0ba56d296dd826fca8e3",
+      "blind_gate_1": "47f2202781ddd1edf293774da810cbdd2a0cca49655be8a7910540f46da07939",
+      "blind_gate_2": "47f2202781ddd1edf293774da810cbdd2a0cca49655be8a7910540f46da07939",
+      "current_sha256": "47f2202781ddd1edf293774da810cbdd2a0cca49655be8a7910540f46da07939",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 19904
+    },
+    {
+      "path": "test_napmem_optional_client.py",
+      "diagnostic_sha256": "39e7df75c3ff0915640a88afcc3a8c6a42e9c99c9cec08628977ef658e7bdafa",
+      "diagnostic_report_sha256": "a96e4f666e22bc591c40d65165ce95145f5caed3d28cc8f9219953d2cdeec9f7",
+      "blind_gate_1": "cadc908cca4e437c059f41590fca20babf8e99cdcdd582b07bc9bd21b0b4b986",
+      "blind_gate_2": "cadc908cca4e437c059f41590fca20babf8e99cdcdd582b07bc9bd21b0b4b986",
+      "current_sha256": "cadc908cca4e437c059f41590fca20babf8e99cdcdd582b07bc9bd21b0b4b986",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7544
+    },
+    {
+      "path": "test_napmem_pipeline.py",
+      "diagnostic_sha256": "f8802b1719cbbaa2deb3df301c608db2c99d030835e2e13d798c9b85d3d34bf9",
+      "diagnostic_report_sha256": "fc33a7e09b006f3c0ce6398a0c6d4cda46c8f3a98eedf75cbf2e261e13fcd026",
+      "blind_gate_1": "f8802b1719cbbaa2deb3df301c608db2c99d030835e2e13d798c9b85d3d34bf9",
+      "blind_gate_2": "f8802b1719cbbaa2deb3df301c608db2c99d030835e2e13d798c9b85d3d34bf9",
+      "current_sha256": "f8802b1719cbbaa2deb3df301c608db2c99d030835e2e13d798c9b85d3d34bf9",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 11344
+    },
+    {
+      "path": "test_napmem_protocol.py",
+      "diagnostic_sha256": "44b6f13fd38bc631489f25b3d40278d13af38c0284c3cd17c5495eed0f90bde7",
+      "diagnostic_report_sha256": "056098cc3731b81645b8080e94b21785a17c16ab1bb10da565e22d050ac6c6bb",
+      "blind_gate_1": "44b6f13fd38bc631489f25b3d40278d13af38c0284c3cd17c5495eed0f90bde7",
+      "blind_gate_2": "44b6f13fd38bc631489f25b3d40278d13af38c0284c3cd17c5495eed0f90bde7",
+      "current_sha256": "44b6f13fd38bc631489f25b3d40278d13af38c0284c3cd17c5495eed0f90bde7",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 7058
+    },
+    {
+      "path": "test_napmem_provenance.py",
+      "diagnostic_sha256": "4a2ccc18dac9eeba927c87f6eb72b397090b50ea04a65ab1aa00b872916145a6",
+      "diagnostic_report_sha256": "6260e961e15587744ed146050014caa2d749fec2c404c10bc8770e2c4484e7dc",
+      "blind_gate_1": "4a2ccc18dac9eeba927c87f6eb72b397090b50ea04a65ab1aa00b872916145a6",
+      "blind_gate_2": "4a2ccc18dac9eeba927c87f6eb72b397090b50ea04a65ab1aa00b872916145a6",
+      "current_sha256": "4a2ccc18dac9eeba927c87f6eb72b397090b50ea04a65ab1aa00b872916145a6",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 4779
+    },
+    {
+      "path": "test_napmem_regressions.py",
+      "diagnostic_sha256": "7ea1f55306f51d7add310dbc994e1092931006bcc0948ef4e3b081dd82b61975",
+      "diagnostic_report_sha256": "c229d9cfedf5e213eb4b1aa167bbb7816c593921144245dba432c13df9e08c3d",
+      "blind_gate_1": "7ea1f55306f51d7add310dbc994e1092931006bcc0948ef4e3b081dd82b61975",
+      "blind_gate_2": "7ea1f55306f51d7add310dbc994e1092931006bcc0948ef4e3b081dd82b61975",
+      "current_sha256": "7ea1f55306f51d7add310dbc994e1092931006bcc0948ef4e3b081dd82b61975",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12966
+    },
+    {
+      "path": "test_napmem_retrieval_contract.py",
+      "diagnostic_sha256": "dc2b16b58288b0b38917e50a14120f4cf0957250b4de430463992b7247f9706c",
+      "diagnostic_report_sha256": "b0017f5183083bacc78041c37e6a56a1b2f3d6a046bd2882504f6130c3a1c256",
+      "blind_gate_1": "12db58c3fa7650708ec54b3b5b9249f37fefde94d127738779f60fbe1c88d2af",
+      "blind_gate_2": "12db58c3fa7650708ec54b3b5b9249f37fefde94d127738779f60fbe1c88d2af",
+      "current_sha256": "12db58c3fa7650708ec54b3b5b9249f37fefde94d127738779f60fbe1c88d2af",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 4776
+    },
+    {
+      "path": "test_napmem_safety.py",
+      "diagnostic_sha256": "52675670f76439db6840d48d65068349058b8ecc4b17c6d5a4bfe3a7cb469486",
+      "diagnostic_report_sha256": "4e372a4a9f0480f1af6bdd4f431a4c6567314211917102b9b4c1b9b58295e26d",
+      "blind_gate_1": "33f9d081b913ba7edf2c0185528aed819910922d511e796c8af6161337e1614f",
+      "blind_gate_2": "33f9d081b913ba7edf2c0185528aed819910922d511e796c8af6161337e1614f",
+      "current_sha256": "33f9d081b913ba7edf2c0185528aed819910922d511e796c8af6161337e1614f",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 3739
+    },
+    {
+      "path": "test_napmem_search.py",
+      "diagnostic_sha256": "49306988d852f9ee59a8708e831d94dc9986ff24c6263c7ef46f1e3b1aaaffb6",
+      "diagnostic_report_sha256": "5ebf7ec9a2af3ffc1f104b095efe2cd970cccb4a72defb1bbb14c56ab4c41e1b",
+      "blind_gate_1": "49306988d852f9ee59a8708e831d94dc9986ff24c6263c7ef46f1e3b1aaaffb6",
+      "blind_gate_2": "49306988d852f9ee59a8708e831d94dc9986ff24c6263c7ef46f1e3b1aaaffb6",
+      "current_sha256": "49306988d852f9ee59a8708e831d94dc9986ff24c6263c7ef46f1e3b1aaaffb6",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 14992
+    },
+    {
+      "path": "test_napmem_snapshots.py",
+      "diagnostic_sha256": "a745ea7648ae0eff89508228b647c78cef744de999d518b8eb51a3b5b35e8944",
+      "diagnostic_report_sha256": "84deae50ef5ff54435787ee04ae37c2cdf23c5dffb3d2f8f7a1e961f0cf9776c",
+      "blind_gate_1": "60ea7c4f597023c8957c5a9fb2888f5f27a2260419eb0bcf5c30fedc424d7912",
+      "blind_gate_2": "60ea7c4f597023c8957c5a9fb2888f5f27a2260419eb0bcf5c30fedc424d7912",
+      "current_sha256": "60ea7c4f597023c8957c5a9fb2888f5f27a2260419eb0bcf5c30fedc424d7912",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 16569
+    },
+    {
+      "path": "test_napmem_sources.py",
+      "diagnostic_sha256": "8439487f5eb6f3e10150b3720eb0314416c50dd8917e897262398a76f0dcc6a7",
+      "diagnostic_report_sha256": "56aeeacdf0836703c038e432ceac8849ae71dd9140c0af63b3485707aa7ee785",
+      "blind_gate_1": "c1c72b7dd70a7dc53cbc132b9303c4ff038317266dfaefaab91723bd97696f35",
+      "blind_gate_2": "c1c72b7dd70a7dc53cbc132b9303c4ff038317266dfaefaab91723bd97696f35",
+      "current_sha256": "c1c72b7dd70a7dc53cbc132b9303c4ff038317266dfaefaab91723bd97696f35",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 12672
+    },
+    {
+      "path": "test_napmem_transactions.py",
+      "diagnostic_sha256": "ae224772f528780e5d93116f91344559384094ed92203c76ba09dcf7bf9ad0cf",
+      "diagnostic_report_sha256": "6b66c8481263ad823f3f9a4e101f60f9bb60a7584d90fbd18a2b00ca008251ba",
+      "blind_gate_1": "bb154e586887668d3fce8a80e98be5310e4da9e2f903edc1e11abd79f674bcc9",
+      "blind_gate_2": "bb154e586887668d3fce8a80e98be5310e4da9e2f903edc1e11abd79f674bcc9",
+      "current_sha256": "bb154e586887668d3fce8a80e98be5310e4da9e2f903edc1e11abd79f674bcc9",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 15009
+    },
+    {
+      "path": "test_napmem_trusted_loop.py",
+      "diagnostic_sha256": "9e5135810f0c172ea46ecf8e8624961b525f54cdab9426b96f56bbc449bbbd19",
+      "diagnostic_report_sha256": "6d4f6751db4b2493219ef0a81f8c20cd8645c59e542ecded4b5a348a2da81647",
+      "blind_gate_1": "37f7264c63f339e26a3a6eb5856212b040dcdb01450d168f84f3f6b2b330a57b",
+      "blind_gate_2": "37f7264c63f339e26a3a6eb5856212b040dcdb01450d168f84f3f6b2b330a57b",
+      "current_sha256": "37f7264c63f339e26a3a6eb5856212b040dcdb01450d168f84f3f6b2b330a57b",
+      "current_review": "blind gate2 exact hash",
+      "bytes": 5615
+    }
+  ],
+  "exclusions": [
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": ".github/SECURITY.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "GEMINI.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "LICENSE",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "README.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "deploy/README.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/ADAPTERS.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/CLI.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/COMPONENTS.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/CONTROLS.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/DEVELOPMENT.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/IMPLEMENTATION.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/INSPECTOR.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/INSTALLATION.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/MCP.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/OBSERVABILITY.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/PERSISTENCE.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/PROVENANCE.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/RETRIEVAL.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/TESTING.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/acceptance-offline-2026-10-27.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/bootstrap-prompt.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/caching-and-optimization.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/code-deep-optimizer-2026-10-26.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/code-deep-optimizer-2026-11-12.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/codebase-overview.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/deployment-topology.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/external-calls.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/high_signal_file_index.json",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "docs/integrations-and-assumptions.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/known-issues.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/logging.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/onboarding.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/optimizer-findings-2026-11-12.json",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "docs/product-roadmap-2026-10-27.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/repo-bootstrap-audit-2026-10-26.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/repo-bootstrap-audit-2026-11-12.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/requirements.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/runbooks/run-naptime-consolidator.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/security-review-ledger.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/semantic-indexing-and-hooks-reference.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "docs/source-audit-coverage-2026-11-12.json",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "docs/tool-inventory.json",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "docs/wiki/README.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "evaluations/baseline_hashed_heldout_v1.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "evaluations/baseline_substring_heldout_v1.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "evaluations/hybrid_final_regression_v2.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "evaluations/hybrid_initial_heldout_v2.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "evaluations/hybrid_regression_v2.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "evaluations/memory_quality_v1.json",
+      "reason": "synthetic evaluation fixture or historical result; immutable data, harness audited"
+    },
+    {
+      "path": "llms-facts.txt",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "llms-full.txt",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "llms-small.txt",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "llms.txt",
+      "reason": "static generated retrieval/audit documentation; prose/data audit"
+    },
+    {
+      "path": "memory.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "napmem_pyramid.json",
+      "reason": "existing corpus/example data; unchanged and never parsed/exposed"
+    },
+    {
+      "path": "prompts.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    },
+    {
+      "path": "sample_agent_memory.md",
+      "reason": "existing corpus/example data; unchanged and never parsed/exposed"
+    },
+    {
+      "path": "tasks/plan.md",
+      "reason": "maintained prose, agent guidance, template, license or documentation; owner bootstrap/prose audit"
+    }
+  ]
+}

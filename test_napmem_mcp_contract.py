@@ -42,7 +42,7 @@ class TestInputContracts(unittest.TestCase):
                 self.assertTrue(success["required"])
                 self.assertEqual(failure["required"], ["error"])
                 self.assertTrue(set(mcp.COMMON_INPUT) <= tool["inputSchema"]["properties"].keys())
-        self.assertEqual(mcp.SERVER_INFO["version"], "1.2.0")
+        self.assertEqual(mcp.SERVER_INFO["version"], "1.2.1")
 
     def test_invalid_tool_arguments_never_load_store_and_remain_in_band_errors(self):
         cases = [("search_memory", value) for value in (
@@ -109,14 +109,17 @@ class TestInputContracts(unittest.TestCase):
         with patch.object(self.server, "_agent", side_effect=RuntimeError(private)), self.assertLogs(mcp.logger, level="ERROR") as logs:
             response = self.server.handle(request("memory_stats"))
         self.assertTrue(response["result"]["isError"])
-        self.assertNotIn(private, mcp.wire_json(response))
-        self.assertNotIn(private, " ".join(logs.output))
+        for marker in private.split():
+            self.assertNotIn(marker, mcp.wire_json(response))
+        for marker in private.split():
+            self.assertNotIn(marker, " ".join(logs.output))
         agent = Mock()
         agent.inspect_provenance.return_value = {"error": private}
         with patch.object(self.server, "_agent", return_value=agent):
             response = self.server.handle(request("inspect_provenance", {"record_id": "r"}))
         self.assertTrue(response["result"]["isError"])
-        self.assertNotIn(private, mcp.wire_json(response))
+        for marker in private.split():
+            self.assertNotIn(marker, mcp.wire_json(response))
 
     def test_opted_in_metrics_count_final_wire_without_query_or_record_ids(self):
         import sys
@@ -330,7 +333,17 @@ class TestReadOnlyToolParity(unittest.TestCase):
                 raise AssertionError("MCP opened a raw source")
             return original_open(path, *args, **kwargs)
 
-        with patch("napmem_retrieval_agent.os.open", side_effect=guard):
+        import builtins
+        original_builtin, original_io = builtins.open, io.open
+        def forbid_source(real):
+            def wrapped(path, *args, **kwargs):
+                if not isinstance(path, int) and os.fspath(path) == str(self.source):
+                    raise AssertionError("MCP opened a raw source")
+                return real(path, *args, **kwargs)
+            return wrapped
+        with patch("napmem_retrieval_agent.os.open", side_effect=guard), \
+                patch("builtins.open", side_effect=forbid_source(original_builtin)), \
+                patch("io.open", side_effect=forbid_source(original_io)):
             stats = self.server.handle(request("memory_stats", {"scope": "project:a", "as_of": AS_OF}))
             inspected = self.server.handle(request("inspect_provenance", {"record_id": self.rid, "scope": "project:a"}))
         self.assertFalse(stats["result"]["isError"])

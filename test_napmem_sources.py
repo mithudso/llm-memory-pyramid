@@ -86,6 +86,31 @@ class TestSourceRegistry(unittest.TestCase):
             read_source(str(path), fd_path_resolver=lambda fd: None)
 
 
+    def test_recycled_inode_or_unknown_birth_never_inherits_another_source(self):
+        old, new = self.root / "old.md", self.root / "new.md"
+        old.write_text("old scoped source")
+        first = self.registry.observe(read_source(str(old)), scope="project:private")
+        old.unlink()
+        new.write_text("unrelated source")
+        snapshot = read_source(str(new))
+        for birth in (None, (first.get("birthtime_ns") or 0) + 1):
+            other = SourceRegistry(self.pyramid, str(self.root / ("case-" + str(birth) + ".json")))
+            from napmem_storage import atomic_write
+            atomic_write(other.path, {"version":"1.0.0","generation":1,"sources":[first]}, expected_fingerprint=None)
+            candidate = {**snapshot,"device":first["device"],"inode":first["inode"],"birthtime_ns":birth}
+            seen = other.observe(candidate, live_paths=[str(new)])
+            self.assertNotEqual(seen["session_id"], first["session_id"])
+            self.assertEqual(seen["scope"], "legacy")
+
+    def test_metadata_resolver_and_observer_agree_after_rename(self):
+        old, new = self.root / "old.md", self.root / "renamed.md"
+        old.write_text("stable source")
+        first = self.registry.observe(read_source(str(old)))
+        old.rename(new)
+        self.assertEqual(self.registry.resolve_session_id(str(new)), first["session_id"])
+        self.assertEqual(self.registry.observe(read_source(str(new)))["session_id"], first["session_id"])
+
+
 class TestConsolidatorSourceLifecycle(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -162,13 +187,26 @@ class TestConsolidatorSourceLifecycle(unittest.TestCase):
                 instance = NaptimeConsolidator(str(self.watch), self.pyramid, extraction="llm", async_batches=True)
             instance._client = client
             return instance
-        self.assertEqual(fresh().scan_and_consolidate(), 1)
+        self.assertEqual(fresh().scan_and_consolidate(), 0)
         client.messages.batches.retrieve.assert_not_called()
         self.assertEqual(fresh().scan_and_consolidate(), 1)
         self.assertEqual(fresh().scan_and_consolidate(), 0)
         self.assertEqual(client.messages.batches.create.call_count, 1)
         self.assertEqual(client.messages.batches.retrieve.call_count, 1)
         self.assertEqual(len(MemoryPyramidDistiller(self.pyramid).data["memory_records"]), 1)
+
+    def test_sync_model_output_for_unchanged_source_is_committed(self):
+        with mock.patch("naptime_consolidator._anthropic_available", return_value=True):
+            instance = NaptimeConsolidator(str(self.watch), self.pyramid, extraction="llm")
+        instance._client = object()
+        output = {"sess_notes": json.dumps([{
+            "type": "fact", "text": "User prefers quiet prompts.", "salience": "high",
+            "source_anchor": {"heading": "Preferences", "line_range": "L2"}}])}
+        with mock.patch("llm_extractor.extract_batch", return_value=output), \
+                mock.patch.dict("sys.modules", {"anthropic": NS(AnthropicError=RuntimeError)}):
+            self.assertEqual(instance.scan_and_consolidate(), 1)
+        self.assertEqual([r["text"] for r in MemoryPyramidDistiller(self.pyramid).data["memory_records"]],
+                         ["User prefers quiet prompts."])
 
     def test_sync_model_output_for_changed_source_is_not_committed_or_heuristically_replayed(self):
         def stale_batch(client, prompts, model):

@@ -253,6 +253,7 @@ class TestTrustedMemoryLoop(AdapterFixture):
         self.assertTrue(exported["truncated"])
         self.assertEqual(exported["omitted_count"], 5 - len(exported["records"]))
         self.assertNotIn("Beta secret", compact_json(exported).decode())
+        self.assertTrue(exported["records"], "Budget must retain at least one complete group")
         identities = {record["id"] for record in exported["records"]}
         self.assertEqual(identities, {item["record_id"] for item in exported["evidence"]})
         self.assertEqual(identities, {item["record_id"] for item in exported["citations"]})
@@ -330,6 +331,9 @@ class TestGitAdapter(AdapterFixture):
         self.git("config", "core.fsmonitor", f"touch {marker}")
         self.git("config", "diff.fake.textconv", f"touch {marker}")
         self.git("config", "filter.fake.smudge", f"touch {marker}")
+        (self.repository / ".gitattributes").write_text("decision.md diff=fake filter=fake\n")
+        self.git("add", ".gitattributes")
+        self.git("commit", "-m", "Activate inert driver fixtures")
         hooks = self.repository / ".git" / "hooks"
         hook = hooks / "post-checkout"
         hook.write_text(f"#!/bin/sh\ntouch '{marker}'\n")

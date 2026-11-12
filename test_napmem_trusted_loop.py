@@ -63,6 +63,7 @@ class TrustedLoopTests(unittest.TestCase):
             cli("ingest", str(root / "a.md"), "--scope", "project:a")
             updated = cli("query", "favorite editor", "--scope", "project:a")
             self.assertIn("Nano", updated["matches"][0]["text"])
+            self.assertNotIn("Vim", json.dumps(updated))
             cli("control", "correct", "--record-id", updated["matches"][0]["id"],
                 "--value", "I prefer Helix as my editor.")
             cli("ingest", str(root / "a.md"), "--scope", "project:a")
@@ -70,6 +71,8 @@ class TrustedLoopTests(unittest.TestCase):
             self.assertEqual([row["id"] for row in corrected["matches"]],
                              [row["id"] for row in rpc("favorite editor", "project:a")["matches"]])
             self.assertIn("Helix", corrected["matches"][0]["text"])
+            self.assertNotIn("Vim", json.dumps(corrected))
+            self.assertNotIn("Nano", json.dumps(corrected))
             old_snapshot = root / "before-forget"
             cli("snapshot", "export", str(old_snapshot))
             cli("control", "forget", "--record-id", corrected["matches"][0]["id"])

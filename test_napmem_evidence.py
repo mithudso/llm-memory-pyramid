@@ -4,9 +4,10 @@ from copy import deepcopy
 import hashlib
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
-import time
 import unittest
 from unittest.mock import patch
 
@@ -288,10 +289,12 @@ class TestExplicitSourceVerification(unittest.TestCase):
     def test_fifo_is_opened_nonblocking_and_refused(self):
         self.path.unlink()
         os.mkfifo(self.path)
-        started = time.monotonic()
-        checked = self.check()
-        self.assertLess(time.monotonic() - started, 1)
-        self.assertEqual(checked["reason"], "source_not_regular")
+        code = ("import json,sys; from napmem_evidence import verify_evidence; "
+                "result=verify_evidence(json.loads(sys.argv[1]),allowed_roots=[sys.argv[2]]); "
+                "print(json.dumps(result))")
+        child = subprocess.run([sys.executable, "-c", code, json.dumps(self.bound), str(self.root)],
+                               capture_output=True, text=True, timeout=3, check=True)
+        self.assertEqual(json.loads(child.stdout)["reason"], "source_not_regular")
 
     def test_directory_and_oversized_source_are_refused(self):
         self.path.unlink()

@@ -92,6 +92,11 @@ intervals; ingestion time does not establish real-world validity.
 
 ## Deployment topology
 
+The checked-in `.mcp.json` currently starts the local stdio server with a
+loopback Ollama override. The fleet topology below is a historical deployment
+reference; this maintenance did not verify or activate installed services.
+
+
 Production topology (three-machine fleet, canonical consolidator on the
 always-on Linux box, launchd/systemd variants, security model) is documented
 in [deployment-topology.md](deployment-topology.md); unit files and install

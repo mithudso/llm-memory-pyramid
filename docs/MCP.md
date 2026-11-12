@@ -1,6 +1,6 @@
 # MCP and client contracts
 
-Server version: 1.2.0. Protocol: 2025-06-18. Transport: UTF-8 newline-delimited
+Server version: 1.2.1. Protocol: 2025-06-18. Transport: UTF-8 newline-delimited
 JSON-RPC over stdio, implemented with the standard library.
 
 Use `napmem --pyramid /absolute/store.json mcp` for the configured portable
@@ -76,3 +76,9 @@ exports and backups; forgetting does not silently erase unreachable mirrors.
 
 Protocol reference:
 https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+
+The legacy proxy allows at most 64 pending requests and 32 MiB of queued request
+text. It applies the request deadline to local and remote backends, resets that
+deadline on replay, reserves unique internal replay IDs, and bounds real stdio
+output writes to one second. Arbitrary caller-supplied Python output objects
+remain the caller's responsibility. Derived prose is pruned before its evidence.

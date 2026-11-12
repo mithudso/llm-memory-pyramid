@@ -140,6 +140,7 @@ class TestOptionalOllamaClient(unittest.TestCase):
         ollama = config["project"]["optional-dependencies"]["ollama"]
         self.assertEqual(len(ollama), 1)
         self.assertIn("ollama-client @ git+https://github.com/mithudso/ollama-client@", ollama[0])
+        self.assertRegex(ollama[0], r"@[0-9a-f]{40}(?:[0-9a-f]{24})?$")
         self.assertEqual(config["project"]["scripts"]["napmem"], "napmem_cli:main")
         runtime = set(config["tool"]["setuptools"]["py-modules"])
         self.assertTrue({"napmem_storage", "napmem_jobs", "napmem_sources", "napmem_snapshots",

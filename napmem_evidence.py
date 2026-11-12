@@ -65,7 +65,12 @@ def _bounded_quote(quote: str) -> tuple[str, bool]:
 
 def _literal_quote(evidence: dict[str, Any]) -> str | None:
     quote = evidence.get("quote")
-    if not isinstance(quote, str) or not quote or len(quote.encode("utf-8")) > MAX_QUOTE_BYTES:
+    if not isinstance(quote, str) or not quote or len(quote) > MAX_QUOTE_BYTES:
+        return None
+    try:
+        if len(quote.encode("utf-8")) > MAX_QUOTE_BYTES:
+            return None
+    except UnicodeEncodeError:
         return None
     if evidence.get("quote_sha256") != _sha(quote):
         return None

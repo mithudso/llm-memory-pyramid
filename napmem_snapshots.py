@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from napmem_model import migrate_store, parse_time
+from napmem_storage import finite_json_float
 
 
 STORE_FILE = "napmem_pyramid.json"
@@ -45,7 +46,7 @@ def _sha(raw: bytes) -> str:
 def _json(raw: bytes, label: str) -> dict[str, Any]:
     def reject_constant(value):
         raise ValueError(f"Nonfinite JSON constant in {label}: {value}")
-    value = json.loads(raw, parse_constant=reject_constant)
+    value = json.loads(raw, parse_constant=reject_constant, parse_float=finite_json_float)
     if not isinstance(value, dict):
         raise ValueError(f"{label} must contain a JSON object")
     return value
@@ -108,6 +109,8 @@ def _cache_info(cache: dict[str, Any], data: dict[str, Any]) -> tuple[str, dict[
     embedding = {"model": model, "backend": cache.get("backend"),
                  "dimensions": next(iter(dimensions)) if len(dimensions) == 1 else None,
                  "config": deepcopy(cache.get("embedding_config"))}
+    if len(_encoded(embedding)) > MAX_MANIFEST_BYTES // 2:
+        raise ValueError("Cache metadata exceeds snapshot manifest allowance")
     provenance = "generation-bound" if generation is not None else "record-text-hashes-only"
     return provenance, embedding
 
@@ -267,7 +270,7 @@ def unpack_snapshot(archive: str | os.PathLike, destination: str | os.PathLike) 
         raise FileExistsError("Snapshot extraction destination must be empty")
     if Path(archive).stat().st_size > MAX_ARCHIVE_BYTES:
         raise ValueError("Snapshot archive exceeds size limit")
-    seen = set()
+    seen, created = set(), set()
     try:
         with tarfile.open(archive, "r:") as stream:
             for member in stream:
@@ -283,12 +286,13 @@ def unpack_snapshot(archive: str | os.PathLike, destination: str | os.PathLike) 
                 if len(raw) != member.size:
                     raise ValueError("Snapshot archive member size mismatch")
                 _write(destination / member.name, raw)
+                created.add(member.name)
         if not {STORE_FILE, MANIFEST_FILE} <= seen:
             raise ValueError("Snapshot archive is incomplete")
         result = load_snapshot(destination)
         return result["manifest"]
     except BaseException:
-        for name in seen:
+        for name in created:
             (destination / name).unlink(missing_ok=True)
         raise
 
@@ -297,13 +301,14 @@ def publish_snapshot(staging: str | os.PathLike, mirror_root: str | os.PathLike)
     """Validate and publish one immutable directory with one serialized pointer change."""
     from napmem_storage import atomic_write, read_snapshot, store_lock
     staging, root = Path(staging), Path(mirror_root)
+    staging = resolve_snapshot_directory(staging)
     checked = load_snapshot(staging)
     if checked["verification"]["status"] != "verified":
         raise ValueError("Cannot publish a manifest-free snapshot")
     manifest = checked["manifest"]
     generations = root / "generations"
     generations.mkdir(parents=True, exist_ok=True)
-    name = f"gen-{manifest['generation']}-{uuid4().hex}"
+    name = ".pending-" + uuid4().hex
     copied = generations / name
     try:
         copied.mkdir(mode=0o700)
@@ -311,7 +316,14 @@ def publish_snapshot(staging: str | os.PathLike, mirror_root: str | os.PathLike)
             source = staging / filename
             if source.exists():
                 _write(copied / filename, _read(source, MAX_MANIFEST_BYTES if filename == MANIFEST_FILE else MAX_FILE_BYTES))
-        load_snapshot(copied)
+        copied_snapshot = load_snapshot(copied)
+        if copied_snapshot["verification"]["status"] != "verified":
+            raise ValueError("Copied snapshot lost its manifest")
+        manifest = copied_snapshot["manifest"]
+        name = f"gen-{manifest['generation']}-{uuid4().hex}"
+        published_directory = generations / name
+        copied.rename(published_directory)
+        copied = published_directory
         if os.name != "nt":
             for directory in (copied, generations, root):
                 fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))

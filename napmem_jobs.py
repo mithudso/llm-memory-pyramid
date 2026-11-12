@@ -27,6 +27,9 @@ STATES = ("queued", "submitted", "ready", "committed", "stale", "failed", "cance
 TERMINAL = ("committed", "stale", "failed", "cancelled")
 BACKENDS = ("heuristic", "anthropic")
 MAX_RESULT_BYTES = 4 * 1024 * 1024
+PUBLIC_COLUMNS = ("id", "idempotency_key", "session_id", "source_path", "source_hash", "scope",
+                  "backend", "model", "prompt_version", "state", "error_code", "lease_owner",
+                  "lease_until", "attempts", "max_attempts", "created_at", "updated_at", "result_hash")
 
 
 def _json(value):
@@ -49,6 +52,9 @@ class JobQueue:
             return
         if create:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        parent = Path(self.path).parent.stat()
+        if hasattr(os, "geteuid") and (parent.st_uid != os.geteuid() or parent.st_mode & 0o022):
+            raise ValueError("Job queue directory must be owned by the current user and not writable by others")
         fd = os.open(self.path, os.O_RDWR | (os.O_CREAT if create else 0) |
                      getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
         try:
@@ -56,9 +62,17 @@ class JobQueue:
             if not stat.S_ISREG(details.st_mode) or details.st_nlink != 1:
                 raise ValueError("Job queue must be a private regular, singly-linked file")
             os.fchmod(fd, 0o600)
+            db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+            try:
+                current = os.stat(self.path, follow_symlinks=False)
+                if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
+                        or (current.st_dev, current.st_ino) != (details.st_dev, details.st_ino)):
+                    raise ValueError("Job queue identity changed while opening SQLite")
+            except BaseException:
+                db.close()
+                raise
         finally:
             os.close(fd)
-        db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         db.row_factory = sqlite3.Row
         try:
             db.execute("PRAGMA busy_timeout=10000")
@@ -101,7 +115,7 @@ class JobQueue:
         with self._db(create=False) as db:
             if db is None:
                 return []
-            rows = db.execute("SELECT * FROM jobs" + (" WHERE state=?" if state else "") +
+            rows = db.execute("SELECT " + ",".join(PUBLIC_COLUMNS) + " FROM jobs" + (" WHERE state=?" if state else "") +
                               " ORDER BY created_at,id LIMIT ?", (state, limit) if state else (limit,))
             return [self._public(row) for row in rows]
 
@@ -109,7 +123,8 @@ class JobQueue:
         with self._db(create=False) as db:
             if db is None:
                 return None
-            row = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            columns = "*" if include_payload else ",".join(PUBLIC_COLUMNS)
+            row = db.execute("SELECT " + columns + " FROM jobs WHERE id=?", (job_id,)).fetchone()
             return dict(row) if row is not None and include_payload else self._public(row)
 
     def enqueue(self, *, session_id: str, source_path: str, source_content: str,
@@ -223,6 +238,9 @@ class JobQueue:
         return self.get(row["id"], include_payload=True)
 
     def renew(self, job_id: str, worker: str, *, lease_seconds: float = 60) -> bool:
+        if (isinstance(lease_seconds, bool) or not isinstance(lease_seconds, (int, float))
+                or not 0 < lease_seconds <= 86400):
+            raise ValueError("lease_seconds must be positive and at most one day")
         now = time.time()
         with self._db(create=False) as db:
             if db is None:
@@ -243,7 +261,9 @@ class JobQueue:
                 raise ValueError("Job does not exist")
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
-            if row is None or (worker is not None and row["lease_owner"] != worker):
+            if row is None or (worker is not None and (
+                    row["lease_owner"] != worker or row["lease_until"] is None
+                    or row["lease_until"] <= time.time())):
                 db.execute("ROLLBACK")
                 raise ValueError("Job lease was lost or job does not exist")
             # A privacy cancellation wins over a concurrent extraction result.
@@ -276,6 +296,7 @@ class JobQueue:
             job = self.claim(worker, backend="anthropic")
             if job is None:
                 break
+            outbound_started = False
             try:
                 prompt = get_extraction_prompt(job["source_text"], job["session_id"], os.path.basename(job["source_path"]))
                 # Persist the outbound intent before calling a provider. A crash
@@ -283,10 +304,12 @@ class JobQueue:
                 # and bill twice when the outcome is unknown.
                 self._finish(job["id"], "submitted", worker=worker, keep_lease=True,
                              batch={"batch_id": None, "phase": "submission_started"})
+                outbound_started = True
                 handle = submit_batch(client, {job["session_id"]: prompt}, job["model"])
                 receipts.append(self._finish(job["id"], "submitted", worker=worker, batch=handle))
             except Exception as exc:
-                receipts.append(self._finish(job["id"], "failed", worker=worker, error=type(exc).__name__))
+                error = "SubmissionOutcomeUnknown" if outbound_started else type(exc).__name__
+                receipts.append(self._finish(job["id"], "failed", worker=worker, error=error))
         return receipts
 
     def collect(self, client, *, limit: int = 20, worker: str | None = None) -> list[dict[str, Any]]:
@@ -313,7 +336,9 @@ class JobQueue:
                 else:
                     receipts.append(self._finish(job["id"], "failed", worker=worker, error="RemoteExtractionFailed"))
             except Exception as exc:
-                receipts.append(self._finish(job["id"], "failed", worker=worker, error=type(exc).__name__))
+                # Collection can resume against the same remote batch. Never
+                # discard its handle or make an ambiguous stream retry submit.
+                receipts.append(self._finish(job["id"], "submitted", worker=worker, error=type(exc).__name__))
         return receipts
 
     def run(self, distiller, *, limit: int = 20, worker: str | None = None) -> list[dict[str, Any]]:
@@ -330,6 +355,24 @@ class JobQueue:
             except Exception as exc:
                 receipts.append(self._finish(job["id"], "failed", worker=worker, error=type(exc).__name__))
         return receipts
+
+    @contextmanager
+    def _commit_lease(self, job, worker):
+        with self._db(create=False) as db:
+            if db is None:
+                raise ValueError("Job does not exist")
+            db.execute("BEGIN IMMEDIATE")
+            current = db.execute("SELECT * FROM jobs WHERE id=?", (job["id"],)).fetchone()
+            now = time.time()
+            if (current is None or current["state"] != "ready"
+                    or current["result_hash"] != job["result_hash"]
+                    or (worker is not None and (current["lease_owner"] != worker
+                                               or current["lease_until"] is None or current["lease_until"] <= now))
+                    or (worker is None and current["lease_owner"] is not None
+                        and current["lease_until"] is not None and current["lease_until"] > now)):
+                raise ValueError("Job lease lost or ready result changed before canonical commit")
+            yield
+            db.execute("COMMIT")
 
     def commit(self, job_id: str, distiller, *, source_reader: Callable | None = None,
                worker: str | None = None) -> dict[str, Any]:
@@ -371,11 +414,14 @@ class JobQueue:
             # A rename changes anchors, not the captured extraction input.
             for record in records:
                 record["source_anchor"]["file_path"] = current["path"]
-            distiller.data.setdefault("applied_jobs", []).append(job_id)
-            distiller.ingest_session_records(
-                job["session_id"], "Durable memory extraction", current["path"], records,
-                scope=job["scope"], source_content=job["source_text"],
-                extraction_info={"method": job["backend"], "model": job["model"], "prompt_version": job["prompt_version"]})
+            from napmem_adapters import _check_owner
+            _check_owner(distiller, job["session_id"], current["path"], job["source_path"])
+            with self._commit_lease(job, worker):
+                distiller.data.setdefault("applied_jobs", []).append(job_id)
+                distiller.ingest_session_records(
+                    job["session_id"], "Durable memory extraction", current["path"], records,
+                    scope=job["scope"], source_content=job["source_text"],
+                    extraction_info={"method": job["backend"], "model": job["model"], "prompt_version": job["prompt_version"]})
         # If the process dies before this acknowledgment, applied_jobs makes the
         # ready queue row safe to replay after restarting.
         return self._finish(job_id, "committed", worker=worker)
@@ -406,6 +452,8 @@ class JobQueue:
                 job = dict(row) if row is not None else None
                 if job is None or job["state"] not in ("failed", "stale", "cancelled"):
                     raise ValueError("Only failed, stale or cancelled jobs can retry")
+                if job["error_code"] == "SubmissionOutcomeUnknown":
+                    raise ValueError("Unknown provider submission outcome requires operator reconciliation before retry")
                 if job["error_code"] == "PrivacyPurge":
                     raise ValueError("Privacy-purged jobs cannot retry; an allowed source needs a fresh enqueue")
                 if job["attempts"] >= job["max_attempts"]:

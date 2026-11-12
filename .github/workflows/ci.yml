@@ -15,19 +15,43 @@ jobs:
           python-version: "3.12"
       - name: Install core without optional clients
         run: pip install .
+      - name: Core tests without optional clients
+        env:
+          NAPMEM_EMBED_BACKEND: hashed
+          NAPMEM_MODE: offline
+        run: |
+          scratch=$(mktemp -d "$RUNNER_TEMP/napmem-isolated.XXXXXX")
+          mkdir -p "$scratch"/{config,cache,data,models,tmp,auth}
+          offline() {
+            sudo unshare --net -- env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" XDG_DATA_HOME="$scratch/data" NAPMEM_DATA_DIR="$scratch/data" HF_HOME="$scratch/models" OLLAMA_MODELS="$scratch/models" NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline NAPMEM_METRICS=0 PYTHONNOUSERSITE=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_ATTR_NOSYSTEM=1 "$@"
+          }
+          offline python - <<'PYTEST'
+          import pathlib, unittest
+          loader = unittest.TestLoader()
+          modules = sorted(p.stem for p in pathlib.Path('.').glob('test_*.py') if p.name != 'test_napmem_extensions.py')
+          suite = unittest.TestSuite(loader.loadTestsFromName(name) for name in modules)
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(not result.wasSuccessful())
+          PYTEST
       - name: Exercise installed offline entrypoint outside checkout
         env:
           NAPMEM_EMBED_BACKEND: hashed
           NAPMEM_MODE: offline
         working-directory: /tmp
         run: |
-          python -c "import importlib.util; assert importlib.util.find_spec('ollama_client') is None; assert importlib.util.find_spec('anthropic') is None"
-          napmem --version
-          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" demo
-          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" query "preferred editor" --scope project:napmem-demo-alpha
-          napmem --pyramid "$RUNNER_TEMP/napmem/store.json" doctor
-          napmem eval --split heldout --eval-mode hybrid
+          scratch=$(mktemp -d "$RUNNER_TEMP/napmem-isolated.XXXXXX")
+          mkdir -p "$scratch"/{config,cache,data,models,tmp,auth}
+          offline() {
+            sudo unshare --net -- env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" XDG_DATA_HOME="$scratch/data" NAPMEM_DATA_DIR="$scratch/data" HF_HOME="$scratch/models" OLLAMA_MODELS="$scratch/models" NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline NAPMEM_METRICS=0 PYTHONNOUSERSITE=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_ATTR_NOSYSTEM=1 "$@"
+          }
+          offline python -c "import importlib.util; assert importlib.util.find_spec('ollama_client') is None; assert importlib.util.find_spec('anthropic') is None"
+          offline napmem --version
+          offline napmem --pyramid "$scratch/data/store.json" demo
+          offline napmem --pyramid "$scratch/data/store.json" query "preferred editor" --scope project:napmem-demo-alpha
+          offline napmem --pyramid "$scratch/data/store.json" doctor
+          offline napmem eval --split heldout --eval-mode hybrid
   test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -58,16 +82,33 @@ jobs:
           pip install "ollama-client @ git+https://github.com/mithudso/ollama-client@740aca7cbc5aab4941779f35f1ca17b59fe73c7f"
       - name: Compile check
         run: python -m compileall -q .
-      - name: Run tests
-        run: python -m unittest discover -v -s . -p "test_*.py"
-        env:
-          NAPMEM_EMBED_BACKEND: hashed
+      - name: Run tests in isolated process tree
+        run: |
+          scratch=$(mktemp -d "$RUNNER_TEMP/napmem-isolated.XXXXXX")
+          mkdir -p "$scratch"/{config,cache,data,models,tmp,auth}
+          offline() {
+            sudo unshare --net -- env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" XDG_DATA_HOME="$scratch/data" NAPMEM_DATA_DIR="$scratch/data" HF_HOME="$scratch/models" OLLAMA_MODELS="$scratch/models" NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline NAPMEM_METRICS=0 PYTHONNOUSERSITE=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_ATTR_NOSYSTEM=1 "$@"
+          }
+          offline python - <<'PROOF'
+          import socket, subprocess, sys
+          code = "import socket; s=socket.socket(); s.settimeout(.2); assert s.connect_ex(('127.0.0.1', 9)) != 0; s.close(); s=socket.socket(); s.settimeout(.2); assert s.connect_ex(('192.0.2.1', 9)) != 0; s.close()"
+          exec(code)
+          subprocess.run([sys.executable, '-c', code], check=True)
+          print('Parent and child deny loopback and external connections')
+          PROOF
+          offline python -m unittest discover -v -s . -p "test_*.py"
       - name: Check static documentation maps
         run: python scripts/repo_docs.py --check
       - name: Offline memory quality regression gate
         env:
           NAPMEM_EMBED_BACKEND: hashed
-        run: python napmem_eval.py --mode hybrid --split heldout --check-baseline evaluations/hybrid_regression_v2.json
+        run: |
+          scratch=$(mktemp -d "$RUNNER_TEMP/napmem-isolated.XXXXXX")
+          mkdir -p "$scratch"/{config,cache,data,models,tmp,auth}
+          offline() {
+            sudo unshare --net -- env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" XDG_DATA_HOME="$scratch/data" NAPMEM_DATA_DIR="$scratch/data" HF_HOME="$scratch/models" OLLAMA_MODELS="$scratch/models" NAPMEM_EMBED_BACKEND=hashed NAPMEM_MODE=offline NAPMEM_METRICS=0 PYTHONNOUSERSITE=1 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_ATTR_NOSYSTEM=1 "$@"
+          }
+          offline python napmem_eval.py --mode hybrid --split heldout --check-baseline evaluations/hybrid_regression_v2.json
       - name: Check wrapper syntax
         run: bash -n scripts/run-naptime.sh
 

@@ -56,3 +56,9 @@ Remove the virtual environment and checkout. Custom pyramid stores, their
 `.embindex.json` and `.sweepstate.json` siblings, and any local mirror remain
 until explicitly removed. Stop any separately installed scheduler first;
 see [deployment](../deploy/README.md).
+
+## Full integration test setup
+
+The complete discovery suite requires `python -m pip install -e '.[ollama]'` and private Git access.
+The core installation remains dependency-free. See [Testing](TESTING.md) for
+the core-only CI suite and all validation commands.

@@ -151,7 +151,7 @@ class TestFailoverProxy(unittest.TestCase):
 
     def test_nonreading_backend_cannot_block_relay_or_watchdog(self):
         proxy, out = self._proxy([sys.executable, "-c", "import time; time.sleep(600)"])
-        proxy.request_timeout = 0.1
+        proxy.request_timeout = 1.0
         with mock.patch.object(fo, "WATCHDOG_TICK_S", 0.02):
             proxy.start(use_primary=True)
             remote = proxy.backend.proc
@@ -337,7 +337,7 @@ class TestMirrorSync(unittest.TestCase):
     def test_concurrent_sync_never_publishes_another_writers_open_file(self):
         # A publishes while B has an open, incomplete transfer. Each transfer
         # must own its staging directory, and the pointer must select only A.
-        self._write_remote("napmem_pyramid.json", json.dumps({"memory_records": []}))
+        self._write_remote("napmem_pyramid.json", json.dumps({"memory_records": [], "generation": 1}))
         validated = threading.Event()
         second_open = threading.Event()
         published = threading.Event()
@@ -380,10 +380,11 @@ class TestMirrorSync(unittest.TestCase):
             try:
                 first.start()
                 self.assertTrue(validated.wait(timeout=3))
+                self._write_remote("napmem_pyramid.json", json.dumps({"memory_records": [], "generation": 2}))
                 second.start()
                 self.assertTrue(published.wait(timeout=3))
                 with open(fo.mirror_pyramid(), encoding="utf-8") as fh:
-                    self.assertEqual(json.load(fh), {"memory_records": []})
+                    self.assertEqual(json.load(fh), {"memory_records": [], "generation": 1})
             finally:
                 release_second.set()
                 first.join(timeout=3)
@@ -407,9 +408,14 @@ class TestMirrorSync(unittest.TestCase):
         self._write_remote("napmem_pyramid.json", json.dumps({"generation": 1}))
         self.assertTrue(fo.sync_mirror("fake"))
         previous = fo.mirror_pyramid()
-        command = [sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x'*10000)"]
+        archive = fo.Path(self.tmp) / "too-large.tar"
+        fo._receive_snapshot("fake", archive)
+        self.assertGreater(archive.stat().st_size, 32)
+        command = [sys.executable, "-c", "import pathlib,sys;sys.stdout.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())", str(archive)]
         with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command), \
                 mock.patch.object(fo, "MAX_ARCHIVE_BYTES", 32):
+            with self.assertRaisesRegex(ValueError, "size|limit"):
+                fo._receive_snapshot("fake", fo.Path(self.tmp) / "bounded.tar")
             self.assertFalse(fo.sync_mirror("fake"))
         command = [sys.executable, "-c", "print('invalid tar')"]
         with mock.patch.object(fo, "remote_snapshot_cmd", return_value=command):

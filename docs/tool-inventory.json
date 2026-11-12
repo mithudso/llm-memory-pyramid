@@ -1,0 +1,67 @@
+{
+  "kind": "static documentation inventory",
+  "runtime_registry": false,
+  "source": "docs/external-calls.md and CLI/MCP public symbols",
+  "operations": [
+    {
+      "name": "ingest",
+      "surface": "napmem ingest / distiller / consolidator",
+      "network": "optional explicit Anthropic/Ollama"
+    },
+    {
+      "name": "query",
+      "surface": "napmem query / search_memory",
+      "network": "default none; selected embedding backend optional"
+    },
+    {
+      "name": "inspect",
+      "surface": "napmem inspect / inspect_provenance / get_topic_track / memory_stats",
+      "network": "none by default"
+    },
+    {
+      "name": "control",
+      "surface": "napmem control",
+      "network": "none"
+    },
+    {
+      "name": "jobs",
+      "surface": "napmem jobs",
+      "network": "explicit Anthropic submit/collect only"
+    },
+    {
+      "name": "snapshot",
+      "surface": "napmem snapshot / napmem_snapshots CLI",
+      "network": "local; failover refresh explicit SSH"
+    },
+    {
+      "name": "adapters",
+      "surface": "napmem ingest/export Git/Markdown/JSON",
+      "network": "local Git subprocess only"
+    },
+    {
+      "name": "eval",
+      "surface": "napmem eval / napmem_eval.py",
+      "network": "synthetic offline"
+    },
+    {
+      "name": "doctor/status",
+      "surface": "napmem doctor/status",
+      "network": "metadata only; no payload/source reads"
+    },
+    {
+      "name": "proxy",
+      "surface": "napmem mcp proxy / napmem_mcp_failover.py",
+      "network": "configured SSH; local mirrored fallback"
+    },
+    {
+      "name": "docs",
+      "surface": "scripts/repo_docs.py [--check]",
+      "network": "none"
+    }
+  ],
+  "architecture_exceptions": [
+    "no operation-run/history dashboard API",
+    "no new admin MCP tools",
+    "no central JSONL error sink"
+  ]
+}

@@ -32,6 +32,7 @@ python3 -m venv .venv
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json demo
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json query "preferred editor" --scope project:napmem-demo-alpha
 .venv/bin/napmem --pyramid /tmp/napmem-demo/store.json doctor
+.venv/bin/python -m pip install -e '.[ollama]'  # full optional-client test suite
 NAPMEM_EMBED_BACKEND=hashed .venv/bin/python -m unittest discover -s . -p "test_*.py"
 ```
 
@@ -74,6 +75,8 @@ example store checked into this repo is separate; see `CLAUDE.md`.
 
 ## Documentation
 
+Start with the maintained [project wiki](docs/wiki/README.md).
+
 - [Architecture](docs/ARCHITECTURE.md) · [Components](docs/COMPONENTS.md) · [Development](docs/DEVELOPMENT.md)
 - [Installation](docs/INSTALLATION.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md)
 - [Deployment topology](docs/deployment-topology.md) · [Deploy units](deploy/README.md) · [Security ledger](docs/security-review-ledger.md)
@@ -96,7 +99,8 @@ Guidance for Claude Code when working in this repository.
 
 NapMem — a 4-layer LLM memory pyramid (raw sessions → atomic records → topic
 tracks → profiles) with incremental re-ingestion, dedup with provenance, and
-active retrieval tools. The package requires Python 3.11+ and the shared `ollama-client` library.
+active retrieval tools. The package requires Python 3.11+. The core has no runtime dependencies;
+`ollama-client` and `anthropic` are optional extras.
 The heuristic distiller, substring retrieval and MCP transport use the standard
 library. Anthropic extraction is an optional extra; Ollama extraction and
 embeddings contact configured hosts only when those paths run.
@@ -203,6 +207,12 @@ remains in the repo but is no longer registered anywhere.
 - Update `memory.md` (work log) and `prompts.md` (request log) each session;
   increment their workflow version and delta. Bump `pyproject.toml` for source
   changes; workflow, package, store and protocol versions have separate scopes.
+
+## Maintained wiki
+
+[Project wiki](docs/wiki/README.md) indexes verified commands, API guides,
+operations, tests and the maintenance audit. Current source controls the facts;
+historical deployment receipts do not establish current fleet health.
 
 ## Docs map
 
@@ -343,6 +353,11 @@ Explicit supersession retains historical assertions and uses half-open valid
 intervals; ingestion time does not establish real-world validity.
 
 ## Deployment topology
+
+The checked-in `.mcp.json` currently starts the local stdio server with a
+loopback Ollama override. The fleet topology below is a historical deployment
+reference; this maintenance did not verify or activate installed services.
+
 
 Production topology (three-machine fleet, canonical consolidator on the
 always-on Linux box, launchd/systemd variants, security model) is documented
@@ -565,6 +580,12 @@ directly). Core pipeline needs none.
 - **Consolidator skips a file** — non-`.md` extensions are ignored; unreadable
   or non-UTF-8 files are logged and skipped.
 
+## Full integration test setup
+
+The complete discovery suite requires `python -m pip install -e '.[ollama]'` and private Git access.
+The core installation remains dependency-free. See [Testing](TESTING.md) for
+the core-only CI suite and all validation commands.
+
 ## Source: docs/TESTING.md
 
 # Testing
@@ -594,14 +615,37 @@ not a runtime dependency.
 
 ## Suites and risky paths
 
-| Suite | Observable behavior |
-|---|---|
-| `test_napmem_pipeline.py` | Heuristic taxonomy, exact dedup, stable IDs, duplicate promotion, provenance, derived layers, sentinel neutralization |
-| `test_napmem_extensions.py` | Schema gates and safe rejection logs, mocked extraction chains, sweep-state recovery, hashed embeddings, host failover, MCP subprocess integration |
-| `test_napmem_failover.py` | Remote/local lifecycle with fake children, strict handshake replay, timeout and malformed-output recovery, mirror refresh configuration and atomicity |
-| `test_napmem_regressions.py` | Reasserted metadata/wording, disposable cache validation, dimension changes, deletion/empty persistence, exact text hashes, result-count bounds |
-| `test_napmem_protocol.py` | Protocol envelopes, silent notifications, bounded input reads, decoder failures and continued serving |
-| `test_napmem_safety.py` | Prompt CPU deadline and extracted shell mirror function on isolated filesystem fixtures |
+| Suite | Cases | Observable behavior |
+|---|---:|---|
+| `test_napmem_adapters.py` | 16 | Synthetic, offline source interoperability and control-replay acceptance. |
+| `test_napmem_cli.py` | 25 | Portable configuration and CLI behavior against synthetic temporary stores. |
+| `test_napmem_controls.py` | 21 | Pure replay, deletion-family and operator-preview tests. |
+| `test_napmem_controls_integration.py` | 9 | Operator controls remain effective across ingestion, cache and reload boundaries. |
+| `test_napmem_eval.py` | 17 | Deterministic, network-free evidence scorer and benchmark contract tests. |
+| `test_napmem_evidence.py` | 26 | Offline tests for literal source binding and explicitly allowed file checks. |
+| `test_napmem_evidence_extraction.py` | 16 | Offline checks for exact extraction inputs and untrusted model quotations. |
+| `test_napmem_evidence_forget.py` | 13 | Forgetting erases literal source evidence without deleting unrelated facts. |
+| `test_napmem_extensions.py` | 58 | Tests for the production-path extensions: LLM extractor parsing/validation, |
+| `test_napmem_failover.py` | 22 | Tests for napmem_mcp_failover.py — the remote-SSH / local-mirror MCP proxy. |
+| `test_napmem_inspector.py` | 31 | Offline operator inspection, provenance boundaries and exact budgets. |
+| `test_napmem_jobs.py` | 16 | Offline durable queue, lease, cloud-resume and atomic-commit tests. |
+| `test_napmem_lifecycle.py` | 7 | Integration gates for compatible scoped assertion ingestion. |
+| `test_napmem_maintenance.py` | 34 | Synthetic adversarial maintenance regressions; no providers or live stores. |
+| `test_napmem_mcp_contract.py` | 22 | Typed MCP contracts, strict pre-load validation and complete wire budgets. |
+| `test_napmem_metrics.py` | 30 | Content-free local metrics, retention and strictly read-only status tests. |
+| `test_napmem_model.py` | 24 | Pure scoped assertion, migration and derived-view tests. |
+| `test_napmem_optional_client.py` | 5 | Offline core acceptance with the optional Ollama package made unimportable. |
+| `test_napmem_pipeline.py` | 9 | Integration test for NapMem + Document Distiller Memory Pipeline |
+| `test_napmem_protocol.py` | 9 | Offline regressions for the stdlib MCP protocol boundary. |
+| `test_napmem_provenance.py` | 6 | Source proof, profile admission and explicit re-verification at public boundaries. |
+| `test_napmem_regressions.py` | 16 | Offline regression checks for store reconciliation and disposable caches. |
+| `test_napmem_retrieval_contract.py` | 8 | Public retrieval adapters preserve scope, offline defaults and budgets. |
+| `test_napmem_safety.py` | 4 | Offline regressions for prompt CPU bounds and wrapper filesystem safety. |
+| `test_napmem_search.py` | 24 | Offline search safety, ranking and exact serialized-budget tests. |
+| `test_napmem_snapshots.py` | 19 | Offline snapshot, checksum and atomic mirror generation tests. |
+| `test_napmem_sources.py` | 16 | Offline stable identity, guarded collection and source lifecycle tests. |
+| `test_napmem_transactions.py` | 21 | Single-host writer isolation, commit boundaries and stale-reader privacy. |
+| `test_napmem_trusted_loop.py` | 2 | Actual offline CLI/MCP loop from scoped sources through correction and restore. |
 
 Tests use temporary stores, hashed vectors, mocked HTTP/SDK calls and local
 fake child processes. The wrapper test extracts `mirror()` without running
@@ -623,7 +667,7 @@ old quadratic implementation cannot wedge the runner.
 
 `.github/workflows/ci.yml` runs compilation, unittest discovery, generated-map
 checks and shell syntax on Python 3.11, 3.12 and 3.14. A separate Ruff job
-checks configured syntax/correctness rules. Both jobs must pass. CI reads the
+checks configured syntax/correctness rules. All five trusted-PR jobs must pass. Fork PRs run lint and the core-only install/test job; private-client integration is explicitly skipped. CI reads the
 shared library with the repository's `OLLAMA_CLIENT_DEPLOY_KEY` secret, at the same
 Git revision pinned in `pyproject.toml`.
 
@@ -633,6 +677,34 @@ available to that job. Local acceptance receipts record its equivalent checks.
 
 Local tests prove source behavior. They do not prove production deployment,
 scheduler health, remote authentication, live Ollama quality or hook loading.
+
+## Whole-process isolation
+
+CI installs declared dependencies before executing tests. Ubuntu test/evaluation
+and installed-CLI steps use `sudo unshare --net` with no interfaces enabled,
+including loopback. `env -i` supplies only PATH and fresh HOME, TMPDIR,
+XDG config/cache/data, auth and model roots, with offline/hashed mode. A proof
+checks parent and spawned-child loopback/external denial before the full suite.
+No cached model computation is an acceptable substitute for a provider mock.
+
+The 2026-11-12 macOS maintenance run used `sandbox-exec` network denial for
+all descendants and proved parent/child denial plus a separate proof-only owned
+fixture exception. The actual suite allowed no endpoints. Baseline:486 tests,
+one reproducible failover timing failure. Final counts and commands are in the
+[optimizer report](code-deep-optimizer-2026-11-12.md). This verifies fixtures,
+protocols, local subprocesses and installed packaging, not production services.
+
+## Offline evaluation eligibility
+
+`memory_quality_v1.json` has100 dev and100 heldout synthetic cases. The
+must-pass surface is the normal suite, compilation, Ruff, maps, shell syntax
+and frozen `hybrid_regression_v2.json` gate. Run development evaluation with
+`python napmem_eval.py --mode hybrid --split dev`; the heldout regression
+command is `python napmem_eval.py --mode hybrid --split heldout --check-baseline evaluations/hybrid_regression_v2.json`.
+No tests/evals invoke real SDK, model, embedding, SSH or external APIs. The
+historically reused heldout set is regression evidence, not a fresh blind
+quality estimate. This run preserves the fixture and threshold bytes, performs
+no model benchmark or global champion promotion, and makes no quality-gain claim.
 
 ## Source: docs/known-issues.md
 
@@ -664,3 +736,47 @@ fleet health; installed acceptance records its exact runtime separately.
 - **No speculative dashboard or service migration.** This release keeps JSON
   canonical and adds stdlib SQLite for jobs. It does not add a hosted service,
   graph database or competing Stele task interface.
+
+## Maintenance choices and unverified surfaces
+
+- Creation identity can be unavailable on older filesystems or old registry rows.
+  Rename inference then fails conservatively; explicit session mapping is required.
+- Synthetic frozen heldout results are regression evidence. Earlier feature work
+  inspected that split, so they do not provide a new blind quality estimate.
+- Optional Anthropic is intentionally not version-locked. Its supported version
+  range and transitive advisory coverage remain maintainer choices; sampled public
+  metadata is not a complete dependency safety attestation.
+- The generic mdb-tam operation registry, centralized error JSONL service, dashboard
+  cards, remediation engine and global skill installation remain accepted
+  architecture/scope exceptions. Existing CLI/MCP, queue receipts and stdlib logs
+  describe actual behavior. Full mdb-tam service parity is not claimed.
+- Private-client integration CI requires repository credentials. Forks run core
+  tests and fresh offline installation; the full optional-client matrix runs on
+  trusted branches. No pull-request-target execution or secret exposure is added.
+
+## Source: docs/wiki/README.md
+
+# NapMem project wiki
+
+Use Python 3.11+ and the default dependency-free offline CLI. Start with
+[Installation](../INSTALLATION.md), [CLI](../CLI.md) and [Development](../DEVELOPMENT.md).
+
+| Question | Maintained reference |
+|---|---|
+| What are the processes, stores and invariants? | [Architecture](../ARCHITECTURE.md), [Components](../COMPONENTS.md), [file map](../codebase-overview.md) |
+| Which assertions can be recalled or approved? | [Retrieval](../RETRIEVAL.md), [Provenance](../PROVENANCE.md), [Controls](../CONTROLS.md) |
+| How do jobs, snapshots and source identity work? | [Persistence](../PERSISTENCE.md), [Adapters](../ADAPTERS.md) |
+| How do clients and the inspector behave? | [MCP](../MCP.md), [Inspector](../INSPECTOR.md) |
+| Which commands verify a change? | [Testing](../TESTING.md), [Contributing](../../CONTRIBUTING.md) |
+| What can leave the machine? | [Security](../SECURITY.md), [external calls](../external-calls.md), [integrations](../integrations-and-assumptions.md) |
+| Where are logs, cache and status? | [Logging](../logging.md), [Observability](../OBSERVABILITY.md), [Caching](../caching-and-optimization.md) |
+| How is a sweep operated or recovered? | [Runbook](../runbooks/run-naptime-consolidator.md), [deployment reference](../../deploy/README.md) |
+| What is verified and what remains limited? | [Known issues](../known-issues.md), [bootstrap audit](../repo-bootstrap-audit-2026-11-12.md), [optimizer report](../code-deep-optimizer-2026-11-12.md) |
+| What is the product direction? | [Roadmap](../product-roadmap-2026-10-27.md), [requirements](../requirements.md) |
+
+Verified source commands: `python -m unittest discover -s . -p "test_*.py"`
+(with the optional Ollama test extra), `ruff check .`,
+`python -m compileall -q .`, `python scripts/repo_docs.py --check`,
+`bash -n scripts/run-naptime.sh`, and the offline regression gate in Testing.
+Refresh static maps with `python scripts/repo_docs.py`. Semantic generation,
+service activation and private data imports require their own explicit scope.

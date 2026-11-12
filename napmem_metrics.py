@@ -16,6 +16,7 @@ import json
 import math
 import os
 import sqlite3
+from contextlib import closing
 import stat
 from typing import Any
 from urllib.parse import quote
@@ -246,8 +247,9 @@ class MetricsStore:
 
     def feedback(self, record_id: str, rating: str, scope: str | None = None) -> dict[str, Any]:
         """Explicit opinion; neither rating nor repeated feedback establishes truth."""
+        candidate = candidate_hash(record_id, scope)
         fields = {"record_hash": hashlib.sha256(record_id.encode()).hexdigest() if isinstance(record_id, str) else None,
-                  "candidate_hash": candidate_hash(record_id, scope), "scope_hash": hash_scope(scope), "rating": rating}
+                  "candidate_hash": candidate, "scope_hash": hash_scope(scope), "rating": rating}
         _validate_fields("feedback", fields, feedback=True)
         return {**self._append("feedback", fields, replace_candidate=True), "candidate_hash": fields["candidate_hash"]}
 
@@ -435,6 +437,8 @@ def _jobs_status(path, scope, at):
     except FileNotFoundError:
         return {"status": "missing", "states": dict.fromkeys(_JOB_STATES, 0), "row_cap": JOB_STATUS_CAP,
                 "counts_complete": True, "rows_examined": 0, "oldest_pending_lag_seconds": None}
+    except OSError:
+        return {"status": "invalid", "states": None, "row_cap": JOB_STATUS_CAP, "counts_complete": False}
     try:
         if not stat.S_ISREG(details.st_mode) or details.st_nlink != 1:
             raise ValueError("Unsafe job metadata file")
@@ -444,7 +448,7 @@ def _jobs_status(path, scope, at):
         elif scope != "*":
             condition, parameters = " WHERE scope IN (?, 'global')", [scope]
         uri = "file:" + quote(os.path.abspath(job_path), safe="/") + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=1) as db:
+        with closing(sqlite3.connect(uri, uri=True, timeout=1)) as db:
             db.execute("PRAGMA query_only=ON")
             db.execute("PRAGMA temp_store=MEMORY")
             rows = db.execute("SELECT state,created_at FROM jobs" + condition + " ORDER BY created_at,id LIMIT ?",

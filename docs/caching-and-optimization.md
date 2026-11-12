@@ -1,29 +1,24 @@
 # Caching and optimization
 
-## Cache layers
+The canonical JSON store is durable memory, not a disposable cache. Whole-operation
+writer locks and generation/fingerprint checks protect same-host writers.
 
-- **Consolidator mtime cache** (`file_timestamps`, in-memory): skips
-  unchanged files within a process lifetime. Invalidation: *any* mtime change
-  (not strictly-newer — see ADR-5). Cold start re-ingests everything; this is
-  correct because re-ingestion is idempotent (stable IDs).
-- **Dedup index** (`existing_texts` dict, per-merge): O(1) exact-text lookup
-  built per `deduplicate_and_merge` call.
+| Layer | Identity and invalidation |
+|---|---|
+| Source registry (`.sources.json`) | Stable path/device/inode/creation identity; missing files retain metadata. Unsupported creation identity requires an explicit session mapping after rename. |
+| Sweep watermark (`.sweepstate.json`) | Persistent content digest and mtime; unchanged sources skip extraction only while their session remains in the canonical store. Invalid state is disposable. |
+| Embedding cache (`.embindex.json`) | Exact input hash and backend/model/dimensions. Explicit authoritative rebuild clears removed records; scope-filtered queries retain other scopes' cached vectors. Stale canonical fingerprints refuse writes. |
+| Retrieval working data | Offline BM25/sparse TF-IDF over eligible records. No default model discovery or embedding cache writes in `query()`. |
+| Job SQLite database | Durable leased work, not a cache. Terminal jobs clear source/result payloads. Unknown submission outcomes require operator reconciliation. |
 
-There is no persistent cache; the pyramid store itself is the durable artifact.
+Budget pruning preserves complete entries. Heap ordering and binary search avoid
+repeatedly serializing every remaining item for each deletion. Portable export
+probes small groups before binary search, so tiny budgets do not first materialize
+half the store. Literal numeric/path matching rejects identifier prefixes while
+ordinary acronym morphology remains lexical approximation.
 
-## Performance characteristics
-
-- Extraction is single-pass line-oriented — O(lines).
-- Reconciliation and rebuild are O(records) per ingest; the whole store is
-  rewritten each save (atomic replace). Fine for the intended scale
-  (thousands of records); a store measured in hundreds of MB would need an
-  incremental backend.
-- Retrieval search is linear substring scan over records/tracks/profiles — no
-  index. Acceptable at current scale; an inverted index or embeddings are the
-  upgrade path.
-
-## The optimization that matters
-
-The system's purpose *is* an optimization: `compute_context_budget_savings()`
-measures token compression of distilled layers vs raw logs, honestly scoped to
-sessions whose raw files are still readable.
+The JSON store still rewrites the complete snapshot on commit. Scope, source and
+privacy controls stay authoritative. Real embeddings, model quality and production
+performance were not benchmarked. For safe profiling, use synthetic stores with
+`NAPMEM_EMBED_BACKEND=hashed`, an empty data/config home and network isolation;
+run the ordinary commands in [Testing](TESTING.md) under that boundary.
